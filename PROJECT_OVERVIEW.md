@@ -46,6 +46,10 @@ src/
 *   **Storage:** SD Card (SPI, CS=5) for CSV data logging.
 
 ### Software Logic
+*   **HX711 Filtering (Hybrid EMA):** 
+    *   **Smoothing:** Uses an Exponential Moving Average (EMA) with $\alpha=0.2$ to eliminate drift and noise.
+    *   **Responsiveness:** Snaps instantly to raw values if a change $>0.5$ L is detected (object added/removed).
+    *   **Safety:** Rejects readings outside $-5.0$ to $70.0$ L and floors results at $0.0$ L.
 *   **State Machine:**
     *   `SYSTEM_INIT` → `START_MENU` (after splash)
     *   `NEW_BREW_WIZARD`: Volume check (min 10 L) before starting brew.
