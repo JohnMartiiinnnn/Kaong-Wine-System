@@ -79,6 +79,9 @@ bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
 bool lastLjRight = false, lastLjLeft = false, lastLjUp = false,
      lastLjDown = false, lastLjSelect = false;
 
+// ---- HX711 EMA seed flag (file-scope so tare handler can reset it) ----
+static bool hx711WeightSeeded = false;
+
 // ---- Fan Speed Helper ----
 void setFanSpeed(int percent) {
   if (percent < 0)
@@ -436,8 +439,11 @@ void loop() {
       drawCalibrationPage();
     } else if (currentAppState == CALIBRATION_MODE) {
       if (calSelection == 0) {
-        if (hx711Status)
+        if (hx711Status) {
           scale.tare();
+          currentWeight     = 0.0f;
+          hx711WeightSeeded = false; // re-seed EMA from new zero reference
+        }
         drawCalibrationPage();
       } else if (calSelection == 2) {
         currentAppState = SENSOR_MONITOR;
@@ -565,15 +571,12 @@ void loop() {
   // HX711 EMA with spike rejection
   if (hx711Status && scale.is_ready()) {
     float rawW = scale.get_units(1);
-    static bool weightSeeded = false;
-    if (!weightSeeded) {
-      currentWeight = rawW;
-      weightSeeded = true;
-    } else if (abs(rawW - currentWeight) < 3.0) {
-      // reject spikes >3L from current — only smooth plausible readings
+    if (!hx711WeightSeeded) {
+      currentWeight      = rawW;
+      hx711WeightSeeded  = true;
+    } else if (abs(rawW - currentWeight) < 3.0f) {
       currentWeight = (currentWeight * 0.95f) + (rawW * 0.05f);
     }
-    // snap to zero when the vat is effectively empty
     if (currentWeight < 0.3f && currentWeight > -0.3f)
       currentWeight = 0.0f;
   }
