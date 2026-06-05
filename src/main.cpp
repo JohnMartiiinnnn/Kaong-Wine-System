@@ -43,7 +43,8 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 26927.0; // calibrated: 0.75L actual → 0.888 reading @ 22742.666
+float calibrationFactor =
+    -157693.0; // MBA M1 (1.29 kg) read -7.555 @ 26927 → negated + rescaled
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -441,7 +442,7 @@ void loop() {
       if (calSelection == 0) {
         if (hx711Status) {
           scale.tare();
-          currentWeight     = 0.0f;
+          currentWeight = 0.0f;
           hx711WeightSeeded = false; // re-seed EMA from new zero reference
         }
         drawCalibrationPage();
@@ -571,12 +572,25 @@ void loop() {
   // HX711 EMA with spike rejection
   if (hx711Status && scale.is_ready()) {
     float rawW = scale.get_units(1);
-    if (!hx711WeightSeeded) {
-      currentWeight      = rawW;
-      hx711WeightSeeded  = true;
-    } else if (abs(rawW - currentWeight) < 3.0f) {
-      currentWeight = (currentWeight * 0.95f) + (rawW * 0.05f);
+    static uint8_t spikeCount = 0;
+    if (rawW < -20.0f || rawW > 50.0f) {
+      // discard ADC overflow glitch
+      spikeCount = 0;
+    } else if (!hx711WeightSeeded || abs(rawW - currentWeight) > 30.0f) {
+      currentWeight = rawW;
+      hx711WeightSeeded = true;
+      spikeCount = 0;
+    } else if (abs(rawW - currentWeight) < 1.0f) {
+      currentWeight = (currentWeight * 0.97f) + (rawW * 0.03f);
+      spikeCount = 0;
+    } else {
+      // reading is 1–30 from EMA: likely EMI spike, but re-seed if sustained
+      if (++spikeCount >= 30) {
+        currentWeight = rawW;
+        spikeCount = 0;
+      }
     }
+    Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
   }
 
   // Wizard weight fast refresh (250ms) — only wizard needs this rate;
