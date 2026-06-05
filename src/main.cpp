@@ -43,7 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 26927.0; // Corrected factor: MBA M1 (1.29kg) now reads ~1.29L
+float calibrationFactor = 27553.0; // Fine-tuned: MBA M1 (1.29kg) reads exactly 1.29L
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -568,7 +568,7 @@ void loop() {
     }
   }
 
-  // HX711 Slow-Sample Filter (1Hz)
+  // HX711 Snap-on-Change Filter (1Hz)
   static uint32_t lastScaleMillis = 0;
   if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
     lastScaleMillis = millis();
@@ -581,8 +581,8 @@ void loop() {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } 
     else {
-      // 2. Treat small negative drift as 0.0 for the EMA
-      float inputW = (rawW < 0.0f) ? 0.0f : rawW;
+      // 2. Treat small negative drift as 0.0
+      float inputW = (rawW < 0.01f) ? 0.0f : rawW;
 
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
@@ -591,22 +591,17 @@ void loop() {
       else {
         float diff = abs(inputW - currentWeight);
         
-        if (diff < 0.05f) {
-          // Micro-fluctuation: Lock display
-        }
-        else if (diff < 0.5f) {
-          // Small change: Smooth it in
-          currentWeight = (currentWeight * 0.7f) + (inputW * 0.3f);
+        // 3. Snap-on-Change Logic
+        if (diff > 0.02f) {
+          // Significant change: Update instantly
+          currentWeight = inputW;
         } 
         else {
-          // Real change (Pouring or Removing): Snap quickly
-          currentWeight = (currentWeight * 0.3f) + (inputW * 0.7f);
+          // Tiny jitter: Keep the display locked
         }
       }
-      // Floor final currentWeight at 0.0 for UI safety
-      if (currentWeight < 0.001f) currentWeight = 0.0f;
       
-      Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
+      Serial.printf("raw=%.4f  ema=%.4f (Instant)\n", rawW, currentWeight);
     }
   }
 
