@@ -161,6 +161,7 @@ void drawDashboardLayout() {
       tft.drawCentreString("PH LEVEL",   240, y + 130, 2);
       tft.drawCentreString("SIGNAL",     80,  y + 210, 2);
       tft.drawCentreString("BATTERY",    240, y + 210, 2);
+      tft.drawCentreString("MIXER",      CENTER_X, y + 285, 2);
     } else if (dashSelection == 2) {
       tft.drawCentreString("PAST. TEMP",     CENTER_X, y + 60,  2);
       tft.drawCentreString("PROCESS STATUS", CENTER_X, y + 130, 2);
@@ -297,6 +298,46 @@ void drawSensorMonitorPage(bool valuesOnly) {
   rv(8, b, false);
 
   tft.setTextPadding(0);
+}
+
+void drawMixerMenu() {
+  tft.fillScreen(TFT_WHITE);
+  tft.fillRect(0, 0, 320, 50, TFT_NAVY);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawCentreString("MIXER CONTROL", CENTER_X, 15, 4);
+
+  const char   *modeTxt[]    = {"OFF", "MANUAL", "AUTO"};
+  uint16_t      modeColors[] = {TFT_RED, 0x0400, 0x001F};
+
+  tft.fillRect(20, 80, 280, 120, modeColors[currentMixerMode]);
+  tft.drawRect(20, 80, 280, 120, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, modeColors[currentMixerMode]);
+  tft.drawCentreString("MIXER MODE", CENTER_X, 100, 2);
+  tft.drawCentreString(modeTxt[currentMixerMode], CENTER_X, 127, 4);
+  tft.drawCentreString("(SELECT TO CYCLE)", CENTER_X, 178, 2);
+
+  tft.fillRect(20, 220, 280, 120, 0xD6BA);
+  tft.drawRect(20, 220, 280, 120, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString("SPEED", CENTER_X, 240, 2);
+  char buf[32];
+  sprintf(buf, "%d%%", mixerSpeedPercent);
+  tft.drawCentreString(buf, CENTER_X, 262, 4);
+  if (currentMixerMode == MIXER_MANUAL)
+    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 318, 2);
+  else
+    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 318, 2);
+
+  if (currentMixerMode == MIXER_AUTO) {
+    uint16_t statusColor = mixerRunning ? 0x0400 : 0x3566;
+    tft.fillRect(20, 360, 280, 50, statusColor);
+    tft.drawRect(20, 360, 280, 50, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, statusColor);
+    tft.drawCentreString(mixerRunning ? "RUNNING" : "STANDBY", CENTER_X, 377, 2);
+  }
+
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO EXIT", CENTER_X, 440, 2);
 }
 
 void drawInitTile(int x, int y, const char *label, int status) {

@@ -42,12 +42,16 @@ const int SD_CS_PIN = 5;
 const int pwmFreq = 25000;
 const int pwmChannel = 0;
 const int pwmResolution = 8;
+const int MOTOR_PWM_PIN     = 0;
+const int MOTOR_PWM_CHANNEL = 1;
+const int MOTOR_PWM_FREQ    = 1000;
 const int HX711_DT_PIN = 36;
 const int HX711_SCK_PIN = 27;
 const int CENTER_X = 160;
 
 // ---- Enums ----
 enum FanMode { FAN_OFF, FAN_ON, FAN_AUTO };
+enum MixerMode { MIXER_OFF, MIXER_MANUAL, MIXER_AUTO };
 
 enum AppState {
   SYSTEM_INIT,
@@ -55,9 +59,13 @@ enum AppState {
   NEW_BREW_WIZARD,
   DASHBOARD_ACTIVE,
   COOLING_MENU,
+  MIXER_MENU,
   SENSOR_MONITOR,
   CALIBRATION_MODE
 };
+
+const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
+const uint32_t MIXER_OFF_MS = 355UL * 60 * 1000;
 
 // ---- UART Data Struct (shared with Secondary) ----
 typedef struct __attribute__((packed)) {
@@ -115,6 +123,11 @@ extern int estopState;
 extern uint32_t estopTimer;
 extern int returnConfirmState;
 extern uint32_t returnConfirmTimer;
+extern int mixerSpeedPercent;
+extern MixerMode currentMixerMode;
+extern bool mixerRunning;
+extern uint32_t mixerOnTimer;
+extern uint32_t mixerCycleTimer;
 
 // ---- UI / App State ----
 extern AppState currentAppState;

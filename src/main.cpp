@@ -59,6 +59,11 @@ int estopState = 0;
 uint32_t estopTimer = 0;
 int returnConfirmState = 0;
 uint32_t returnConfirmTimer = 0;
+int mixerSpeedPercent = 0;
+MixerMode currentMixerMode = MIXER_OFF;
+bool mixerRunning = false;
+uint32_t mixerOnTimer = 0;
+uint32_t mixerCycleTimer = 0;
 
 // ---- UI / App State ----
 AppState currentAppState = SYSTEM_INIT;
@@ -93,10 +98,22 @@ void setFanSpeed(int percent) {
   ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
 }
 
+// ---- Mixer Speed Helper ----
+void setMixerSpeed(int percent) {
+  if (percent < 0)
+    percent = 0;
+  if (percent > 100)
+    percent = 100;
+  mixerSpeedPercent = percent;
+  ledcWrite(MOTOR_PWM_CHANNEL, map(percent, 0, 100, 0, 255));
+}
+
 // ---- Setup ----
 void setup() {
   pinMode(PWM_PIN, OUTPUT);
   digitalWrite(PWM_PIN, HIGH);
+  pinMode(MOTOR_PWM_PIN, OUTPUT);
+  digitalWrite(MOTOR_PWM_PIN, LOW);
 
   Serial.begin(115200);
   pinMode(15, OUTPUT);
@@ -166,6 +183,9 @@ void setup() {
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
   setFanSpeed(0);
+  ledcSetup(MOTOR_PWM_CHANNEL, MOTOR_PWM_FREQ, pwmResolution);
+  ledcAttachPin(MOTOR_PWM_PIN, MOTOR_PWM_CHANNEL);
+  setMixerSpeed(0);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
   WiFi.softAP("WineBrew_System", "12345678");
@@ -200,6 +220,9 @@ void loop() {
         mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
+      setMixerSpeed(0);
+      currentMixerMode = MIXER_OFF;
+      mixerRunning = false;
       tft.fillScreen(TFT_RED);
       tft.setTextColor(TFT_WHITE);
       tft.drawCentreString("SYSTEM HALTED", 160, 100, 4);
@@ -349,6 +372,12 @@ void loop() {
         currentSpeedPercent = 100;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
+    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+      mixerSpeedPercent -= 10;
+      if (mixerSpeedPercent < 0)
+        mixerSpeedPercent = 100;
+      setMixerSpeed(mixerSpeedPercent);
+      drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 1) % 3;
       drawCalibrationPage();
@@ -372,6 +401,12 @@ void loop() {
         currentSpeedPercent = 0;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
+    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+      mixerSpeedPercent += 10;
+      if (mixerSpeedPercent > 100)
+        mixerSpeedPercent = 0;
+      setMixerSpeed(mixerSpeedPercent);
+      drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 2) % 3;
       drawCalibrationPage();
@@ -419,7 +454,29 @@ void loop() {
       } else if (dashSelection == 0) {
         currentAppState = COOLING_MENU;
         drawCoolingMenu();
+      } else if (dashSelection == 1) {
+        currentAppState = MIXER_MENU;
+        drawMixerMenu();
       }
+    } else if (currentAppState == MIXER_MENU) {
+      if (currentMixerMode == MIXER_OFF) {
+        currentMixerMode = MIXER_MANUAL;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      } else if (currentMixerMode == MIXER_MANUAL) {
+        currentMixerMode = MIXER_AUTO;
+        mixerRunning = true;
+        mixerOnTimer = millis();
+        mixerCycleTimer = 0;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      } else {
+        currentMixerMode = MIXER_OFF;
+        mixerRunning = false;
+        mixerSpeedPercent = 0;
+        setMixerSpeed(0);
+      }
+      drawMixerMenu();
     } else if (currentAppState == COOLING_MENU) {
       if (currentFanMode == FAN_OFF) {
         currentFanMode = FAN_ON;
@@ -479,6 +536,11 @@ void loop() {
         drawReturnConfirmation();
       }
     } else if (currentAppState == COOLING_MENU) {
+      currentAppState = DASHBOARD_ACTIVE;
+      moduleViewActive = true;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+    } else if (currentAppState == MIXER_MENU) {
       currentAppState = DASHBOARD_ACTIVE;
       moduleViewActive = true;
       dashNeedsFullRedraw = true;
@@ -601,6 +663,26 @@ void loop() {
     drawNewBrewWizard();
   }
 
+  // Auto-mixing scheduler
+  if (currentMixerMode == MIXER_AUTO) {
+    uint32_t now = millis();
+    if (mixerRunning) {
+      if (now - mixerOnTimer >= MIXER_ON_MS) {
+        mixerRunning = false;
+        mixerCycleTimer = now;
+        mixerSpeedPercent = 0;
+        setMixerSpeed(0);
+      }
+    } else {
+      if (now - mixerCycleTimer >= MIXER_OFF_MS) {
+        mixerRunning = true;
+        mixerOnTimer = now;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      }
+    }
+  }
+
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
@@ -670,6 +752,14 @@ void loop() {
         tft.drawCentreString(buf, 80, y + 235, 4);
         sprintf(buf, "%d%%", incomingData.pillBattery);
         tft.drawCentreString(buf, 240, y + 235, 4);
+        tft.setTextPadding(280);
+        const char *mxTxt[] = {"OFF", "MANUAL", "AUTO"};
+        if (currentMixerMode == MIXER_AUTO) {
+          tft.drawCentreString(mixerRunning ? "AUTO: RUNNING" : "AUTO: STANDBY", CENTER_X, y + 310, 2);
+        } else {
+          sprintf(buf, "%s: %d%%", mxTxt[currentMixerMode], mixerSpeedPercent);
+          tft.drawCentreString(buf, CENTER_X, y + 310, 2);
+        }
 
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);
