@@ -43,8 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor =
-    -157693.0; // MBA M1 (1.29 kg) read -7.555 @ 26927 → negated + rescaled
+float calibrationFactor = 22850.0; // Corrected factor: 52L measured -> 58L actual
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -631,28 +630,44 @@ void loop() {
     }
   }
 
-  // HX711 EMA with spike rejection
-  if (hx711Status && scale.is_ready()) {
-    float rawW = scale.get_units(1);
-    static uint8_t spikeCount = 0;
-    if (rawW < -20.0f || rawW > 50.0f) {
-      // discard ADC overflow glitch
-      spikeCount = 0;
-    } else if (!hx711WeightSeeded || abs(rawW - currentWeight) > 30.0f) {
-      currentWeight = rawW;
-      hx711WeightSeeded = true;
-      spikeCount = 0;
-    } else if (abs(rawW - currentWeight) < 1.0f) {
-      currentWeight = (currentWeight * 0.97f) + (rawW * 0.03f);
-      spikeCount = 0;
-    } else {
-      // reading is 1–30 from EMA: likely EMI spike, but re-seed if sustained
-      if (++spikeCount >= 30) {
-        currentWeight = rawW;
-        spikeCount = 0;
+  // HX711 Hybrid EMA Filter (1Hz)
+  static uint32_t lastScaleMillis = 0;
+  if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
+    lastScaleMillis = millis();
+    
+    // Read 5 samples and average them (takes ~500ms)
+    float rawW = scale.get_units(5);
+    
+    // 1. Ignore extreme garbage (massive spikes)
+    if (rawW < -5.0f || rawW > 70.0f) {
+      Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
+    } 
+    else {
+      // 2. Treat small negative drift as 0.0
+      float inputW = (rawW < 0.05f) ? 0.0f : rawW;
+
+      if (!hx711WeightSeeded) {
+        currentWeight = inputW;
+        hx711WeightSeeded = true;
+      } 
+      else {
+        float diff = abs(inputW - currentWeight);
+        
+        if (diff > 0.5f) {
+          // Significant change (Object added/removed): Snap instantly
+          currentWeight = inputW;
+        } 
+        else {
+          // Small change or drift: Apply EMA smoothing (alpha = 0.2)
+          currentWeight = (currentWeight * 0.8f) + (inputW * 0.2f);
+        }
       }
+      
+      // Floor final currentWeight at 0.0 for UI safety
+      if (currentWeight < 0.001f) currentWeight = 0.0f;
+      
+      Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
     }
-    Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
   }
 
   // Wizard weight fast refresh (250ms) — only wizard needs this rate;
