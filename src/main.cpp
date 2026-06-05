@@ -43,7 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 25200.0; // Corrected factor: MBA M1 (1.29kg) now reads ~1.29L
+float calibrationFactor = 22850.0; // Corrected factor: 52L measured -> 58L actual
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -577,12 +577,12 @@ void loop() {
     float rawW = scale.get_units(5);
     
     // 1. Ignore extreme garbage (massive spikes)
-    if (rawW < -2.0f || rawW > 50.0f) {
+    if (rawW < -5.0f || rawW > 70.0f) {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } 
     else {
       // 2. Treat small negative drift as 0.0
-      float inputW = (rawW < 0.01f) ? 0.0f : rawW;
+      float inputW = (rawW < 0.05f) ? 0.0f : rawW;
 
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
