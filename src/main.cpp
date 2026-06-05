@@ -570,15 +570,22 @@ void loop() {
 
   // HX711 EMA with spike rejection
   if (hx711Status && scale.is_ready()) {
-    float rawW = scale.get_units(1);
+    long  rawADC = scale.read_average(1);      // raw 24-bit count (no calibration)
+    float rawW   = scale.get_units(1);         // after offset+scale division
+    // --- CALIBRATION DEBUG (remove after calibrating) ---
+    static uint32_t dbgT = 0;
+    if (millis() - dbgT > 500) {
+      dbgT = millis();
+      Serial.printf("[HX711] raw_adc=%ld  get_units=%.4f  ema=%.4f  factor=%.3f\n",
+                    rawADC, rawW, currentWeight, calibrationFactor);
+    }
+    // -----------------------------------------------------
     if (!hx711WeightSeeded) {
       currentWeight      = rawW;
       hx711WeightSeeded  = true;
     } else if (abs(rawW - currentWeight) < 3.0f) {
       currentWeight = (currentWeight * 0.95f) + (rawW * 0.05f);
     }
-    if (currentWeight < 0.3f && currentWeight > -0.3f)
-      currentWeight = 0.0f;
   }
 
   // Wizard weight fast refresh (250ms) — only wizard needs this rate;
