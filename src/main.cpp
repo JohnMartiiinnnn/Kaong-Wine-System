@@ -43,8 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor =
-    157693.0; // MBA M1 (1.29 kg) read -7.555 @ 26927 → negated + rescaled
+float calibrationFactor = 26927.0; // Corrected factor: MBA M1 (1.29kg) now reads ~1.29L
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -577,31 +576,37 @@ void loop() {
     // Read 5 samples and average them (takes ~500ms)
     float rawW = scale.get_units(5);
     
-    // 1. Ignore negatives and extreme garbage
-    if (rawW < 0.0f || rawW > 50.0f) {
-      // Do nothing, keep old weight
+    // 1. Ignore extreme garbage (massive spikes)
+    if (rawW < -2.0f || rawW > 50.0f) {
+      Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } 
     else {
+      // 2. Treat small negative drift as 0.0 for the EMA
+      float inputW = (rawW < 0.0f) ? 0.0f : rawW;
+
       if (!hx711WeightSeeded) {
-        currentWeight = rawW;
+        currentWeight = inputW;
         hx711WeightSeeded = true;
       } 
       else {
-        float diff = abs(rawW - currentWeight);
+        float diff = abs(inputW - currentWeight);
         
         if (diff < 0.05f) {
-          // Micro-fluctuation: Do absolutely nothing (Lock the display)
+          // Micro-fluctuation: Lock display
         }
         else if (diff < 0.5f) {
           // Small change: Smooth it in
-          currentWeight = (currentWeight * 0.7f) + (rawW * 0.3f);
+          currentWeight = (currentWeight * 0.7f) + (inputW * 0.3f);
         } 
         else {
-          // Real change (Pouring): Jump quickly to new value
-          currentWeight = (currentWeight * 0.3f) + (rawW * 0.7f);
+          // Real change (Pouring or Removing): Snap quickly
+          currentWeight = (currentWeight * 0.3f) + (inputW * 0.7f);
         }
       }
-      Serial.printf("Weight Update: %.4f L\n", currentWeight);
+      // Floor final currentWeight at 0.0 for UI safety
+      if (currentWeight < 0.001f) currentWeight = 0.0f;
+      
+      Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
     }
   }
 
