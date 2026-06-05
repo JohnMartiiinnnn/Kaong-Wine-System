@@ -44,7 +44,7 @@ struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor =
-    -157693.0; // MBA M1 (1.29 kg) read -7.555 @ 26927 → negated + rescaled
+    157693.0; // MBA M1 (1.29 kg) read -7.555 @ 26927 → negated + rescaled
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -569,28 +569,40 @@ void loop() {
     }
   }
 
-  // HX711 EMA with spike rejection
-  if (hx711Status && scale.is_ready()) {
-    float rawW = scale.get_units(1);
-    static uint8_t spikeCount = 0;
-    if (rawW < -20.0f || rawW > 50.0f) {
-      // discard ADC overflow glitch
-      spikeCount = 0;
-    } else if (!hx711WeightSeeded || abs(rawW - currentWeight) > 30.0f) {
-      currentWeight = rawW;
-      hx711WeightSeeded = true;
-      spikeCount = 0;
-    } else if (abs(rawW - currentWeight) < 1.0f) {
-      currentWeight = (currentWeight * 0.97f) + (rawW * 0.03f);
-      spikeCount = 0;
-    } else {
-      // reading is 1–30 from EMA: likely EMI spike, but re-seed if sustained
-      if (++spikeCount >= 30) {
+  // HX711 Slow-Sample Filter (1Hz)
+  static uint32_t lastScaleMillis = 0;
+  if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
+    lastScaleMillis = millis();
+    
+    // Read 5 samples and average them (takes ~500ms)
+    float rawW = scale.get_units(5);
+    
+    // 1. Ignore negatives and extreme garbage
+    if (rawW < 0.0f || rawW > 50.0f) {
+      // Do nothing, keep old weight
+    } 
+    else {
+      if (!hx711WeightSeeded) {
         currentWeight = rawW;
-        spikeCount = 0;
+        hx711WeightSeeded = true;
+      } 
+      else {
+        float diff = abs(rawW - currentWeight);
+        
+        if (diff < 0.05f) {
+          // Micro-fluctuation: Do absolutely nothing (Lock the display)
+        }
+        else if (diff < 0.5f) {
+          // Small change: Smooth it in
+          currentWeight = (currentWeight * 0.7f) + (rawW * 0.3f);
+        } 
+        else {
+          // Real change (Pouring): Jump quickly to new value
+          currentWeight = (currentWeight * 0.3f) + (rawW * 0.7f);
+        }
       }
+      Serial.printf("Weight Update: %.4f L\n", currentWeight);
     }
-    Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
   }
 
   // Wizard weight fast refresh (250ms) — only wizard needs this rate;
