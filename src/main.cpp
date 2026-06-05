@@ -43,7 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 22742.666;
+float calibrationFactor = 26927.0; // calibrated: 0.75L actual → 0.888 reading @ 22742.666
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -570,16 +570,7 @@ void loop() {
 
   // HX711 EMA with spike rejection
   if (hx711Status && scale.is_ready()) {
-    long  rawADC = scale.read_average(1);      // raw 24-bit count (no calibration)
-    float rawW   = scale.get_units(1);         // after offset+scale division
-    // --- CALIBRATION DEBUG (remove after calibrating) ---
-    static uint32_t dbgT = 0;
-    if (millis() - dbgT > 500) {
-      dbgT = millis();
-      Serial.printf("[HX711] raw_adc=%ld  get_units=%.4f  ema=%.4f  factor=%.3f\n",
-                    rawADC, rawW, currentWeight, calibrationFactor);
-    }
-    // -----------------------------------------------------
+    float rawW = scale.get_units(1);
     if (!hx711WeightSeeded) {
       currentWeight      = rawW;
       hx711WeightSeeded  = true;
