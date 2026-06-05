@@ -10,6 +10,6 @@ void drawDashboardLayout();
 void drawStartMenu();
 void drawValueTile(int x, int y, const char *label, String value, bool isError);
 void drawCalibrationValueTile(int y, const char *label, String value, bool isSelected);
-void drawCalibrationPage();
-void drawSensorMonitorPage();
+void drawCalibrationPage(bool valuesOnly = false);
+void drawSensorMonitorPage(bool valuesOnly = false);
 void drawInitTile(int x, int y, const char *label, int status);

@@ -562,18 +562,20 @@ void loop() {
     }
   }
 
-  // HX711 EMA with pre-EMA deadband
+  // HX711 EMA with spike rejection
   if (hx711Status && scale.is_ready()) {
     float rawW = scale.get_units(1);
-    if (rawW > -0.15 && rawW < 0.15)
-      rawW = 0.0;
     static bool weightSeeded = false;
     if (!weightSeeded) {
       currentWeight = rawW;
       weightSeeded = true;
-    } else {
-      currentWeight = (currentWeight * 0.9) + (rawW * 0.1);
+    } else if (abs(rawW - currentWeight) < 3.0) {
+      // reject spikes >3L from current — only smooth plausible readings
+      currentWeight = (currentWeight * 0.95f) + (rawW * 0.05f);
     }
+    // snap to zero when the vat is effectively empty
+    if (currentWeight < 0.3f && currentWeight > -0.3f)
+      currentWeight = 0.0f;
   }
 
   // Wizard weight fast refresh (250ms) — only wizard needs this rate;
@@ -600,10 +602,10 @@ void loop() {
     }
 
     if (currentAppState == SENSOR_MONITOR)
-      drawSensorMonitorPage();
+      drawSensorMonitorPage(true);
 
     if (currentAppState == CALIBRATION_MODE)
-      drawCalibrationPage();
+      drawCalibrationPage(true);
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;
