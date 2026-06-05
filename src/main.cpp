@@ -43,7 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 27553.0; // Fine-tuned: MBA M1 (1.29kg) reads exactly 1.29L
+float calibrationFactor = 25200.0; // Corrected factor: MBA M1 (1.29kg) now reads ~1.29L
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -568,7 +568,7 @@ void loop() {
     }
   }
 
-  // HX711 Snap-on-Change Filter (1Hz)
+  // HX711 Hybrid EMA Filter (1Hz)
   static uint32_t lastScaleMillis = 0;
   if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
     lastScaleMillis = millis();
@@ -591,17 +591,20 @@ void loop() {
       else {
         float diff = abs(inputW - currentWeight);
         
-        // 3. Snap-on-Change Logic
-        if (diff > 0.02f) {
-          // Significant change: Update instantly
+        if (diff > 0.5f) {
+          // Significant change (Object added/removed): Snap instantly
           currentWeight = inputW;
         } 
         else {
-          // Tiny jitter: Keep the display locked
+          // Small change or drift: Apply EMA smoothing (alpha = 0.2)
+          currentWeight = (currentWeight * 0.8f) + (inputW * 0.2f);
         }
       }
       
-      Serial.printf("raw=%.4f  ema=%.4f (Instant)\n", rawW, currentWeight);
+      // Floor final currentWeight at 0.0 for UI safety
+      if (currentWeight < 0.001f) currentWeight = 0.0f;
+      
+      Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
     }
   }
 
