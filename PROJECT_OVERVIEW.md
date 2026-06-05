@@ -42,10 +42,10 @@ src/
     *   **DS3231 RTC:** Real-time clock for logging timestamps.
 *   **Actuators:**
     *   **PWM (Pin 25):** 4-wire Fan speed control.
-    *   **PWM (Pin 0):** TB6612FN PWMA — mixing impeller speed (LEDC ch1, 1 kHz, 8-bit).
+    *   **PWM (TBD):** TB6612FN PWMA — mixing impeller speed (LEDC ch1, 1 kHz, 8-bit). GPIO pin not yet assigned — Primary ESP32 has no free output pins.
     *   **AC Dimmer:** Pins 12, 13, 14 for heating control; Pin 32 for Zero-Cross detection.
 *   **Motor Driver (TB6612FN):**
-    *   **PWMA → GPIO0** (ESP32 LEDC ch1, 1 kHz)
+    *   **PWMA → TBD** (GPIO pin pending — no free output pin on Primary ESP32)
     *   **AIN1 → 3.3 V** hardwired — fixed CW direction
     *   **AIN2 → GND** hardwired
     *   **STBY → 3.3 V** hardwired — always active
@@ -136,7 +136,7 @@ Controllers exchange data using a packed C-struct over `Serial2` at 115200 baud.
 | **AC ZC** | 32 | Zero Cross |
 | **AC DIM1** | 14, 12 | Dimmer Channels |
 | **AC DIM2** | 13 | Shared |
-| **Motor PWM** | 0 | TB6612FN PWMA (LEDC ch1) |
+| **Motor PWM** | TBD | TB6612FN PWMA (LEDC ch1) — no free GPIO currently |
 
 ---
 

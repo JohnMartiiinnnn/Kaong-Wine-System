@@ -42,7 +42,8 @@ const int SD_CS_PIN = 5;
 const int pwmFreq = 25000;
 const int pwmChannel = 0;
 const int pwmResolution = 8;
-const int MOTOR_PWM_PIN     = 0;
+// TODO: No free output GPIO exists on Primary ESP32 — resolve pin before production use.
+const int MOTOR_PWM_PIN     = -1;
 const int MOTOR_PWM_CHANNEL = 1;
 const int MOTOR_PWM_FREQ    = 1000;
 const int HX711_DT_PIN = 36;

@@ -1,8 +1,9 @@
 # Mixing Impeller — Setup, Pinout & Testing Guide
 
 **System:** Automated Kaong Wine Brewing System  
-**Component:** JGY370 12 V DC Worm Gear Motor + TB6612FN Motor Driver  
-**Controller:** Primary ESP32 (main firmware in `src/`)
+**Component:** JGY370 12 V DC Worm Gear Motor + TB6612FN Motor Driver
+
+Hardware testing is done on the **Secondary ESP32** using the `Motor_Test/` project. The production firmware (`src/`) runs on the Primary ESP32 — UI tests (Tests 3–5) verify software behavior only; the motor will not spin during those tests until the Primary ESP32 GPIO assignment is resolved.
 
 ---
 
@@ -10,14 +11,15 @@
 
 | Item | Specification |
 | :--- | :--- |
-| Microcontroller | ESP32-WROOM-32 (30-pin DevKit) |
+| ESP32 (bench test) | Secondary ESP32-WROOM-32 (30-pin DevKit) |
 | Motor driver | TB6612FNG dual H-bridge |
 | Motor | JGY370 12 V DC worm gear, 40–55 RPM |
 | Power supply | 12 V DC, minimum 2 A |
 | Logic supply | 3.3 V (from ESP32 onboard regulator) |
 | Wires | Jumper wires, 22 AWG or heavier for motor leads |
 | Multimeter | For voltage verification |
-| Optional | Oscilloscope or logic analyser (for PWM verification) |
+| USB cable + PC | For Serial Monitor |
+| Optional | Oscilloscope or logic analyser (PWM verification) |
 
 ---
 
@@ -36,7 +38,7 @@ TB6612FN (top view, DIP/breakout orientation)
 └─────────────────────────────┘
 ```
 
-### 2.2 Full Wiring Table
+### 2.2 Full Wiring Table (Bench Test — Secondary ESP32)
 
 | TB6612FN Pin | Connects to | Wire color (suggested) | Notes |
 | :--- | :--- | :--- | :--- |
@@ -44,57 +46,65 @@ TB6612FN (top view, DIP/breakout orientation)
 | **VCC** | 3.3 V (ESP32 3V3 pin) | Orange | Logic power |
 | **GND** | Common GND | Black | Tie to ESP32 GND and 12 V supply GND |
 | **STBY** | 3.3 V (ESP32 3V3 pin) | Orange | Hardwired HIGH — driver always active |
-| **AIN1** | 3.3 V (ESP32 3V3 pin) | Yellow | Hardwired HIGH — sets CW direction |
-| **AIN2** | GND | Black | Hardwired LOW — sets CW direction |
-| **PWMA** | ESP32 **GPIO0** | Blue | PWM speed signal from firmware |
+| **AIN1** | **GPIO26** (Secondary ESP32) | Yellow | Direction — HIGH = CW, LOW = CCW |
+| **AIN2** | **GPIO27** (Secondary ESP32) | Yellow | Direction — LOW = CW, HIGH = CCW |
+| **PWMA** | **GPIO25** (Secondary ESP32) | Blue | PWM speed signal from firmware |
 | **AO1** | Motor **+** terminal | Red | JGY370 positive lead |
 | **AO2** | Motor **–** terminal | Black | JGY370 negative lead |
 
 > Channel B (BIN1, BIN2, PWMB, BO1, BO2) is **not used**. Leave floating or tie to GND.
 
-### 2.3 ESP32 Pin Reference
+### 2.3 GPIO25 Location on Secondary ESP32 DevKit (30-pin)
+
+GPIO25 is on the **left side**, 9th pin from the top (counting 3V3 as pin 1).
 
 ```
-ESP32 DevKit (30-pin), relevant pins only:
-
-                    ┌──────────┐
-              GND ──┤          ├── 3V3
-              ...   │ ESP32    │   ...
-        GPIO0 (0) ──┤  WROOM   ├── ...   ← PWMA to TB6612FN
-              ...   │   32     │   ...
-              GND ──┤          ├── 3V3
-                    └──────────┘
-
-GPIO0 location: left column, near the bottom of the 30-pin DevKit.
-Label on board: "0" or "D0" depending on manufacturer.
+Secondary ESP32 — 30-pin DevKit
+         3V3  [ 1]  [30] GND
+          EN  [ 2]  [29] GPIO23
+       GPIO36 [ 3]  [28] GPIO22
+       GPIO39 [ 4]  [27] GPIO1  (TX0)
+       GPIO34 [ 5]  [26] GPIO3  (RX0)
+       GPIO35 [ 6]  [25] GPIO21
+       GPIO32 [ 7]  [24] GND
+       GPIO33 [ 8]  [23] GPIO19
+       GPIO25 [ 9]  [22] GPIO18  ← PWMA connects here
+       GPIO26 [10]  [21] GPIO5
+       GPIO27 [11]  [20] GPIO17
+       GPIO14 [12]  [19] GPIO16
+       GPIO12 [13]  [18] GPIO4
+         GND  [14]  [17] GPIO0
+       GPIO13 [15]  [16] GPIO2
 ```
 
 ### 2.4 Power Supply Wiring
 
 ```
 12 V DC Supply
-  (+) ─────────────────────── VM  (TB6612FN)
-  (–) ─────────────────────── GND (TB6612FN)
-                  │
-                  └─────────── GND (ESP32)   ← common ground required
+  (+) ──────── VM  (TB6612FN)
+  (–) ──────── GND (TB6612FN)
+       │
+       └──────── GND (ESP32)   ← common ground is required
 
 3.3 V (from ESP32 3V3 pin)
-  ─────────────────────────── VCC  (TB6612FN)
-  ─────────────────────────── STBY (TB6612FN)
-  ─────────────────────────── AIN1 (TB6612FN)
+  ──────────── VCC  (TB6612FN)
+  ──────────── STBY (TB6612FN)
+
+GPIO26 ──────── AIN1 (TB6612FN)   ← firmware-controlled direction
+GPIO27 ──────── AIN2 (TB6612FN)   ← firmware-controlled direction
 ```
 
-### 2.5 Complete Wiring Diagram (ASCII)
+### 2.5 Wiring Diagram — Bench Test (Secondary ESP32, GPIO25)
 
 ```
-ESP32                        TB6612FN                JGY370 Motor
-──────                       ────────                ────────────
+Secondary ESP32              TB6612FN                JGY370 Motor
+───────────────              ────────                ────────────
 3V3  ──────────────────────► VCC
 3V3  ──────────────────────► STBY
-3V3  ──────────────────────► AIN1
-GND  ──────────────────────► AIN2
+GPIO26 ────────────────────► AIN1
+GPIO27 ────────────────────► AIN2
 GND  ──────────────────────► GND
-GPIO0 ─────────────────────► PWMA
+GPIO25 ────────────────────► PWMA
                              AO1  ─────────────────► Motor (+)
                              AO2  ─────────────────► Motor (–)
 
@@ -106,99 +116,118 @@ GPIO0 ─────────────────────► PWMA
 
 ## 3. Firmware Overview
 
-The motor is controlled via LEDC (hardware PWM) on channel 1:
+### 3.1 Bench Test Firmware (`Motor_Test/`)
+
+Flashed to the **Secondary ESP32**. No sensors, no BLE — motor control only.
 
 | Parameter | Value |
 | :--- | :--- |
-| GPIO pin | 0 |
+| Project folder | `Motor_Test/` |
+| GPIO pin | 25 |
+| LEDC channel | 0 |
+| PWM frequency | 1000 Hz |
+| Resolution | 8-bit (0–255) |
+| Interface | Serial Monitor at 115200 baud |
+
+**Serial commands:**
+
+| Input | Action |
+| :--- | :--- |
+| `0` – `100` + Enter | Set speed to that percentage instantly |
+| `a` or `A` | Ramp cycle CW: 0 % → 100 % → 0 % in 10 % steps |
+| `r` or `R` | Ramp cycle CCW: same pattern, returns to CW after |
+| `s` or `S` | Stop motor immediately |
+| `h` or `H` | Print help |
+
+### 3.2 Production Firmware (`src/`)
+
+Flashed to the **Primary ESP32**. Full system with TFT display and keypad.
+
+| Parameter | Value |
+| :--- | :--- |
+| Project folder | `src/` |
+| GPIO pin | TBD — Primary ESP32 has no free output pin currently assigned |
 | LEDC channel | 1 |
 | PWM frequency | 1000 Hz |
 | Resolution | 8-bit (0–255) |
-| 0 % speed | duty = 0 (motor stopped) |
-| 100 % speed | duty = 255 (full rated RPM) |
+| Interface | TFT display + keypad |
 
-The firmware exposes three mixer modes:
+**Mixer modes:**
 
 | Mode | Behaviour |
 | :--- | :--- |
 | **OFF** | Motor stopped, duty = 0 |
-| **MANUAL** | Operator sets speed in 10 % increments via UP/DOWN buttons |
-| **AUTO** | 5 minutes ON at 100 %, then 355 minutes (5 h 55 m) OFF, repeating |
-
-Auto mode starts the first ON period immediately upon activation.
+| **MANUAL** | Speed set in 10 % steps via UP/DOWN buttons |
+| **AUTO** | 5 min ON at 100 %, then 355 min OFF, repeating |
 
 ---
 
-## 4. Pre-Test Checklist
+## 4. Pre-Test Checklist (Bench Test)
 
-Before powering up, verify the following:
+Run through this before powering up.
 
 - [ ] 12 V supply GND and ESP32 GND share a common connection
-- [ ] STBY, AIN1 confirmed connected to 3.3 V
-- [ ] AIN2 confirmed connected to GND
-- [ ] GPIO0 wire runs from ESP32 to TB6612FN PWMA
-- [ ] Motor leads AO1/AO2 connected to JGY370 (polarity sets direction)
+- [ ] STBY confirmed connected to 3.3 V
+- [ ] **GPIO26** connected to AIN1, **GPIO27** connected to AIN2
+- [ ] **GPIO25** connected to PWMA
+- [ ] Motor leads AO1/AO2 connected to JGY370 (polarity sets spin direction)
 - [ ] No short between VM (12 V) and VCC (3.3 V)
-- [ ] 12 V supply rated ≥ 2 A (motor stall current is ~1.5 A)
+- [ ] 12 V supply rated ≥ 2 A (motor stall current ~1.5 A)
+- [ ] `Motor_Test/` firmware flashed to Secondary ESP32
 
 ---
 
 ## 5. Test Procedures
 
-### Test 1 — Bench Power Test (no firmware required)
+### Test 1 — Bare Hardware Test (no firmware, no ESP32)
 
-Verifies the TB6612FN and motor are wired correctly before involving the ESP32.
-
-**Setup:**
-1. Connect TB6612FN as in Section 2 but **do not connect GPIO0 yet**.
-2. Apply 12 V and 3.3 V power.
+Verifies the TB6612FN and motor before any firmware is involved.
 
 **Steps:**
-1. With a jumper wire, manually connect **PWMA to 3.3 V**.
-2. **Expected:** Motor spins. Confirm direction is CW when viewed from above the shaft.
-3. Remove the jumper from PWMA (leave floating / connect to GND).
-4. **Expected:** Motor stops.
-5. If direction is wrong, swap the AO1 and AO2 leads at the motor terminals.
+1. Wire TB6612FN as in Section 2 but **leave PWMA disconnected**.
+2. Apply 12 V to VM and 3.3 V to VCC, STBY, AIN1.
+3. Using a jumper wire, manually connect **PWMA to 3.3 V**.
+   - **Expected:** Motor spins. Confirm direction is CW when viewed from above the shaft.
+4. Remove the jumper from PWMA.
+   - **Expected:** Motor stops.
+5. If direction is wrong, swap **AO1 and AO2** at the motor terminals.
 
 **Pass criteria:** Motor runs when PWMA is HIGH, stops when PWMA is LOW.
 
 ---
 
-### Test 2 — Manual Mode Test (firmware running)
+### Test 2 — Speed Control Test (Secondary ESP32, `Motor_Test/` firmware)
 
-Verifies firmware control via the UI.
+Verifies firmware PWM control over Serial.
 
 **Setup:**
-1. Flash the firmware and connect GPIO0 to PWMA.
-2. Power on the ESP32 and 12 V supply.
+1. Flash `Motor_Test/` to the **Secondary ESP32**.
+2. Wire TB6612FN with PWMA → **GPIO25** (Secondary ESP32).
+3. Open Serial Monitor at **115200 baud**.
+4. Apply 12 V to the motor supply.
 
 **Steps:**
-1. On the TFT display, navigate: `MAIN MENU → CONTINUE BREW (or NEW BREW)`
-2. Enter the `DASHBOARD` and navigate to the **FERMENTATION** tab (press RIGHT or DOWN).
-3. Press **SELECT** to enter the Fermentation module view.
-4. Press **SELECT** again to open **MIXER CONTROL**.
-5. Press **SELECT** → mode changes to **MANUAL**. Motor starts at 100 %.
-   - **Expected:** Motor runs, display shows `MANUAL`.
-6. Press **DOWN** three times → speed decreases to 70 %.
-   - **Expected:** Motor slows noticeably. Display shows `70%`.
-7. Press **DOWN** until speed reaches 0 %.
-   - **Expected:** Motor stops. Display shows `MANUAL: 0%`.
-8. Press **UP** twice → speed increases to 20 %.
-   - **Expected:** Motor resumes. Display shows `MANUAL: 20%`.
-9. Press **LEFT** → returns to Fermentation module view.
-   - **Expected:** Motor continues at 20 %. Live MIXER row shows `MANUAL: 20%`.
+1. Type `50` + Enter.
+   - **Expected:** Motor runs at approximately half speed. Serial prints `[MOTOR] Speed set to 50%`.
+2. Type `100` + Enter.
+   - **Expected:** Motor runs at full speed. Serial prints `[MOTOR] Speed set to 100%`.
+3. Type `0` + Enter.
+   - **Expected:** Motor stops. Serial prints `[MOTOR] Speed set to 0%`.
+4. Type `a` + Enter.
+   - **Expected:** Motor ramps from 0 % to 100 % in 10 % steps (800 ms per step), holds at 100 % for 3 s, then ramps back down to 0 %. Each step is printed to Serial.
+5. Type `s` + Enter at any time during the ramp.
+   - **Expected:** Motor stops immediately.
 
-**Pass criteria:** Speed changes are reflected in motor behaviour and display in real time.
+**Pass criteria:** Speed changes are audible/visible on the motor and each step is logged to Serial.
 
 ---
 
-### Test 3 — Auto Mode Test (short-cycle)
+### Test 3 — Auto Schedule Test (Primary ESP32, UI only)
 
-Verifies the auto-mixing scheduler. The default schedule (5 min ON / 355 min OFF) is too long to observe directly, so temporarily shorten the cycle times in firmware.
+> **Note:** This test verifies the timing logic via the TFT display. The motor will not spin unless the Primary ESP32 GPIO assignment is resolved and the TB6612FN is wired to it.
 
-**Firmware change (revert after test):**
+To verify the scheduler without waiting 6 hours, temporarily shorten the timing constants in `src/config.h`:
 
-In `src/config.h`, temporarily change:
 ```cpp
 // Default (production):
 const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
@@ -209,57 +238,61 @@ const uint32_t MIXER_ON_MS  = 10UL * 1000;   // 10 seconds ON
 const uint32_t MIXER_OFF_MS = 20UL * 1000;   // 20 seconds OFF
 ```
 
-Flash the modified firmware.
+Flash the modified firmware to the Primary ESP32, navigate to **MIXER CONTROL**, and set mode to **AUTO**. The display should show `AUTO: RUNNING` for 10 s, then `AUTO: STANDBY` for 20 s, cycling automatically.
 
-**Steps:**
-1. Navigate to MIXER CONTROL and press SELECT twice → mode is **AUTO**.
-   - **Expected:** Motor starts immediately. Display shows `AUTO: RUNNING`.
-2. Wait 10 seconds.
-   - **Expected:** Motor stops. Display shows `AUTO: STANDBY`.
-3. Wait 20 seconds.
-   - **Expected:** Motor restarts. Display shows `AUTO: RUNNING`.
-4. Confirm the cycle repeats at least twice.
-5. Press SELECT → mode cycles back to **OFF**. Motor stops.
-
-**After test:** Restore `MIXER_ON_MS` and `MIXER_OFF_MS` to production values and reflash.
-
-**Pass criteria:** Motor follows the ON/OFF schedule automatically without any button input.
+Restore `MIXER_ON_MS` and `MIXER_OFF_MS` to production values and reflash before use.
 
 ---
 
-### Test 4 — Emergency Stop Test
+### Test 4 — Full UI Test (Primary ESP32, `src/` firmware)
 
-Verifies the E-Stop kills the motor immediately.
+> **Note:** Verifies the display and keypad interface. Motor will not spin until Primary ESP32 GPIO is assigned and wired.
+
+**UI navigation to reach MIXER CONTROL:**
+```
+MAIN MENU
+  └─ NEW BREW or CONTINUE BREW
+       └─ DASHBOARD
+            └─ Navigate to FERMENTATION tab  (RIGHT or DOWN button)
+                 └─ SELECT  →  enter module view
+                      └─ SELECT  →  MIXER CONTROL
+```
 
 **Steps:**
-1. Set mixer to MANUAL at any speed. Confirm motor is running.
-2. Press the **ESTOP button** (MCP23017 GPB6).
-   - **Expected:** System prompts confirmation screen.
+1. Open MIXER CONTROL as above.
+2. Press SELECT → mode changes to **MANUAL**.
+   - **Expected:** Display shows `MANUAL`.
+3. Press DOWN three times → speed decreases to 70 %.
+   - **Expected:** Display shows `70%`.
+4. Press DOWN until 0 %.
+   - **Expected:** Display shows `MANUAL: 0%`.
+5. Press UP twice → speed increases to 20 %.
+   - **Expected:** Display shows `MANUAL: 20%`.
+6. Press LEFT → exit to Fermentation module view.
+   - **Expected:** Live MIXER row shows `MANUAL: 20%`.
+7. Press SELECT again → re-enter MIXER CONTROL.
+8. Press SELECT → mode changes to **AUTO**.
+   - **Expected:** Display shows `AUTO` and status tile shows `RUNNING`.
+9. Press LEFT to exit.
+   - **Expected:** MIXER row shows `AUTO: RUNNING`.
+
+**Pass criteria:** Speed and mode changes reflect correctly on the display.
+
+---
+
+### Test 5 — Emergency Stop Test (Primary ESP32 only)
+
+**Steps:**
+1. Set mixer to MANUAL at any non-zero speed.
+2. Press the **ESTOP button** (MCP23017 GPB6 on Primary ESP32).
+   - **Expected:** Confirmation screen appears.
 3. Press ESTOP again to confirm halt.
-   - **Expected:** Motor stops immediately. Screen turns red showing `SYSTEM HALTED`.
+   - **Expected:** Motor stops immediately (if wired). Screen turns red showing `SYSTEM HALTED`.
 4. Confirm motor does not restart.
-5. Reboot the ESP32 (press EN/RST button).
+5. Press EN/RST to reboot.
    - **Expected:** System restarts normally. Mixer defaults to OFF.
 
-**Pass criteria:** Motor halts within one loop iteration of E-Stop confirmation.
-
----
-
-### Test 5 — Fermentation Module Live Display
-
-Verifies the MIXER status row updates on the dashboard.
-
-**Steps:**
-1. Enter Fermentation module view (SELECT on FERMENTATION tab).
-2. Open MIXER CONTROL and set to MANUAL at 60 %.
-3. Exit back to Fermentation module view (LEFT).
-4. Observe the bottom of the module view.
-   - **Expected:** MIXER row shows `MANUAL: 60%`, updating every ~1 second.
-5. Open MIXER CONTROL again, switch to AUTO.
-6. Exit back to Fermentation module view.
-   - **Expected:** MIXER row shows `AUTO: RUNNING` or `AUTO: STANDBY`.
-
-**Pass criteria:** Live MIXER row reflects current mode and speed without requiring menu re-entry.
+**Pass criteria:** Mixer mode resets to OFF on E-Stop and does not resume until manually re-enabled after reboot.
 
 ---
 
@@ -269,47 +302,33 @@ Verifies the MIXER status row updates on the dashboard.
 
 | Symptom | Likely cause | Action |
 | :--- | :--- | :--- |
-| Silent in MANUAL at 100 % | GPIO0 PWM not reaching driver | Probe GPIO0 with multimeter — should read ~2.5 V average at 50 % duty. If 0 V, check `ledcAttachPin(MOTOR_PWM_PIN, MOTOR_PWM_CHANNEL)` in `setup()`. |
-| Silent, TB6612FN hot | STBY or AIN1 not HIGH | Measure STBY and AIN1 pins. Both must read 3.3 V. |
-| Silent, TB6612FN cool | 12 V rail absent | Measure VM pin. Should be 12 V. Check power supply and wiring. |
-| Spins briefly at boot then stops | Normal — GPIO0 boot state | Not a fault. Motor starts only after `setMixerSpeed(0)` runs in `setup()`. |
-| Driver shuts down (thermal) | Sustained stall | Check impeller for mechanical obstruction. Stall current is ~1.5 A, within driver rating, but sustained stall will overheat. |
+| Silent at any speed command | PWMA wire disconnected or wrong GPIO | Confirm the wire is on **GPIO25** on the Secondary ESP32. Probe with a multimeter — at 50 % speed it should read ~1.65 V average. |
+| Silent, TB6612FN warm/hot | STBY or AIN1 not HIGH | Measure STBY and AIN1. Both must read 3.3 V. |
+| Silent, TB6612FN cool | 12 V rail absent | Measure VM — should read 12 V. Check supply and wiring. |
+| Driver shuts down (hot to touch) | Sustained stall | Check impeller for mechanical obstruction. |
 
 ### 6.2 Motor Runs Wrong Direction
 
-Swap **AO1 and AO2** at the motor connector. Do not change AIN1/AIN2 — they are hardwired.
+Swap **AO1 and AO2** at the motor terminals. AIN1/AIN2 are hardwired and cannot be changed in firmware.
 
-### 6.3 Speed Control Has No Effect
+### 6.3 Bench Test — Serial Commands Not Working
 
-- Confirm mode is **MANUAL**. UP/DOWN buttons only adjust speed in MANUAL mode.
-- In AUTO mode, the firmware controls speed (always 100 % when running).
-- In OFF mode, speed is locked at 0 %.
+- Confirm baud rate is **115200** in Serial Monitor.
+- Confirm Serial Monitor line ending is set to **Newline** (or **Both NL & CR**).
+- Type just the number (e.g. `75`) and press Enter — no extra characters.
 
-### 6.4 Auto Mode Never Starts
+### 6.4 UI Test — Speed Control Has No Effect on Display
 
-1. Confirm `MIXER_OFF_MS` in `config.h` is `355UL * 60 * 1000` (not accidentally 0 or negative).
-2. When AUTO is first activated, `mixerCycleTimer` is set to 0, so the first ON period starts immediately. If the motor still does not start, check that the mode toggle reached AUTO (display should show `AUTO`).
-3. Verify `MIXER_ON_MS` is non-zero.
+- Confirm mode is **MANUAL**. UP/DOWN only adjusts speed in MANUAL mode.
+- In AUTO mode the firmware controls speed internally (always 100 % when ON).
 
-### 6.5 GPIO0 Causes Boot Issues
+### 6.5 PWM Verification with Oscilloscope (Bench Test)
 
-If the ESP32 enters bootloader mode instead of running firmware on power-on:
-
-- GPIO0 is being held LOW at boot time.
-- Check that the TB6612FN is not pulling GPIO0 LOW. The PWMA input on the TB6612FN is typically high-impedance; it should not load GPIO0 below the boot threshold (~0.8 V).
-- If using a long wire to PWMA, add a 10 kΩ pull-up resistor from GPIO0 to 3.3 V to ensure it is HIGH during boot.
-
-### 6.6 PWM Verification with Oscilloscope
-
-Connect oscilloscope probe to GPIO0 (and GND to ESP32 GND):
-
-| Mixer state | Expected waveform |
-| :--- | :--- |
-| OFF / 0 % | Constant LOW (0 V) |
-| MANUAL 50 % | 1 kHz square wave, 50 % duty (~1.65 V average) |
-| MANUAL 100 % | Constant HIGH (3.3 V) |
-| AUTO: RUNNING | Constant HIGH (3.3 V) |
-| AUTO: STANDBY | Constant LOW (0 V) |
+| GPIO | Speed | Expected waveform |
+| :--- | :--- | :--- |
+| 25 | 0 % | Constant LOW (0 V) |
+| 25 | 50 % | 1 kHz square wave, 50 % duty (~1.65 V avg) |
+| 25 | 100 % | Constant HIGH (3.3 V) |
 
 ---
 
@@ -317,8 +336,9 @@ Connect oscilloscope probe to GPIO0 (and GND to ESP32 GND):
 
 | Constraint | Detail |
 | :--- | :--- |
-| **GPIO0 is boot pin** | Do not hold GPIO0 LOW externally during power-on reset. Disconnect TB6612FN PWMA or add a 10 kΩ pull-up if boot issues occur. |
-| **Coast stop only** | At 0 % duty (PWMA LOW), the driver enters coast mode — not active brake. The worm gear's self-locking prevents back-driving, so this is safe for the impeller. |
-| **Single channel** | Only TB6612FN channel A is used (1.2 A continuous, 3.2 A peak). Channel B is unused. For higher current, bridge both channels in parallel for 2.4 A continuous. |
-| **Fixed direction** | AIN1/AIN2 are hardwired for CW only. Reversing direction requires swapping AO1/AO2 at the motor terminals — no firmware change needed. |
-| **No auto-restart after E-Stop** | E-Stop sets `currentMixerMode = MIXER_OFF`. The mixer must be manually re-enabled from the UI after a system reboot. |
+| **Primary ESP32 GPIO pending** | All output-capable GPIO pins on the Primary ESP32 are occupied by existing peripherals. The production motor PWM pin assignment must be resolved before hardware motor testing on the Primary is possible. |
+| **Coast stop only** | At 0 % duty (PWMA LOW), the driver enters coast mode, not active brake. The worm gear self-locks, so the impeller will not back-drive. |
+| **Single channel** | Only TB6612FN channel A is used (1.2 A continuous, 3.2 A peak). Channel B is unused. Bridge both channels in parallel for 2.4 A if needed. |
+| **Fixed direction** | AIN1/AIN2 are hardwired for CW only. To reverse, swap AO1 and AO2 at the motor terminals. |
+| **No auto-restart after E-Stop** | E-Stop sets mixer to OFF. Must be manually re-enabled from the UI after rebooting the Primary ESP32. |
+| **Bench test has no auto schedule** | The `Motor_Test/` sketch does not implement the 5 min/355 min cycle. Auto schedule behavior is verified through the Primary ESP32 UI (Test 3). |
