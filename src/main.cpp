@@ -52,12 +52,21 @@ char brewStartTime[32] = "NOT STARTED";
 int currentSpeedPercent = 0;
 int currentHeatingPercent = 0;
 bool isFanOn = false;
+bool isFermFanOn = false;
+bool isLight1On = false;
+bool isLight2On = false;
+bool isLight3On = false;
 FanMode currentFanMode = FAN_OFF;
 bool isSystemHalted = false;
 int estopState = 0;
 uint32_t estopTimer = 0;
 int returnConfirmState = 0;
 uint32_t returnConfirmTimer = 0;
+int mixerSpeedPercent = 0;
+MixerMode currentMixerMode = MIXER_OFF;
+bool mixerRunning = false;
+uint32_t mixerOnTimer = 0;
+uint32_t mixerCycleTimer = 0;
 
 // ---- UI / App State ----
 AppState currentAppState = SYSTEM_INIT;
@@ -72,6 +81,15 @@ int lastDashSelection = -1;
 bool monitorNeedsFullRedraw = true;
 bool calNeedsFullRedraw = true;
 int calSelection = 0;
+int systemCheckSelection = 0;
+int fanTestSelection = 0;
+int fanTestRow = 0;
+int fanTestFanChoice = 0;
+int fanTestSpeed = 0;
+int lightTestSelection = 0;
+bool systemCheckNeedsFullRedraw = true;
+bool fanTestNeedsFullRedraw = true;
+bool lightTestNeedsFullRedraw = true;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -89,13 +107,32 @@ void setFanSpeed(int percent) {
   if (percent > 100)
     percent = 100;
   currentSpeedPercent = percent;
-  ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
+
+  // Pre-Heating logic (default): 0% = 255 PWM, 100% = 0 PWM
+  // Fermentation logic: 0% = 0 PWM, 100% = 255 PWM
+  if (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1) {
+    ledcWrite(pwmChannel, map(percent, 0, 100, 0, 255));
+  } else {
+    ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
+  }
+}
+
+// ---- Mixer Speed Helper ----
+void setMixerSpeed(int percent) {
+  if (percent < 0)
+    percent = 0;
+  if (percent > 100)
+    percent = 100;
+  mixerSpeedPercent = percent;
+  ledcWrite(MOTOR_PWM_CHANNEL, map(percent, 0, 100, 0, 255));
 }
 
 // ---- Setup ----
 void setup() {
   pinMode(PWM_PIN, OUTPUT);
   digitalWrite(PWM_PIN, HIGH);
+  pinMode(MOTOR_PWM_PIN, OUTPUT);
+  digitalWrite(MOTOR_PWM_PIN, LOW);
 
   Serial.begin(115200);
   pinMode(15, OUTPUT);
@@ -154,6 +191,14 @@ void setup() {
     }
     mcp.pinMode(FAN_RELAY_PIN, OUTPUT);
     mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+    mcp.pinMode(FERM_FAN_RELAY_PIN, OUTPUT);
+    mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+    mcp.pinMode(LIGHT_R, OUTPUT);
+    mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+    mcp.pinMode(LIGHT_Y, OUTPUT);
+    mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+    mcp.pinMode(LIGHT_G, OUTPUT);
+    mcp.digitalWrite(LIGHT_G, RELAY_OFF);
     mcp.pinMode(ESTOP_BUTTON_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_RIGHT_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_LEFT_PIN, INPUT_PULLUP);
@@ -165,6 +210,9 @@ void setup() {
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
   setFanSpeed(0);
+  ledcSetup(MOTOR_PWM_CHANNEL, MOTOR_PWM_FREQ, pwmResolution);
+  ledcAttachPin(MOTOR_PWM_PIN, MOTOR_PWM_CHANNEL);
+  setMixerSpeed(0);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
   WiFi.softAP("WineBrew_System", "12345678");
@@ -199,6 +247,9 @@ void loop() {
         mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
+      setMixerSpeed(0);
+      currentMixerMode = MIXER_OFF;
+      mixerRunning = false;
       tft.fillScreen(TFT_RED);
       tft.setTextColor(TFT_WHITE);
       tft.drawCentreString("SYSTEM HALTED", 160, 100, 4);
@@ -348,9 +399,29 @@ void loop() {
         currentSpeedPercent = 100;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
+    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+      mixerSpeedPercent -= 10;
+      if (mixerSpeedPercent < 0)
+        mixerSpeedPercent = 100;
+      setMixerSpeed(mixerSpeedPercent);
+      drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 1) % 3;
       drawCalibrationPage();
+    } else if (currentAppState == SYSTEM_CHECK_MENU) {
+      systemCheckSelection = (systemCheckSelection + 1) % 2;
+      drawSystemCheckMenu();
+    } else if (currentAppState == FAN_TEST_PICK) {
+      fanTestFanChoice = (fanTestFanChoice + 1) % 2;
+      drawFanTestPick();
+    } else if (currentAppState == FAN_TEST_MENU) {
+      fanTestSpeed -= 10;
+      if (fanTestSpeed < 0) fanTestSpeed = 100;
+      setFanSpeed(fanTestSpeed);
+      drawFanTestMenu();
+    } else if (currentAppState == LIGHT_TEST_MENU) {
+      lightTestSelection = (lightTestSelection + 1) % 3;
+      drawLightTestMenu();
     }
   }
 
@@ -371,9 +442,29 @@ void loop() {
         currentSpeedPercent = 0;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
+    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+      mixerSpeedPercent += 10;
+      if (mixerSpeedPercent > 100)
+        mixerSpeedPercent = 0;
+      setMixerSpeed(mixerSpeedPercent);
+      drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 2) % 3;
       drawCalibrationPage();
+    } else if (currentAppState == SYSTEM_CHECK_MENU) {
+      systemCheckSelection = (systemCheckSelection + 1) % 2;
+      drawSystemCheckMenu();
+    } else if (currentAppState == FAN_TEST_PICK) {
+      fanTestFanChoice = (fanTestFanChoice + 1) % 2;
+      drawFanTestPick();
+    } else if (currentAppState == FAN_TEST_MENU) {
+      fanTestSpeed += 10;
+      if (fanTestSpeed > 100) fanTestSpeed = 0;
+      setFanSpeed(fanTestSpeed);
+      drawFanTestMenu();
+    } else if (currentAppState == LIGHT_TEST_MENU) {
+      lightTestSelection = (lightTestSelection + 2) % 3;
+      drawLightTestMenu();
     }
   }
 
@@ -391,7 +482,10 @@ void loop() {
         moduleViewActive = false;
         drawDashboardLayout();
       } else if (menuSelection == 2) {
-        ESP.restart();
+        currentAppState = SYSTEM_CHECK_MENU;
+        systemCheckNeedsFullRedraw = true;
+        systemCheckSelection = 0;
+        drawSystemCheckMenu();
       } else if (menuSelection == 3) {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
@@ -415,10 +509,29 @@ void loop() {
         moduleViewActive = true;
         dashNeedsFullRedraw = true;
         drawDashboardLayout();
-      } else if (dashSelection == 0) {
-        currentAppState = COOLING_MENU;
-        drawCoolingMenu();
+      } else if (dashSelection == 1) {
+        currentAppState = MIXER_MENU;
+        drawMixerMenu();
       }
+    } else if (currentAppState == MIXER_MENU) {
+      if (currentMixerMode == MIXER_OFF) {
+        currentMixerMode = MIXER_MANUAL;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      } else if (currentMixerMode == MIXER_MANUAL) {
+        currentMixerMode = MIXER_AUTO;
+        mixerRunning = true;
+        mixerOnTimer = millis();
+        mixerCycleTimer = 0;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      } else {
+        currentMixerMode = MIXER_OFF;
+        mixerRunning = false;
+        mixerSpeedPercent = 0;
+        setMixerSpeed(0);
+      }
+      drawMixerMenu();
     } else if (currentAppState == COOLING_MENU) {
       if (currentFanMode == FAN_OFF) {
         currentFanMode = FAN_ON;
@@ -432,6 +545,55 @@ void loop() {
       }
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
       drawCoolingMenu();
+    } else if (currentAppState == SYSTEM_CHECK_MENU) {
+      if (systemCheckSelection == 0) {
+        currentAppState = FAN_TEST_PICK;
+        fanTestNeedsFullRedraw = true;
+        fanTestFanChoice = 0;
+        drawFanTestPick();
+      } else {
+        currentAppState = LIGHT_TEST_MENU;
+        lightTestNeedsFullRedraw = true;
+        lightTestSelection = 0;
+        drawLightTestMenu();
+      }
+    } else if (currentAppState == FAN_TEST_PICK) {
+      currentAppState = FAN_TEST_MENU;
+      fanTestNeedsFullRedraw = true;
+      fanTestRow = 0;
+      fanTestSpeed = 100;
+      setFanSpeed(100);
+      drawFanTestMenu();
+    } else if (currentAppState == FAN_TEST_MENU) {
+      if (currentFanMode == FAN_OFF) {
+        currentFanMode = FAN_ON;
+        if (fanTestFanChoice == 0) {
+          isFanOn = true;
+          isFermFanOn = false;
+        } else {
+          isFermFanOn = true;
+          isFanOn = false;
+        }
+      } else {
+        currentFanMode = FAN_OFF;
+        isFanOn = false;
+        isFermFanOn = false;
+      }
+      mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      drawFanTestMenu();
+    } else if (currentAppState == LIGHT_TEST_MENU) {
+      if (lightTestSelection == 0) {
+        isLight1On = !isLight1On;
+        mcp.digitalWrite(LIGHT_R, isLight1On ? RELAY_ON : RELAY_OFF);
+      } else if (lightTestSelection == 1) {
+        isLight2On = !isLight2On;
+        mcp.digitalWrite(LIGHT_Y, isLight2On ? RELAY_ON : RELAY_OFF);
+      } else {
+        isLight3On = !isLight3On;
+        mcp.digitalWrite(LIGHT_G, isLight3On ? RELAY_ON : RELAY_OFF);
+      }
+      drawLightTestMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
       currentAppState = CALIBRATION_MODE;
       calNeedsFullRedraw = true;
@@ -482,6 +644,33 @@ void loop() {
       moduleViewActive = true;
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
+    } else if (currentAppState == MIXER_MENU) {
+      currentAppState = DASHBOARD_ACTIVE;
+      moduleViewActive = true;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+    } else if (currentAppState == SYSTEM_CHECK_MENU) {
+      currentAppState = START_MENU;
+      menuNeedsFullRedraw = true;
+      drawStartMenu();
+    } else if (currentAppState == FAN_TEST_PICK) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == FAN_TEST_MENU) {
+      currentAppState = FAN_TEST_PICK;
+      fanTestNeedsFullRedraw = true;
+      // Safety: Turn off fans when leaving control screen
+      isFanOn = false;
+      isFermFanOn = false;
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      setFanSpeed(0);
+      drawFanTestPick();
+    } else if (currentAppState == LIGHT_TEST_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
@@ -616,6 +805,26 @@ void loop() {
     drawNewBrewWizard();
   }
 
+  // Auto-mixing scheduler
+  if (currentMixerMode == MIXER_AUTO) {
+    uint32_t now = millis();
+    if (mixerRunning) {
+      if (now - mixerOnTimer >= MIXER_ON_MS) {
+        mixerRunning = false;
+        mixerCycleTimer = now;
+        mixerSpeedPercent = 0;
+        setMixerSpeed(0);
+      }
+    } else {
+      if (now - mixerCycleTimer >= MIXER_OFF_MS) {
+        mixerRunning = true;
+        mixerOnTimer = now;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
+      }
+    }
+  }
+
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
@@ -685,6 +894,14 @@ void loop() {
         tft.drawCentreString(buf, 80, y + 235, 4);
         sprintf(buf, "%d%%", incomingData.pillBattery);
         tft.drawCentreString(buf, 240, y + 235, 4);
+        tft.setTextPadding(280);
+        const char *mxTxt[] = {"OFF", "MANUAL", "AUTO"};
+        if (currentMixerMode == MIXER_AUTO) {
+          tft.drawCentreString(mixerRunning ? "AUTO: RUNNING" : "AUTO: STANDBY", CENTER_X, y + 310, 2);
+        } else {
+          sprintf(buf, "%s: %d%%", mxTxt[currentMixerMode], mixerSpeedPercent);
+          tft.drawCentreString(buf, CENTER_X, y + 310, 2);
+        }
 
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);

@@ -161,6 +161,7 @@ void drawDashboardLayout() {
       tft.drawCentreString("PH LEVEL",   240, y + 130, 2);
       tft.drawCentreString("SIGNAL",     80,  y + 210, 2);
       tft.drawCentreString("BATTERY",    240, y + 210, 2);
+      tft.drawCentreString("MIXER",      CENTER_X, y + 285, 2);
     } else if (dashSelection == 2) {
       tft.drawCentreString("PAST. TEMP",     CENTER_X, y + 60,  2);
       tft.drawCentreString("PROCESS STATUS", CENTER_X, y + 130, 2);
@@ -186,6 +187,116 @@ void drawStartMenu() {
     tft.setTextColor(txtColor, color);
     tft.drawCentreString(options[i], CENTER_X, 95 + (i * 70), 2);
   }
+}
+
+void drawSystemCheckMenu() {
+  if (systemCheckNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
+    systemCheckNeedsFullRedraw = false;
+  }
+  const char *options[] = {"FAN TEST", "LIGHT INDICATORS"};
+  for (int i = 0; i < 2; i++) {
+    uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 80 + (i * 100), 280, 80, color);
+    tft.drawRect(20, 80 + (i * 100), 280, 80, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 110 + (i * 100), 4);
+  }
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
+}
+
+void drawFanTestPick() {
+  if (fanTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("SELECT FAN GROUP", CENTER_X, 15, 4);
+    fanTestNeedsFullRedraw = false;
+  }
+  const char *options[] = {"PRE-HEATING FANS", "FERMENTATION FANS"};
+  for (int i = 0; i < 2; i++) {
+    uint16_t color    = (fanTestFanChoice == i) ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = (fanTestFanChoice == i) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 80 + (i * 120), 280, 100, color);
+    tft.drawRect(20, 80 + (i * 120), 280, 100, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 120 + (i * 120), 4);
+  }
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
+}
+
+void drawFanTestMenu() {
+  if (fanTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("FAN CONTROL", CENTER_X, 15, 4);
+    fanTestNeedsFullRedraw = false;
+  }
+
+  const char *title = (fanTestFanChoice == 0) ? "PRE-HEATING" : "FERMENTATION";
+  tft.setTextColor(TFT_BLACK);
+  tft.drawCentreString(title, CENTER_X, 70, 4);
+
+  // Status and Toggle
+  bool activeFanOn = (currentFanMode == FAN_ON);
+  uint16_t statusColor = activeFanOn ? 0x0400 : TFT_RED;
+  
+  tft.fillRect(20, 120, 280, 160, statusColor);
+  tft.drawRect(20, 120, 280, 160, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, statusColor);
+  tft.drawCentreString(activeFanOn ? "RUNNING" : "STOPPED", CENTER_X, 170, 4);
+  tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 240, 2);
+
+  // Power Info
+  tft.fillRect(20, 300, 280, 80, 0xD6BA);
+  tft.drawRect(20, 300, 280, 80, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString("UP/DOWN: SPEED", CENTER_X, 315, 2);
+  char buf[16];
+  sprintf(buf, "%d %%", fanTestSpeed);
+  tft.drawCentreString(buf, CENTER_X, 340, 4);
+
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO CHANGE GROUP", CENTER_X, 450, 2);
+}
+
+void drawLightTestMenu() {
+  if (lightTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("LIGHT INDICATORS", CENTER_X, 15, 4);
+    lightTestNeedsFullRedraw = false;
+  }
+
+  const char *lightLabels[] = {"INDICATOR R", "INDICATOR Y", "INDICATOR G"};
+  bool        lightStates[] = {isLight1On, isLight2On, isLight3On};
+  uint16_t    ledColors[]   = {TFT_RED, TFT_YELLOW, TFT_GREEN};
+
+  for (int i = 0; i < 3; i++) {
+    uint16_t color    = (lightTestSelection == i) ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = (lightTestSelection == i) ? TFT_WHITE : TFT_BLACK;
+    uint16_t ledColor = lightStates[i] ? ledColors[i] : TFT_DARKGREY;
+
+    tft.fillRect(20, 80 + (i * 100), 280, 80, color);
+    tft.drawRect(20, 80 + (i * 100), 280, 80, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawString(lightLabels[i], 40, 110 + (i * 100), 4);
+
+    tft.fillCircle(260, 120 + (i * 100), 15, ledColor);
+    tft.drawCircle(260, 120 + (i * 100), 15, TFT_BLACK);
+  }
+
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 420, 2);
+  tft.drawCentreString("RETURN TO EXIT", CENTER_X, 450, 2);
 }
 
 void drawValueTile(int x, int y, const char *label, String value, bool isError) {
@@ -297,6 +408,46 @@ void drawSensorMonitorPage(bool valuesOnly) {
   rv(8, b, false);
 
   tft.setTextPadding(0);
+}
+
+void drawMixerMenu() {
+  tft.fillScreen(TFT_WHITE);
+  tft.fillRect(0, 0, 320, 50, TFT_NAVY);
+  tft.setTextColor(TFT_WHITE);
+  tft.drawCentreString("MIXER CONTROL", CENTER_X, 15, 4);
+
+  const char   *modeTxt[]    = {"OFF", "MANUAL", "AUTO"};
+  uint16_t      modeColors[] = {TFT_RED, 0x0400, 0x001F};
+
+  tft.fillRect(20, 80, 280, 120, modeColors[currentMixerMode]);
+  tft.drawRect(20, 80, 280, 120, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, modeColors[currentMixerMode]);
+  tft.drawCentreString("MIXER MODE", CENTER_X, 100, 2);
+  tft.drawCentreString(modeTxt[currentMixerMode], CENTER_X, 127, 4);
+  tft.drawCentreString("(SELECT TO CYCLE)", CENTER_X, 178, 2);
+
+  tft.fillRect(20, 220, 280, 120, 0xD6BA);
+  tft.drawRect(20, 220, 280, 120, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString("SPEED", CENTER_X, 240, 2);
+  char buf[32];
+  sprintf(buf, "%d%%", mixerSpeedPercent);
+  tft.drawCentreString(buf, CENTER_X, 262, 4);
+  if (currentMixerMode == MIXER_MANUAL)
+    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 318, 2);
+  else
+    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 318, 2);
+
+  if (currentMixerMode == MIXER_AUTO) {
+    uint16_t statusColor = mixerRunning ? 0x0400 : 0x3566;
+    tft.fillRect(20, 360, 280, 50, statusColor);
+    tft.drawRect(20, 360, 280, 50, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, statusColor);
+    tft.drawCentreString(mixerRunning ? "RUNNING" : "STANDBY", CENTER_X, 377, 2);
+  }
+
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO EXIT", CENTER_X, 440, 2);
 }
 
 void drawInitTile(int x, int y, const char *label, int status) {
