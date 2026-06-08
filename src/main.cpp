@@ -43,7 +43,7 @@ bool hx711Status = false;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
-float calibrationFactor = 22850.0; // Corrected factor: 52L measured -> 58L actual
+float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
