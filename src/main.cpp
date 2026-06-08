@@ -81,6 +81,8 @@ int lastDashSelection = -1;
 bool monitorNeedsFullRedraw = true;
 bool calNeedsFullRedraw = true;
 int calSelection = 0;
+bool loadCellNeedsFullRedraw = true;
+int loadCellSelection = 0;
 int systemCheckSelection = 0;
 int fanTestSelection = 0;
 int fanTestRow = 0;
@@ -450,6 +452,9 @@ void loop() {
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 1) % 3;
       drawCalibrationPage();
+    } else if (currentAppState == LOAD_CELL_PAGE) {
+      loadCellSelection = (loadCellSelection + 1) % 2;
+      drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 1) % 2;
       drawSystemCheckMenu();
@@ -493,6 +498,9 @@ void loop() {
     } else if (currentAppState == CALIBRATION_MODE) {
       calSelection = (calSelection + 2) % 3;
       drawCalibrationPage();
+    } else if (currentAppState == LOAD_CELL_PAGE) {
+      loadCellSelection = (loadCellSelection + 1) % 2;
+      drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 1) % 2;
       drawSystemCheckMenu();
@@ -640,22 +648,29 @@ void loop() {
       }
       drawLightTestMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
-      currentAppState = CALIBRATION_MODE;
-      calNeedsFullRedraw = true;
-      calSelection = 0;
-      drawCalibrationPage();
+      currentAppState = LOAD_CELL_PAGE;
+      loadCellNeedsFullRedraw = true;
+      loadCellSelection = 0;
+      drawLoadCellPage();
     } else if (currentAppState == CALIBRATION_MODE) {
       if (calSelection == 0) {
         if (hx711Status) {
           scale.tare();
           currentWeight = 0.0f;
-          hx711WeightSeeded = false; // re-seed EMA from new zero reference
+          hx711WeightSeeded = false;
         }
         drawCalibrationPage();
       } else if (calSelection == 2) {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
+      }
+    } else if (currentAppState == LOAD_CELL_PAGE) {
+      if (loadCellSelection == 0 && hx711Status) {
+        scale.tare();
+        currentWeight = 0.0f;
+        hx711WeightSeeded = false;
+        drawLoadCellPage();
       }
     }
   }
@@ -666,6 +681,12 @@ void loop() {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
     drawCalibrationPage();
+  }
+  if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE &&
+      loadCellSelection == 1) {
+    calibrationFactor += 10.0;
+    scale.set_scale(calibrationFactor);
+    drawLoadCellPage();
   }
 
   // Navigation: Left / Return
@@ -703,6 +724,16 @@ void loop() {
         calibrationFactor -= 10.0;
         scale.set_scale(calibrationFactor);
         drawCalibrationPage();
+      } else {
+        currentAppState = SENSOR_MONITOR;
+        monitorNeedsFullRedraw = true;
+        drawSensorMonitorPage();
+      }
+    } else if (currentAppState == LOAD_CELL_PAGE) {
+      if (loadCellSelection == 1) {
+        calibrationFactor -= 10.0;
+        scale.set_scale(calibrationFactor);
+        drawLoadCellPage();
       } else {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
@@ -889,6 +920,9 @@ void loop() {
 
     if (currentAppState == CALIBRATION_MODE)
       drawCalibrationPage(true);
+
+    if (currentAppState == LOAD_CELL_PAGE)
+      drawLoadCellPage(true);
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;

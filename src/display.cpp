@@ -189,6 +189,76 @@ void drawStartMenu() {
   }
 }
 
+void drawLoadCellPage(bool valuesOnly) {
+  char b[32];
+
+  if (!valuesOnly) {
+    if (loadCellNeedsFullRedraw) {
+      tft.fillScreen(TFT_WHITE);
+      // Header
+      tft.fillRect(0, 0, 320, 50, 0x0493);
+      tft.setTextColor(TFT_WHITE);
+      tft.drawCentreString("LOAD CELL", CENTER_X, 15, 4);
+      loadCellNeedsFullRedraw = false;
+    }
+
+    // Weight display box (static frame)
+    tft.fillRect(10, 58, 300, 72, 0xCE79);
+    tft.drawRect(10, 58, 300, 72, TFT_DARKGREY);
+    tft.setTextColor(TFT_BLACK, 0xCE79);
+    tft.drawCentreString("LIVE WEIGHT", CENTER_X, 63, 2);
+
+    // TARE row
+    uint16_t tareBg  = (loadCellSelection == 0) ? 0x3566 : 0xD6BA;
+    uint16_t tareTxt = (loadCellSelection == 0) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 142, 300, 65, tareBg);
+    tft.drawRect(10, 142, 300, 65, TFT_DARKGREY);
+    tft.setTextColor(tareTxt, tareBg);
+    tft.drawString("TARE", 25, 161, 4);
+    tft.drawRightString("SELECT TO ZERO", 290, 165, 2);
+
+    // CAL FACTOR row
+    uint16_t calBg  = (loadCellSelection == 1) ? 0x3566 : 0xD6BA;
+    uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 217, 300, 65, calBg);
+    tft.drawRect(10, 217, 300, 65, TFT_DARKGREY);
+    tft.setTextColor(calTxt, calBg);
+    tft.drawString("CAL FACTOR", 25, 236, 4);
+    sprintf(b, "%.2f", calibrationFactor);
+    tft.drawRightString(b, 290, 240, 2);
+
+    // HX711 status bar
+    uint16_t statusBg  = hx711Status ? 0x0400 : TFT_RED;
+    tft.fillRect(10, 292, 300, 45, statusBg);
+    tft.drawRect(10, 292, 300, 45, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, statusBg);
+    tft.drawCentreString(hx711Status ? "HX711  OK" : "HX711  FAILED", CENTER_X, 308, 2);
+
+    // Navigation hints
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP / DOWN : NAVIGATE", CENTER_X, 352, 2);
+    tft.drawCentreString("LEFT / RIGHT : ADJUST FACTOR  +-10", CENTER_X, 375, 2);
+    tft.drawCentreString("RETURN : GO BACK", CENTER_X, 450, 2);
+  }
+
+  // Live weight value — always update
+  sprintf(b, "%.2f L", currentWeight);
+  tft.setTextColor(TFT_BLACK, 0xCE79);
+  tft.setTextPadding(200);
+  tft.drawCentreString(b, CENTER_X, 90, 4);
+  tft.setTextPadding(0);
+
+  // Always refresh cal factor value in case it changed
+  if (!valuesOnly) return;
+  uint16_t calBg  = (loadCellSelection == 1) ? 0x3566 : 0xD6BA;
+  uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
+  sprintf(b, "%.2f", calibrationFactor);
+  tft.setTextColor(calTxt, calBg);
+  tft.setTextPadding(120);
+  tft.drawRightString(b, 290, 240, 2);
+  tft.setTextPadding(0);
+}
+
 void drawSystemCheckMenu() {
   if (systemCheckNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
@@ -352,7 +422,7 @@ void drawSensorMonitorPage(bool valuesOnly) {
       tft.setTextColor(TFT_WHITE);
       tft.drawCentreString("KEY VALUES", CENTER_X, 15, 4);
       tft.setTextColor(TFT_BLACK);
-      tft.drawCentreString("SELECT: CALIBRATE", CENTER_X, 420, 2);
+      tft.drawCentreString("SELECT: LOAD CELL", CENTER_X, 420, 2);
       tft.drawCentreString("RETURN: GO BACK",   CENTER_X, 450, 2);
       monitorNeedsFullRedraw = false;
     }

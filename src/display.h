@@ -9,6 +9,7 @@ void drawMixerMenu();
 void drawNewBrewWizard();
 void drawDashboardLayout();
 void drawStartMenu();
+void drawLoadCellPage(bool valuesOnly = false);
 void drawSystemCheckMenu();
 void drawFanTestPick();
 void drawFanTestMenu();

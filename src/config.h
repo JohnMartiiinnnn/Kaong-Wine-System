@@ -67,6 +67,7 @@ enum AppState {
   MIXER_MENU,
   SENSOR_MONITOR,
   CALIBRATION_MODE,
+  LOAD_CELL_PAGE,
   SYSTEM_CHECK_MENU,
   FAN_TEST_PICK,
   FAN_TEST_MENU,
@@ -155,6 +156,8 @@ extern int lastDashSelection;
 extern bool monitorNeedsFullRedraw;
 extern bool calNeedsFullRedraw;
 extern int calSelection;
+extern bool loadCellNeedsFullRedraw;
+extern int loadCellSelection;
 extern int systemCheckSelection;
 extern int fanTestSelection;
 extern int fanTestRow;
