@@ -563,8 +563,8 @@ void loop() {
       currentAppState = FAN_TEST_MENU;
       fanTestNeedsFullRedraw = true;
       fanTestRow = 0;
-      fanTestSpeed = 100;
-      setFanSpeed(100);
+      fanTestSpeed = 0;
+      setFanSpeed(0);
       drawFanTestMenu();
     } else if (currentAppState == FAN_TEST_MENU) {
       if (currentFanMode == FAN_OFF) {
