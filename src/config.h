@@ -26,7 +26,11 @@ const int ONE_WIRE_BUS = 26;
 
 // MCP23017 pin numbers (GPA = 0-7, GPB = 8-15)
 static const int RELAY_PINS[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-const int FAN_RELAY_PIN = 15;    // GPB7
+const int FAN_RELAY_PIN = 15;    // GPB7 (Pre-Heating)
+const int FERM_FAN_RELAY_PIN = 0; // GPA0
+const int LIGHT_R = 7;           // GPA7
+const int LIGHT_Y = 6;           // GPA6
+const int LIGHT_G = 5;           // GPA5
 const int BTN_RIGHT_PIN = 8;     // GPB0
 const int BTN_LEFT_PIN = 9;      // GPB1
 const int BTN_UP_PIN = 10;       // GPB2
@@ -62,7 +66,11 @@ enum AppState {
   COOLING_MENU,
   MIXER_MENU,
   SENSOR_MONITOR,
-  CALIBRATION_MODE
+  CALIBRATION_MODE,
+  SYSTEM_CHECK_MENU,
+  FAN_TEST_PICK,
+  FAN_TEST_MENU,
+  LIGHT_TEST_MENU
 };
 
 const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
@@ -118,6 +126,10 @@ extern char brewStartTime[32];
 extern int currentSpeedPercent;
 extern int currentHeatingPercent;
 extern bool isFanOn;
+extern bool isFermFanOn;
+extern bool isLight1On;
+extern bool isLight2On;
+extern bool isLight3On;
 extern FanMode currentFanMode;
 extern bool isSystemHalted;
 extern int estopState;
@@ -143,6 +155,15 @@ extern int lastDashSelection;
 extern bool monitorNeedsFullRedraw;
 extern bool calNeedsFullRedraw;
 extern int calSelection;
+extern int systemCheckSelection;
+extern int fanTestSelection;
+extern int fanTestRow;
+extern int fanTestFanChoice;
+extern int fanTestSpeed;
+extern int lightTestSelection;
+extern bool systemCheckNeedsFullRedraw;
+extern bool fanTestNeedsFullRedraw;
+extern bool lightTestNeedsFullRedraw;
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;
