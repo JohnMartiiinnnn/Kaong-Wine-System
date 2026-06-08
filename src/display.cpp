@@ -273,7 +273,7 @@ void drawLightTestMenu() {
     lightTestNeedsFullRedraw = false;
   }
 
-  const char *lightLabels[] = {"INDICATOR RED", "INDICATOR YELLOW", "INDICATOR GREEN"};
+  const char *lightLabels[] = {"RED", "YELLOW", "GREEN"};
   bool        lightStates[] = {isLight1On, isLight2On, isLight3On};
   uint16_t    ledColors[]   = {TFT_RED, TFT_YELLOW, TFT_GREEN};
 

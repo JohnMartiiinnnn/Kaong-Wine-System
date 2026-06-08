@@ -234,30 +234,73 @@ void loop() {
   char buf[64];
 
   // Emergency stop
+  static uint32_t haltHoldStart = 0;
+  static bool haltHoldActive = false;
+  static uint8_t lastHoldPct = 255;
   bool ces = mcp.digitalRead(ESTOP_BUTTON_PIN);
+
+  if (isSystemHalted) {
+    // Long-press e-stop for 3s to reset
+    if (ces == LOW) {
+      if (!haltHoldActive) {
+        haltHoldActive = true;
+        haltHoldStart = millis();
+        lastHoldPct = 255;
+      }
+      uint32_t held = millis() - haltHoldStart;
+      uint8_t pct = (uint8_t)min(held * 100 / 3000UL, 100UL);
+      if (pct != lastHoldPct) {
+        lastHoldPct = pct;
+        tft.fillRect(40, 300, 240, 20, TFT_DARKGREY);
+        tft.fillRect(40, 300, (int)(240 * pct / 100), 20, TFT_WHITE);
+        tft.drawRect(40, 300, 240, 20, TFT_WHITE);
+      }
+      if (held >= 3000) {
+        isSystemHalted = false;
+        haltHoldActive = false;
+        currentAppState = START_MENU;
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
+      }
+    } else {
+      if (haltHoldActive) {
+        haltHoldActive = false;
+        // Reset progress bar
+        tft.fillRect(40, 300, 240, 20, TFT_RED);
+        tft.drawRect(40, 300, 240, 20, TFT_WHITE);
+      }
+    }
+    les = ces;
+    return;
+  }
+
   if (ces == LOW && les == HIGH) {
-    if (estopState == 0 && !isSystemHalted) {
+    if (estopState == 0) {
       estopState = 1;
       drawEstopPage();
     } else if (estopState == 1) {
       isSystemHalted = true;
       estopState = 0;
+      haltHoldActive = false;
       for (int i = 0; i < 8; i++)
         mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
       setMixerSpeed(0);
       currentMixerMode = MIXER_OFF;
       mixerRunning = false;
+      isFanOn = false;
+      isFermFanOn = false;
       tft.fillScreen(TFT_RED);
       tft.setTextColor(TFT_WHITE);
-      tft.drawCentreString("SYSTEM HALTED", 160, 100, 4);
-      tft.drawCentreString("REBOOT TO RESET", 160, 200, 2);
+      tft.drawCentreString("SYSTEM HALTED", 160, 80, 4);
+      tft.drawCentreString("HOLD ESTOP 3s TO RESET", 160, 200, 2);
+      tft.fillRect(40, 300, 240, 20, TFT_RED);
+      tft.drawRect(40, 300, 240, 20, TFT_WHITE);
     }
   }
   les = ces;
-  if (isSystemHalted)
-    return;
 
   // Button reads
   bool rawRight = (mcp.digitalRead(BTN_RIGHT_PIN) == LOW);
