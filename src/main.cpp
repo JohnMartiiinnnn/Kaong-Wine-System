@@ -45,6 +45,10 @@ uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
 float originalGravity = 0.0;
+bool ogCapturing = false;
+int ogSampleCount = 0;
+float ogSampleSum = 0.0f;
+const int OG_SAMPLES = 5;
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -550,7 +554,10 @@ void loop() {
           sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
                   now.hour(), now.minute());
         }
-        originalGravity = incomingData.pillGravity;
+        originalGravity = 0.0f;
+        ogSampleSum = 0.0f;
+        ogSampleCount = 0;
+        ogCapturing = true;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -832,6 +839,14 @@ void loop() {
       incomingData = t;
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
+      if (ogCapturing && incomingData.pillGravity > 0.5f) {
+        ogSampleSum += incomingData.pillGravity;
+        ogSampleCount++;
+        if (ogSampleCount >= OG_SAMPLES) {
+          originalGravity = ogSampleSum / ogSampleCount;
+          ogCapturing = false;
+        }
+      }
     }
   }
 
