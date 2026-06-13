@@ -44,6 +44,7 @@ struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
+float originalGravity = 0.0;
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
@@ -549,6 +550,7 @@ void loop() {
           sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
                   now.hour(), now.minute());
         }
+        originalGravity = incomingData.pillGravity;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -828,6 +830,7 @@ void loop() {
     Serial2.readBytes((uint8_t *)&t, sizeof(t));
     if (t.signature == 0xDEADBEEF && calculateChecksum(t) == t.checksum) {
       incomingData = t;
+      incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
     }
   }
@@ -980,6 +983,15 @@ void loop() {
           sprintf(buf, "%s: %d%%", mxTxt[currentMixerMode], mixerSpeedPercent);
           tft.drawCentreString(buf, CENTER_X, y + 310, 2);
         }
+        if (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0) {
+          float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
+          if (abv < 0.0f) abv = 0.0f;
+          dtostrf(abv, 4, 2, buf);
+          strcat(buf, "%");
+        } else {
+          strcpy(buf, "--");
+        }
+        tft.drawCentreString(buf, CENTER_X, y + 344, 2);
 
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);

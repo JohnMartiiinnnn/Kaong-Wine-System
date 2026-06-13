@@ -40,6 +40,7 @@ const int ESTOP_BUTTON_PIN = 14; // GPB6
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
+#define GRAVITY_OFFSET 0.009
 
 const int PWM_PIN = 25;
 const int SD_CS_PIN = 5;
@@ -119,6 +120,7 @@ extern struct_message incomingData;
 extern uint32_t lastDataReceivedMillis;
 extern float currentWeight;
 extern float calibrationFactor;
+extern float originalGravity;
 extern String currentLogFile;
 extern char lastLogTime[10];
 extern char brewStartTime[32];

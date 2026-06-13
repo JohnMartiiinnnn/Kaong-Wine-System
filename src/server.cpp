@@ -34,6 +34,7 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
   <div class="card"><div class="label">Ferm Liquid</div><div class="val" id="fl">--</div><span class="unit">C</span></div>
   <div class="card"><div class="label">pH Level</div><div class="val" id="ph">--</div></div>
   <div class="card"><div class="label">Gravity</div><div class="val" id="sg">--</div></div>
+  <div class="card"><div class="label">ABV</div><div class="val" id="abv">--</div><span class="unit">%</span></div>
 </div>
 <script>
 async function update(){
@@ -47,6 +48,7 @@ async function update(){
     document.getElementById('fl').innerText=d.fl.toFixed(1);
     document.getElementById('ph').innerText=d.ph.toFixed(2);
     document.getElementById('sg').innerText=d.sg.toFixed(4);
+    document.getElementById('abv').innerText=d.abv.toFixed(2);
   }catch(e){}
 }
 setInterval(update,1000);
@@ -65,7 +67,10 @@ void handleData() {
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue) + ",";
-  json += "\"sg\":" + String(incomingData.pillGravity);
+  json += "\"sg\":" + String(incomingData.pillGravity) + ",";
+  float abv = (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0)
+              ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
+  json += "\"abv\":" + String(abv);
   json += "}";
   server.send(200, "application/json", json);
 }

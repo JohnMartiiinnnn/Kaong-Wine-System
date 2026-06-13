@@ -162,6 +162,7 @@ void drawDashboardLayout() {
       tft.drawCentreString("SIGNAL",     80,  y + 210, 2);
       tft.drawCentreString("BATTERY",    240, y + 210, 2);
       tft.drawCentreString("MIXER",      CENTER_X, y + 285, 2);
+      tft.drawCentreString("ABV",        CENTER_X, y + 326, 2);
     } else if (dashSelection == 2) {
       tft.drawCentreString("PAST. TEMP",     CENTER_X, y + 60,  2);
       tft.drawCentreString("PROCESS STATUS", CENTER_X, y + 130, 2);

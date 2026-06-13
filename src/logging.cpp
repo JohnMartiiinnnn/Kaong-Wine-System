@@ -17,7 +17,7 @@ void logDataToSD() {
   if (!dataFile)
     return;
   if (!fileExists)
-    dataFile.println("Date,Time,LocalTemp,LocalLiquid1,LocalLiquid2,RemoteTemp,RemoteLiquid,Gravity,pH");
+    dataFile.println("Date,Time,LocalTemp,LocalLiquid1,LocalLiquid2,RemoteTemp,RemoteLiquid,Gravity,pH,ABV");
   sprintf(lastLogTime, "%02d:%02d", now.hour(), now.minute());
   dataFile.print(now.year(), DEC);   dataFile.print('/');
   dataFile.print(now.month(), DEC);  dataFile.print('/');
@@ -31,7 +31,10 @@ void logDataToSD() {
   dataFile.print(incomingData.room2Temp); dataFile.print(',');
   dataFile.print(incomingData.ds18Status == 1 ? incomingData.room2LiquidTemp : 0.0); dataFile.print(',');
   dataFile.print(incomingData.pillGravity, 4); dataFile.print(',');
-  dataFile.print(incomingData.phValue, 2);
+  dataFile.print(incomingData.phValue, 2);     dataFile.print(',');
+  float abv = (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0)
+              ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
+  dataFile.print(abv, 2);
   dataFile.println();
   dataFile.close();
 }
