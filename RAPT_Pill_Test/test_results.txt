@@ -1,0 +1,64 @@
+RAPT Pill BLE Test Results
+==========================
+Date: 2026-06-13
+Hardware: Primary ESP32 (temporarily flashed with RAPT_Pill_Test firmware)
+Medium: Tap water (room temperature)
+
+
+--- PHASE 1: Raw Readings (No Gravity Offset) ---
+
+Firmware: Initial version with GRAVITY_OFFSET not yet applied.
+The RAPT Pill was submerged in tap water. Expected SG on water = 1.0000.
+Observed readings were consistently below 1.000, indicating a calibration offset is needed.
+
+SG: 0.9910  Temp: 31.25C  Batt: 100%  RSSI: -77 dBm
+SG: 0.9912  Temp: 31.12C  Batt: 100%  RSSI: -69 dBm
+SG: 0.9911  Temp: 30.94C  Batt: 100%  RSSI: -73 dBm
+
+Average raw SG on water: ~0.9911
+Offset required: 1.0000 - 0.9911 = 0.0089, rounded to 0.009
+
+
+--- PHASE 2: Calibration Applied (GRAVITY_OFFSET = 0.009) ---
+
+Firmware updated to apply GRAVITY_OFFSET = 0.009f to each decoded SG reading.
+Same test conditions: RAPT Pill submerged in tap water.
+
+SG: 1.0002  Temp: 30.75C  Batt: 100%  RSSI: -67 dBm
+SG: 1.0002  Temp: 30.62C  Batt: 100%  RSSI: -69 dBm
+SG: 0.9990  Temp: 30.56C  Batt: 100%  RSSI: -78 dBm
+SG: 0.9996  Temp: 30.62C  Batt: 100%  RSSI: -84 dBm
+SG: 0.9996  Temp: 30.62C  Batt: 100%  RSSI: -89 dBm
+
+Calibrated readings are now within +/- 0.001 of 1.0000 on water. Acceptable.
+
+
+--- NOTES ---
+
+Temperature (~30-31C):
+  The RAPT Pill sensor measures liquid temperature, not ambient air.
+  Tap water sitting out or slight self-heating from the pill's BLE radio
+  accounts for the reading being above room temperature. This is normal.
+
+RSSI variation (-67 to -89 dBm):
+  Signal strength fluctuates naturally due to BLE advertising intervals,
+  multipath interference, and the pill's orientation in water. This does
+  not affect gravity or temperature accuracy.
+
+Duplicate suppression:
+  An earlier firmware version printed every BLE advertisement, flooding
+  the serial monitor. The final firmware only prints when the SG value
+  changes, keeping output clean and readable.
+
+Serial garbage on monitor open:
+  The ESP32 boot ROM outputs at 74880 baud. Opening the monitor at 115200
+  causes the initial boot log to appear as garbage characters. This is
+  normal and stops once the application starts.
+
+
+--- CALIBRATION APPLIED TO MAIN FIRMWARE ---
+
+GRAVITY_OFFSET = 0.009 is defined in src/config.h and applied in
+src/main.cpp at the UART receive point (after Secondary ESP32 transmits
+raw pill data). All downstream systems (display, logging, web UI, ABV
+calculation) use the corrected value automatically.
