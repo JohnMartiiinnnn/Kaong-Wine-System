@@ -31,10 +31,10 @@ src/
 ### Hardware Connections
 *   **Display:** 3.5" TFT LCD (ILI9488) via SPI.
 *   **GPIO Expansion (MCP23017):**
-    *   **GPA0-GPA7:** 8-Channel Relay Module.
-    *   **GPB0-GPB4:** 5-Button Keypad (Right, Left, Up, Down, Select).
-    *   **GPB6:** Emergency Stop Button.
-    *   **GPB7:** Fan Relay.
+    *   **GPB0-GPB7:** 8-Channel Relay Module.
+    *   **GPA0-GPA4:** 5-Button Keypad (Right, Left, Up, Down, Select).
+    *   **GPA6:** Emergency Stop Button.
+    *   **GPA7:** Fan Relay.
 *   **Sensors:**
     *   **BME280:** Ambient Temperature (Pre-heating area).
     *   **DS18B20 (x2):** Liquid temperatures (Vat/Pasteurization) on a shared OneWire bus (pin 26).
@@ -121,22 +121,43 @@ Controllers exchange data using a packed C-struct over `Serial2` at 115200 baud.
 | **TFT CS** | 15 | SPI |
 | **TFT DC** | 2 | SPI |
 | **TFT RST** | 4 | SPI |
+| **Touchscreen CS** | 33 | SPI |
 | **SD CS** | 5 | SPI |
-| **SPI SCLK** | 18 | Shared |
-| **SPI MOSI** | 23 | Shared |
-| **SPI MISO** | 19 | Shared |
-| **I2C SDA** | 21 | RTC, MCP23017 |
-| **I2C SCL** | 22 | RTC, MCP23017 |
-| **PWM Fan** | 25 | 25 kHz PWM |
-| **OneWire** | 26 | DS18B20 (shared bus) |
-| **HX711 DT** | 36 | Load Cell data |
-| **HX711 SCK** | 27 | Load Cell clock |
-| **UART RX** | 16 | From Secondary |
-| **UART TX** | 17 | To Secondary |
-| **AC ZC** | 32 | Zero Cross |
-| **AC DIM1** | 14, 12 | Dimmer Channels |
-| **AC DIM2** | 13 | Shared |
-| **Motor PWM** | TBD | TB6612FN PWMA (LEDC ch1) — no free GPIO currently |
+| **SPI SCLK** | 18 | Shared: SD, TFT, Touchscreen |
+| **SPI MOSI** | 23 | Shared: SD, TFT, Touchscreen |
+| **SPI MISO** | 19 | Shared (TFT MISO disconnected) |
+| **I2C SDA** | 21 | RTC DS3231 + MCP23017 |
+| **I2C SCL** | 22 | RTC DS3231 + MCP23017 |
+| **Heater/Fan PWM** | 25 | LEDC ch0, 25 kHz, 8-bit |
+| **OneWire** | 26 | DS18B20 shared bus (both liquid temp sensors) |
+| **HX711 DT** | 36 | Load cell data (input-only) |
+| **HX711 SCK** | 27 | Load cell clock |
+| **UART RX** | 16 | Serial2 from Secondary ESP32 |
+| **UART TX** | 17 | Serial2 to Secondary ESP32 |
+| **AC Zero-Cross** | 32 | INPUT_PULLUP, shared by all dimmer channels |
+| **AC Dimmer 1 CH1** | 14 | TRIAC trigger |
+| **AC Dimmer 1 CH2** | 12 | TRIAC trigger |
+| **AC Dimmer 2** | 13 | TRIAC trigger (shared channel) |
+| **Motor PWM** | 0 | TB6612FN PWMA (LEDC ch1, 1 kHz) — boot pin, disconnect driver during flashing. Currently set to -1 in config.h pending confirmation. |
+
+### MCP23017 Pin Assignments
+
+| MCP Pin | Name in config.h | Function |
+| :--- | :--- | :--- |
+| GPA0 | `BTN_RIGHT_PIN` | Keypad RIGHT |
+| GPA1 | `BTN_LEFT_PIN` | Keypad LEFT |
+| GPA2 | `BTN_UP_PIN` | Keypad UP |
+| GPA3 | `BTN_DOWN_PIN` | Keypad DOWN |
+| GPA4 | `BTN_SELECT_PIN` | Keypad SELECT |
+| GPA5 | — | Unused |
+| GPA6 | `ESTOP_BUTTON_PIN` | Emergency stop |
+| GPA7 | `FAN_RELAY_PIN` | Pre-heating fan relay |
+| GPB0 | `FERM_FAN_RELAY_PIN`  | Fermentation fan relay 1 |
+| GPB1 | `FERM_FAN2_RELAY_PIN` | Fermentation fan relay 2 |
+| GPB2–GPB4 | `RELAY_PINS[2–4]` | General relay channels |
+| GPB5 | `LIGHT_G` | Status light — Green |
+| GPB6 | `LIGHT_Y` | Status light — Yellow |
+| GPB7 | `LIGHT_R` | Status light — Red |
 
 ---
 

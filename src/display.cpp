@@ -268,14 +268,14 @@ void drawSystemCheckMenu() {
     tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
     systemCheckNeedsFullRedraw = false;
   }
-  const char *options[] = {"FAN TEST", "LIGHT INDICATORS"};
-  for (int i = 0; i < 2; i++) {
+  const char *options[] = {"FAN TEST", "LIGHT INDICATORS", "RELAY TEST"};
+  for (int i = 0; i < 3; i++) {
     uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 80 + (i * 100), 280, 80, color);
-    tft.drawRect(20, 80 + (i * 100), 280, 80, TFT_DARKGREY);
+    tft.fillRect(20, 70 + (i * 110), 280, 80, color);
+    tft.drawRect(20, 70 + (i * 110), 280, 80, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 110 + (i * 100), 4);
+    tft.drawCentreString(options[i], CENTER_X, 100 + (i * 110), 4);
   }
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
@@ -363,6 +363,46 @@ void drawLightTestMenu() {
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 420, 2);
   tft.drawCentreString("RETURN TO EXIT", CENTER_X, 450, 2);
+}
+
+void drawRelayTestMenu() {
+  if (relayTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("RELAY TEST", CENTER_X, 15, 4);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("AUTO-SEQUENCING  500ms/CH", CENTER_X, 410, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawCentreString("RETURN TO EXIT", CENTER_X, 450, 2);
+    relayTestNeedsFullRedraw = false;
+  }
+
+  // Channel labels and circle centers: 2 rows of 4, x=40,120,200,280
+  const int cx[4]    = {40, 120, 200, 280};
+  const int rowY[2]  = {170, 310};
+  const int r        = 30;
+  const char *labels[8] = {"CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8"};
+
+  for (int i = 0; i < 8; i++) {
+    int row = i / 4;
+    int col = i % 4;
+    bool active      = (relayTestChannel == i);
+    uint16_t fill    = active ? TFT_GREEN : 0xC618;
+    uint16_t outline = active ? 0x0300 : TFT_DARKGREY;
+    tft.fillCircle(cx[col], rowY[row], r, fill);
+    tft.drawCircle(cx[col], rowY[row], r, outline);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.fillRect(cx[col] - 18, rowY[row] + r + 4, 36, 14, TFT_WHITE);
+    tft.drawCentreString(labels[i], cx[col], rowY[row] + r + 5, 1);
+  }
+
+  // Active channel banner
+  char buf[18];
+  sprintf(buf, "ACTIVE: CH%d", relayTestChannel + 1);
+  tft.fillRect(0, 55, 320, 28, TFT_WHITE);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString(buf, CENTER_X, 62, 2);
 }
 
 void drawValueTile(int x, int y, const char *label, String value, bool isError) {

@@ -1,18 +1,17 @@
 /*
  * WIRING FOR MAIN ESP32:
  * SD Card: CS->5, MISO->19 (LCD MISO Disconnected), MOSI->23, SCLK->18
- * OneWire 1 (Liquid Temp): Data->27
- * OneWire 2 (Secondary Liquid Temp): Data->26
+ * OneWire (Liquid Temps, shared bus): Data->26
  * RTC (DS3231): SDA->21, SCL->22
  * TFT LCD: CS->15, DC->2, RST->4, MOSI->23, SCLK->18
  * TOUCHSCREEN: CS->33, CLK->18, DIN->23, DO->19
  * AC DIMMER 1: CH1->14, CH2->12
  * AC DIMMER 2: SHARED->13
  * AC ZERO-CROSS: 32
- * MCP23017 GPA0-7: 8-Channel Relay Module
- * FAN RELAY: GPB7 (MCP)
- * KEYPAD: RIGHT->GPB0, LEFT->GPB1, UP->GPB2, DOWN->GPB3, SELECT->GPB4 (MCP)
- * EMERGENCY STOP: GPB6 (MCP)
+ * MCP23017 GPB0-7: 8-Channel Relay Module
+ * FAN RELAY: GPA7 (MCP)
+ * KEYPAD: RIGHT->GPA0, LEFT->GPA1, UP->GPA2, DOWN->GPA3, SELECT->GPA4 (MCP)
+ * EMERGENCY STOP: GPA6 (MCP)
  */
 
 #include "config.h"
@@ -97,6 +96,9 @@ int lightTestSelection = 0;
 bool systemCheckNeedsFullRedraw = true;
 bool fanTestNeedsFullRedraw = true;
 bool lightTestNeedsFullRedraw = true;
+bool relayTestNeedsFullRedraw = true;
+int  relayTestChannel = 0;
+uint32_t relayTestTimer = 0;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -199,6 +201,8 @@ void setup() {
     mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
     mcp.pinMode(FERM_FAN_RELAY_PIN, OUTPUT);
     mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+    mcp.pinMode(FERM_FAN2_RELAY_PIN, OUTPUT);
+    mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
     mcp.pinMode(LIGHT_R, OUTPUT);
     mcp.digitalWrite(LIGHT_R, RELAY_OFF);
     mcp.pinMode(LIGHT_Y, OUTPUT);
@@ -293,6 +297,7 @@ void loop() {
         mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
       setMixerSpeed(0);
       currentMixerMode = MIXER_OFF;
@@ -461,7 +466,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 2;
+      systemCheckSelection = (systemCheckSelection + 1) % 3;
       drawSystemCheckMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -507,7 +512,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 2;
+      systemCheckSelection = (systemCheckSelection + 2) % 3;
       drawSystemCheckMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -613,11 +618,18 @@ void loop() {
         fanTestNeedsFullRedraw = true;
         fanTestFanChoice = 0;
         drawFanTestPick();
-      } else {
+      } else if (systemCheckSelection == 1) {
         currentAppState = LIGHT_TEST_MENU;
         lightTestNeedsFullRedraw = true;
         lightTestSelection = 0;
         drawLightTestMenu();
+      } else {
+        relayTestChannel = 0;
+        relayTestNeedsFullRedraw = true;
+        relayTestTimer = millis();
+        mcp.digitalWrite(RELAY_PINS[0], RELAY_ON);
+        currentAppState = RELAY_TEST_MENU;
+        drawRelayTestMenu();
       }
     } else if (currentAppState == FAN_TEST_PICK) {
       currentAppState = FAN_TEST_MENU;
@@ -642,7 +654,8 @@ void loop() {
         isFermFanOn = false;
       }
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN,  isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
       drawFanTestMenu();
     } else if (currentAppState == LIGHT_TEST_MENU) {
       if (lightTestSelection == 0) {
@@ -763,9 +776,15 @@ void loop() {
       isFermFanOn = false;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
       drawFanTestPick();
     } else if (currentAppState == LIGHT_TEST_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == RELAY_TEST_MENU) {
+      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -777,6 +796,15 @@ void loop() {
   ljUp = cUp;
   ljDown = cDown;
   ljSelect = cSelect;
+
+  // Relay test auto-advance (500ms per channel)
+  if (currentAppState == RELAY_TEST_MENU && millis() - relayTestTimer > 500) {
+    mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+    relayTestChannel = (relayTestChannel + 1) % 8;
+    mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
+    relayTestTimer = millis();
+    drawRelayTestMenu();
+  }
 
   // SD card health check (1s)
   if (millis() - ls > 1000) {
