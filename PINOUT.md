@@ -30,6 +30,32 @@
 
 ---
 
+## HX711 Load Cell
+
+### HX711 → ESP32
+
+| HX711 Pin | ESP32 GPIO | config.h name |
+|-----------|-----------|---------------|
+| DT (DOUT) | GPIO 36 | `HX711_DT_PIN` |
+| SCK (PD_SCK) | GPIO 27 | `HX711_SCK_PIN` |
+| VCC | 3.3 V | — |
+| GND | GND | — |
+
+> GPIO 36 is input-only (no internal pullup). HX711 drives DOUT actively so this is fine.
+
+### Load Cell → HX711
+
+| Load cell wire | HX711 terminal | Role |
+|----------------|----------------|------|
+| Red | E+ | Excitation + |
+| Black | E- | Excitation – |
+| White | A+ | Signal + |
+| Green | A– | Signal – |
+
+> Use Channel A (128× gain, default). Channel B is unused.
+
+---
+
 ## AC Dimmer Detail
 
 | Signal | ESP32 Pin | Role |
@@ -75,4 +101,31 @@ Zero-cross fires an interrupt on GPIO 32; after a delay proportional to the desi
 
 ## Secondary ESP32 (Sensor Node)
 
-The Secondary transmits over UART2 (115200 baud) to the Primary. Its own GPIO assignments are in `Secondary_Transmitter/src/main.cpp`. Key peripherals: BME280/BMP280 (I2C), DS18B20 (OneWire), ADS1115 + PH4502C (I2C), NimBLE scanner.
+The Secondary transmits over UART2 (115200 baud) to the Primary. Source: `Secondary_Transmitter/src/main.cpp`.
+
+### Direct GPIO
+
+| GPIO | Signal | Notes |
+|------|--------|-------|
+| 13 | OneWire Bus (`ONE_WIRE_BUS`) | DS18B20 fermentation liquid temp; 4.7 kΩ pullup to 3.3 V |
+| 16 | UART2 RX | Serial2 — from Primary ESP32 (crosses to Primary TX=17) |
+| 17 | UART2 TX | Serial2 — to Primary ESP32 (crosses to Primary RX=16) |
+| 21 | I2C SDA | BME280/BMP280 + ADS1115 |
+| 22 | I2C SCL | BME280/BMP280 + ADS1115 |
+
+> **BLE:** NimBLE uses the built-in radio — no external GPIO required.
+
+---
+
+### I2C Devices
+
+| Device | Address | Function | Address config |
+|--------|---------|----------|---------------|
+| BME280 or BMP280 | 0x77 | Fermentation ambient temp & pressure | CSB → 3.3 V, SDO → 3.3 V |
+| ADS1115 | 0x48 | 16-bit ADC for pH sensor | ADDR → GND (default) |
+
+### Analog Input
+
+| ADS1115 Channel | Source | Function |
+|-----------------|--------|----------|
+| A0 | PH4502C `Po` pin | pH voltage output |
