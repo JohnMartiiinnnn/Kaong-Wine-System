@@ -886,8 +886,8 @@ void loop() {
   if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
     lastScaleMillis = millis();
     
-    // Read 5 samples and average them (takes ~500ms)
-    float rawW = scale.get_units(5);
+    // Single read — is_ready() already confirmed data is waiting, so no blocking delay
+    float rawW = scale.get_units(1);
     
     // 1. Ignore extreme garbage (massive spikes)
     if (rawW < -5.0f || rawW > 70.0f) {
