@@ -378,28 +378,31 @@ void drawRelayTestMenu() {
     relayTestNeedsFullRedraw = false;
   }
 
-  // Channel labels and circle centers: 2 rows of 4, x=40,120,200,280
-  const int cx[4]    = {40, 120, 200, 280};
-  const int rowY[2]  = {170, 310};
-  const int r        = 30;
-  const char *labels[8] = {"CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8"};
+  // Channel labels and circle centers: 3 rows of 3, x=55,160,265
+  const int cx[3]    = {55, 160, 265};
+  const int rowY[3]  = {120, 230, 340};
+  const int r        = 35;
+  const char *labels[9] = {"CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8","FAN"};
 
-  for (int i = 0; i < 8; i++) {
-    int row = i / 4;
-    int col = i % 4;
+  for (int i = 0; i < 9; i++) {
+    int row = i / 3;
+    int col = i % 3;
     bool active      = (relayTestChannel == i);
     uint16_t fill    = active ? TFT_GREEN : 0xC618;
     uint16_t outline = active ? 0x0300 : TFT_DARKGREY;
     tft.fillCircle(cx[col], rowY[row], r, fill);
     tft.drawCircle(cx[col], rowY[row], r, outline);
     tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.fillRect(cx[col] - 18, rowY[row] + r + 4, 36, 14, TFT_WHITE);
+    tft.fillRect(cx[col] - 20, rowY[row] + r + 4, 40, 14, TFT_WHITE);
     tft.drawCentreString(labels[i], cx[col], rowY[row] + r + 5, 1);
   }
 
   // Active channel banner
-  char buf[18];
-  sprintf(buf, "ACTIVE: CH%d", relayTestChannel + 1);
+  char buf[20];
+  if (relayTestChannel < 8)
+    sprintf(buf, "ACTIVE: CH%d", relayTestChannel + 1);
+  else
+    sprintf(buf, "ACTIVE: FAN");
   tft.fillRect(0, 55, 320, 28, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString(buf, CENTER_X, 62, 2);

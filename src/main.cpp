@@ -784,7 +784,8 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == RELAY_TEST_MENU) {
-      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+      if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+      else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -799,9 +800,11 @@ void loop() {
 
   // Relay test auto-advance (500ms per channel)
   if (currentAppState == RELAY_TEST_MENU && millis() - relayTestTimer > 500) {
-    mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
-    relayTestChannel = (relayTestChannel + 1) % 8;
-    mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
+    if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+    else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+    relayTestChannel = (relayTestChannel + 1) % 9;
+    if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
+    else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
     relayTestTimer = millis();
     drawRelayTestMenu();
   }
