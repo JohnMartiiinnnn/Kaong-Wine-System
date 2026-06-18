@@ -2,9 +2,11 @@
 #include <Adafruit_BME280.h>
 #include <Adafruit_BMP280.h>
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <DallasTemperature.h>
 #include <NimBLEDevice.h>
 #include <OneWire.h>
+#include <WiFi.h>
 #include <Wire.h>
 
 /*
@@ -17,6 +19,21 @@
  */
 
 const int ONE_WIRE_BUS = 13;
+
+// TB6612FN motor driver (JGB37-545)
+#define PWMA_PIN      25
+#define AIN1_PIN      26
+#define AIN2_PIN      27
+#define MOTOR_LEDC_CH  1
+#define MOTOR_FREQ  1000
+
+// Motor command struct (matches main ESP32)
+typedef struct __attribute__((packed)) {
+  uint32_t signature; // 0xC0DEBABE
+  uint8_t  motorSpeed;
+  uint8_t  motorCW;
+  uint8_t  checksum;
+} motor_cmd_t;
 
 // Structure to send data (Updated to include framing and checksum)
 typedef struct __attribute__((packed)) {
@@ -168,7 +185,13 @@ void setup() {
     Serial.println("not found");
   }
 
-  // 5. BLE Setup
+  // 5. WiFi + OTA
+  WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
+  { uint32_t t = millis(); while (WiFi.status() != WL_CONNECTED && millis() - t < 8000) delay(100); }
+  ArduinoOTA.setHostname("winebrew-secondary");
+  ArduinoOTA.begin();
+
+  // 6. BLE Setup
   Serial.print("BLE decoder: ");
   NimBLEDevice::init("");
   pBLEScan = NimBLEDevice::getScan();
@@ -187,6 +210,15 @@ void setup() {
     Serial.println("failed to initialize");
   }
 
+  // 6. Motor driver setup
+  pinMode(AIN1_PIN, OUTPUT);
+  pinMode(AIN2_PIN, OUTPUT);
+  digitalWrite(AIN1_PIN, HIGH);
+  digitalWrite(AIN2_PIN, LOW);
+  ledcSetup(MOTOR_LEDC_CH, MOTOR_FREQ, 8);
+  ledcAttachPin(PWMA_PIN, MOTOR_LEDC_CH);
+  ledcWrite(MOTOR_LEDC_CH, 0);
+
   // Send initial status immediately
   txData.signature = 0xDEADBEEF;
   txData.checksum = calculateChecksum(txData);
@@ -194,6 +226,8 @@ void setup() {
 }
 
 void loop() {
+  ArduinoOTA.handle();
+
   // 1. Dynamic Sensor Status Check (In case they weren't ready at boot)
   if (txData.sensor2Status == 0) {
     if (bme.begin(0x77))
@@ -268,6 +302,21 @@ void loop() {
   snapshot.signature = 0xDEADBEEF;
   snapshot.checksum = calculateChecksum(snapshot);
   Serial2.write((uint8_t *)&snapshot, sizeof(snapshot));
+
+  // 6. Receive motor commands from main ESP32
+  while (Serial2.available() >= (int)sizeof(motor_cmd_t)) {
+    if (Serial2.peek() != 0xBE) { Serial2.read(); continue; }
+    motor_cmd_t cmd;
+    Serial2.readBytes((uint8_t *)&cmd, sizeof(cmd));
+    uint8_t cs = 0;
+    const uint8_t *p = (const uint8_t *)&cmd;
+    for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++) cs ^= p[i];
+    if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
+      digitalWrite(AIN1_PIN, cmd.motorCW ? HIGH : LOW);
+      digitalWrite(AIN2_PIN, cmd.motorCW ? LOW  : HIGH);
+      ledcWrite(MOTOR_LEDC_CH, map(cmd.motorSpeed, 0, 100, 0, 255));
+    }
+  }
 
   // BLE scanning happens in the background via callbacks
   if (!pBLEScan->isScanning()) {

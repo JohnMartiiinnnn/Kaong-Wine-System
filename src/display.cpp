@@ -268,14 +268,14 @@ void drawSystemCheckMenu() {
     tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
     systemCheckNeedsFullRedraw = false;
   }
-  const char *options[] = {"FAN TEST", "LIGHT INDICATORS", "RELAY TEST"};
-  for (int i = 0; i < 3; i++) {
+  const char *options[] = {"FAN TEST", "LIGHT INDICATORS", "RELAY TEST", "MOTOR TEST"};
+  for (int i = 0; i < 4; i++) {
     uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 70 + (i * 110), 280, 80, color);
-    tft.drawRect(20, 70 + (i * 110), 280, 80, TFT_DARKGREY);
+    tft.fillRect(20, 65 + (i * 90), 280, 70, color);
+    tft.drawRect(20, 65 + (i * 90), 280, 70, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 100 + (i * 110), 4);
+    tft.drawCentreString(options[i], CENTER_X, 83 + (i * 90), 4);
   }
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
@@ -372,9 +372,9 @@ void drawRelayTestMenu() {
     tft.setTextColor(TFT_WHITE);
     tft.drawCentreString("RELAY TEST", CENTER_X, 15, 4);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("AUTO-SEQUENCING  500ms/CH", CENTER_X, 410, 2);
+    tft.drawCentreString("AUTO-SEQUENCING  500ms/CH", CENTER_X, 420, 2);
     tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString("RETURN TO EXIT", CENTER_X, 450, 2);
+    tft.drawCentreString("RETURN TO EXIT", CENTER_X, 455, 2);
     relayTestNeedsFullRedraw = false;
   }
 
@@ -406,6 +406,37 @@ void drawRelayTestMenu() {
   tft.fillRect(0, 55, 320, 28, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString(buf, CENTER_X, 62, 2);
+}
+
+void drawMotorTestMenu() {
+  if (motorTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("MOTOR TEST", CENTER_X, 15, 4);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SPEED   L/R: DIR", CENTER_X, 415, 2);
+    tft.drawCentreString("SELECT: STOP   RETURN: EXIT", CENTER_X, 440, 2);
+    motorTestNeedsFullRedraw = false;
+  }
+
+  // Speed tile
+  uint16_t speedColor = (motorTestSpeed == 0) ? TFT_DARKGREY : 0x03E0;
+  tft.fillRect(20, 70, 280, 130, speedColor);
+  tft.drawRect(20, 70, 280, 130, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, speedColor);
+  tft.drawCentreString("SPEED", CENTER_X, 85, 2);
+  char buf[16];
+  sprintf(buf, "%d%%", motorTestSpeed);
+  tft.drawCentreString(buf, CENTER_X, 115, 7);
+
+  // Direction tile
+  uint16_t dirColor = motorTestCW ? 0x001F : 0xF800;
+  tft.fillRect(20, 220, 280, 130, dirColor);
+  tft.drawRect(20, 220, 280, 130, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, dirColor);
+  tft.drawCentreString("DIRECTION", CENTER_X, 235, 2);
+  tft.drawCentreString(motorTestCW ? "CLOCKWISE" : "C-CLOCKWISE", CENTER_X, 270, 4);
 }
 
 void drawValueTile(int x, int y, const char *label, String value, bool isError) {

@@ -99,6 +99,9 @@ bool lightTestNeedsFullRedraw = true;
 bool relayTestNeedsFullRedraw = true;
 int  relayTestChannel = 0;
 uint32_t relayTestTimer = 0;
+bool motorTestNeedsFullRedraw = true;
+int  motorTestSpeed = 0;
+bool motorTestCW = true;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -133,6 +136,19 @@ void setMixerSpeed(int percent) {
     percent = 100;
   mixerSpeedPercent = percent;
   ledcWrite(MOTOR_PWM_CHANNEL, map(percent, 0, 100, 0, 255));
+}
+
+// ---- Motor Command Sender ----
+void sendMotorCommand(int speed, bool cw) {
+  motor_cmd_t cmd;
+  cmd.signature  = 0xC0DEBABE;
+  cmd.motorSpeed = (uint8_t)speed;
+  cmd.motorCW    = cw ? 1 : 0;
+  cmd.checksum   = 0;
+  const uint8_t *p = (const uint8_t *)&cmd;
+  for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
+    cmd.checksum ^= p[i];
+  Serial2.write((uint8_t *)&cmd, sizeof(cmd));
 }
 
 // ---- Setup ----
@@ -225,7 +241,14 @@ void setup() {
   setMixerSpeed(0);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
+  WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
+  { uint32_t t = millis(); while (WiFi.status() != WL_CONNECTED && millis() - t < 8000) delay(100); }
+
+  ArduinoOTA.setHostname("winebrew-main");
+  ArduinoOTA.begin();
+
   if (MDNS.begin("winebrew"))
     MDNS.addService("http", "tcp", 80);
   server.on("/", HTTP_GET, handleRoot);
@@ -239,6 +262,7 @@ void setup() {
 
 // ---- Main Loop ----
 void loop() {
+  ArduinoOTA.handle();
   server.handleClient();
   static uint32_t ld = 0, ll = 0, ls = 0, lw = 0;
   static bool lsd = !sdStatus, les = HIGH;
@@ -466,7 +490,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 3;
+      systemCheckSelection = (systemCheckSelection + 1) % 4;
       drawSystemCheckMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -479,6 +503,11 @@ void loop() {
     } else if (currentAppState == LIGHT_TEST_MENU) {
       lightTestSelection = (lightTestSelection + 1) % 3;
       drawLightTestMenu();
+    } else if (currentAppState == MOTOR_TEST_MENU && cDown) {
+      motorTestSpeed -= 25;
+      if (motorTestSpeed < 0) motorTestSpeed = 0;
+      sendMotorCommand(motorTestSpeed, motorTestCW);
+      drawMotorTestMenu();
     }
   }
 
@@ -512,7 +541,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 2) % 3;
+      systemCheckSelection = (systemCheckSelection + 3) % 4;
       drawSystemCheckMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -525,6 +554,11 @@ void loop() {
     } else if (currentAppState == LIGHT_TEST_MENU) {
       lightTestSelection = (lightTestSelection + 2) % 3;
       drawLightTestMenu();
+    } else if (currentAppState == MOTOR_TEST_MENU) {
+      motorTestSpeed += 25;
+      if (motorTestSpeed > 100) motorTestSpeed = 100;
+      sendMotorCommand(motorTestSpeed, motorTestCW);
+      drawMotorTestMenu();
     }
   }
 
@@ -623,13 +657,20 @@ void loop() {
         lightTestNeedsFullRedraw = true;
         lightTestSelection = 0;
         drawLightTestMenu();
-      } else {
+      } else if (systemCheckSelection == 2) {
         relayTestChannel = 0;
         relayTestNeedsFullRedraw = true;
         relayTestTimer = millis();
         mcp.digitalWrite(RELAY_PINS[0], RELAY_ON);
         currentAppState = RELAY_TEST_MENU;
         drawRelayTestMenu();
+      } else {
+        motorTestSpeed = 0;
+        motorTestCW = true;
+        motorTestNeedsFullRedraw = true;
+        sendMotorCommand(0, true);
+        currentAppState = MOTOR_TEST_MENU;
+        drawMotorTestMenu();
       }
     } else if (currentAppState == FAN_TEST_PICK) {
       currentAppState = FAN_TEST_MENU;
@@ -669,6 +710,10 @@ void loop() {
         mcp.digitalWrite(LIGHT_G, isLight3On ? RELAY_ON : RELAY_OFF);
       }
       drawLightTestMenu();
+    } else if (currentAppState == MOTOR_TEST_MENU) {
+      motorTestSpeed = 0;
+      sendMotorCommand(0, motorTestCW);
+      drawMotorTestMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
       currentAppState = LOAD_CELL_PAGE;
       loadCellNeedsFullRedraw = true;
@@ -709,6 +754,12 @@ void loop() {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
     drawLoadCellPage();
+  }
+
+  if (cRight && !ljRight && currentAppState == MOTOR_TEST_MENU) {
+    motorTestCW = !motorTestCW;
+    sendMotorCommand(motorTestSpeed, motorTestCW);
+    drawMotorTestMenu();
   }
 
   // Navigation: Left / Return
@@ -786,6 +837,12 @@ void loop() {
     } else if (currentAppState == RELAY_TEST_MENU) {
       if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
       else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == MOTOR_TEST_MENU) {
+      sendMotorCommand(0, motorTestCW);
+      motorTestSpeed = 0;
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();

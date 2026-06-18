@@ -15,6 +15,7 @@ void drawFanTestPick();
 void drawFanTestMenu();
 void drawLightTestMenu();
 void drawRelayTestMenu();
+void drawMotorTestMenu();
 void drawValueTile(int x, int y, const char *label, String value, bool isError);
 void drawCalibrationValueTile(int y, const char *label, String value, bool isSelected);
 void drawCalibrationPage(bool valuesOnly = false);

@@ -14,6 +14,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <WebServer.h>
+#include <ArduinoOTA.h>
 #include <WiFi.h>
 #include <Wire.h>
 
@@ -74,11 +75,20 @@ enum AppState {
   FAN_TEST_PICK,
   FAN_TEST_MENU,
   LIGHT_TEST_MENU,
-  RELAY_TEST_MENU
+  RELAY_TEST_MENU,
+  MOTOR_TEST_MENU
 };
 
 const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
 const uint32_t MIXER_OFF_MS = 355UL * 60 * 1000;
+
+// ---- Motor Command Struct (Main -> Secondary via UART) ----
+typedef struct __attribute__((packed)) {
+  uint32_t signature; // 0xC0DEBABE
+  uint8_t  motorSpeed; // 0-100
+  uint8_t  motorCW;    // 1=CW, 0=CCW
+  uint8_t  checksum;
+} motor_cmd_t;
 
 // ---- UART Data Struct (shared with Secondary) ----
 typedef struct __attribute__((packed)) {
@@ -177,6 +187,9 @@ extern bool lightTestNeedsFullRedraw;
 extern bool relayTestNeedsFullRedraw;
 extern int  relayTestChannel;
 extern uint32_t relayTestTimer;
+extern bool motorTestNeedsFullRedraw;
+extern int  motorTestSpeed;
+extern bool motorTestCW;
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;
