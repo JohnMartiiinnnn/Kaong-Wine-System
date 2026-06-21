@@ -951,8 +951,8 @@ void loop() {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } 
     else {
-      // 2. Treat small negative drift as 0.0
-      float inputW = (rawW < 0.05f) ? 0.0f : rawW;
+      // 2. Allow negative drift/values through for debugging inverted load cells
+      float inputW = rawW;
 
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
@@ -971,8 +971,8 @@ void loop() {
         }
       }
       
-      // Floor final currentWeight at 0.0 for UI safety
-      if (currentWeight < 0.001f) currentWeight = 0.0f;
+      // Floor final currentWeight slightly, but allow negative values for debugging
+      if (currentWeight > -0.05f && currentWeight < 0.05f) currentWeight = 0.0f;
       
       Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
     }
