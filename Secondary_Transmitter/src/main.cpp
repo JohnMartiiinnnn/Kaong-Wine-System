@@ -20,12 +20,12 @@
 
 const int ONE_WIRE_BUS = 13;
 
-// TB6612FN motor driver (JGB37-545)
-#define PWMA_PIN      25
-#define AIN1_PIN      26
-#define AIN2_PIN      27
-#define MOTOR_LEDC_CH  1
-#define MOTOR_FREQ  1000
+// BTS7960 motor driver (Mixing Impeller)
+#define LPWM_PIN      25
+#define RPWM_PIN      26
+#define LPWM_CH       1
+#define RPWM_CH       2
+#define MOTOR_FREQ    1000
 
 // Motor command struct (matches main ESP32)
 typedef struct __attribute__((packed)) {
@@ -211,13 +211,12 @@ void setup() {
   }
 
   // 6. Motor driver setup
-  pinMode(AIN1_PIN, OUTPUT);
-  pinMode(AIN2_PIN, OUTPUT);
-  digitalWrite(AIN1_PIN, HIGH);
-  digitalWrite(AIN2_PIN, LOW);
-  ledcSetup(MOTOR_LEDC_CH, MOTOR_FREQ, 8);
-  ledcAttachPin(PWMA_PIN, MOTOR_LEDC_CH);
-  ledcWrite(MOTOR_LEDC_CH, 0);
+  ledcSetup(LPWM_CH, MOTOR_FREQ, 8);
+  ledcSetup(RPWM_CH, MOTOR_FREQ, 8);
+  ledcAttachPin(LPWM_PIN, LPWM_CH);
+  ledcAttachPin(RPWM_PIN, RPWM_CH);
+  ledcWrite(LPWM_CH, 0);
+  ledcWrite(RPWM_CH, 0);
 
   // Send initial status immediately
   txData.signature = 0xDEADBEEF;
@@ -312,9 +311,17 @@ void loop() {
     const uint8_t *p = (const uint8_t *)&cmd;
     for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++) cs ^= p[i];
     if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
-      digitalWrite(AIN1_PIN, cmd.motorCW ? HIGH : LOW);
-      digitalWrite(AIN2_PIN, cmd.motorCW ? LOW  : HIGH);
-      ledcWrite(MOTOR_LEDC_CH, map(cmd.motorSpeed, 0, 100, 0, 255));
+      int pwmSpeed = map(cmd.motorSpeed, 0, 100, 0, 255);
+      if (cmd.motorSpeed == 0) {
+        ledcWrite(LPWM_CH, 0);
+        ledcWrite(RPWM_CH, 0);
+      } else if (cmd.motorCW) {
+        ledcWrite(RPWM_CH, 0);
+        ledcWrite(LPWM_CH, pwmSpeed);
+      } else {
+        ledcWrite(LPWM_CH, 0);
+        ledcWrite(RPWM_CH, pwmSpeed);
+      }
     }
   }
 

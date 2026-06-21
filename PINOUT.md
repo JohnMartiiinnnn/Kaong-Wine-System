@@ -129,3 +129,21 @@ The Secondary transmits over UART2 (115200 baud) to the Primary. Source: `Second
 | ADS1115 Channel | Source | Function |
 |-----------------|--------|----------|
 | A0 | PH4502C `Po` pin | pH voltage output |
+
+---
+
+### BTS7960 Motor Driver
+
+| BTS7960 Pin | Secondary ESP32 GPIO | Role |
+|-------------|----------------------|------|
+| LPWM | GPIO 25 | Forward PWM Speed Control |
+| RPWM | GPIO 26 | Reverse PWM Speed Control |
+| L_EN | 3.3V / 5V | Left Enable (must be HIGH) |
+| R_EN | 3.3V / 5V | Right Enable (must be HIGH) |
+| VCC | 3.3V / 5V | ESP32 Logic Power |
+| GND | GND | Common Ground |
+| R_IS | NC | Right Current Sense (Optional) |
+| L_IS | NC | Left Current Sense (Optional) |
+
+> **Note:** `L_EN` and `R_EN` are typically shorted together with a jumper. You can leave the jumper attached and connect a single wire from either pin to 3.3V on the ESP32.
+
