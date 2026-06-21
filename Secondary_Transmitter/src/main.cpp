@@ -21,18 +21,18 @@
 const int ONE_WIRE_BUS = 13;
 
 // BTS7960 motor driver (Mixing Impeller)
-#define LPWM_PIN      25
-#define RPWM_PIN      26
-#define LPWM_CH       1
-#define RPWM_CH       2
-#define MOTOR_FREQ    1000
+#define LPWM_PIN 25
+#define RPWM_PIN 26
+#define LPWM_CH 1
+#define RPWM_CH 2
+#define MOTOR_FREQ 1000
 
 // Motor command struct (matches main ESP32)
 typedef struct __attribute__((packed)) {
   uint32_t signature; // 0xC0DEBABE
-  uint8_t  motorSpeed;
-  uint8_t  motorCW;
-  uint8_t  checksum;
+  uint8_t motorSpeed;
+  uint8_t motorCW;
+  uint8_t checksum;
 } motor_cmd_t;
 
 // Structure to send data (Updated to include framing and checksum)
@@ -187,7 +187,11 @@ void setup() {
 
   // 5. WiFi + OTA
   WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
-  { uint32_t t = millis(); while (WiFi.status() != WL_CONNECTED && millis() - t < 8000) delay(100); }
+  {
+    uint32_t t = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t < 8000)
+      delay(100);
+  }
   ArduinoOTA.setHostname("winebrew-secondary");
   ArduinoOTA.begin();
 
@@ -304,12 +308,16 @@ void loop() {
 
   // 6. Receive motor commands from main ESP32
   while (Serial2.available() >= (int)sizeof(motor_cmd_t)) {
-    if (Serial2.peek() != 0xBE) { Serial2.read(); continue; }
+    if (Serial2.peek() != 0xBE) {
+      Serial2.read();
+      continue;
+    }
     motor_cmd_t cmd;
     Serial2.readBytes((uint8_t *)&cmd, sizeof(cmd));
     uint8_t cs = 0;
     const uint8_t *p = (const uint8_t *)&cmd;
-    for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++) cs ^= p[i];
+    for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
+      cs ^= p[i];
     if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
       int pwmSpeed = map(cmd.motorSpeed, 0, 100, 0, 255);
       if (cmd.motorSpeed == 0) {
