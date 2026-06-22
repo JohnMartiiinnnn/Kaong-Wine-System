@@ -79,6 +79,8 @@ enum AppState {
   MOTOR_TEST_MENU
 };
 
+extern long rawHX711;
+
 const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
 const uint32_t MIXER_OFF_MS = 355UL * 60 * 1000;
 

@@ -246,7 +246,13 @@ void drawLoadCellPage(bool valuesOnly) {
   sprintf(b, "%.2f L", currentWeight);
   tft.setTextColor(TFT_BLACK, 0xCE79);
   tft.setTextPadding(200);
-  tft.drawCentreString(b, CENTER_X, 90, 4);
+  tft.drawCentreString(b, CENTER_X, 82, 4);
+  
+  // Show raw ADC value below the live weight for debugging
+  sprintf(b, "RAW: %ld", rawHX711);
+  tft.setTextPadding(150);
+  tft.drawCentreString(b, CENTER_X, 108, 2);
+  
   tft.setTextPadding(0);
 
   // Always refresh cal factor value in case it changed

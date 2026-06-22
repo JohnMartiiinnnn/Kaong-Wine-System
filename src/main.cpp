@@ -37,6 +37,7 @@ bool remoteStatusReceived = false;
 bool rtcStatus = false;
 bool sdStatus = false;
 bool hx711Status = false;
+long rawHX711 = 0;
 
 // ---- Sensor & Brew Data ----
 struct_message incomingData = {};
@@ -97,10 +98,10 @@ bool systemCheckNeedsFullRedraw = true;
 bool fanTestNeedsFullRedraw = true;
 bool lightTestNeedsFullRedraw = true;
 bool relayTestNeedsFullRedraw = true;
-int  relayTestChannel = 0;
+int relayTestChannel = 0;
 uint32_t relayTestTimer = 0;
 bool motorTestNeedsFullRedraw = true;
-int  motorTestSpeed = 0;
+int motorTestSpeed = 0;
 bool motorTestCW = true;
 
 // ---- Button Latch State ----
@@ -141,10 +142,10 @@ void setMixerSpeed(int percent) {
 // ---- Motor Command Sender ----
 void sendMotorCommand(int speed, bool cw) {
   motor_cmd_t cmd;
-  cmd.signature  = 0xC0DEBABE;
+  cmd.signature = 0xC0DEBABE;
   cmd.motorSpeed = (uint8_t)speed;
-  cmd.motorCW    = cw ? 1 : 0;
-  cmd.checksum   = 0;
+  cmd.motorCW = cw ? 1 : 0;
+  cmd.checksum = 0;
   const uint8_t *p = (const uint8_t *)&cmd;
   for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
     cmd.checksum ^= p[i];
@@ -244,7 +245,11 @@ void setup() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
   WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
-  { uint32_t t = millis(); while (WiFi.status() != WL_CONNECTED && millis() - t < 8000) delay(100); }
+  {
+    uint32_t t = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - t < 8000)
+      delay(100);
+  }
 
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -477,7 +482,8 @@ void loop() {
         currentSpeedPercent = 100;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
-    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+    } else if (currentAppState == MIXER_MENU &&
+               currentMixerMode == MIXER_MANUAL) {
       mixerSpeedPercent -= 10;
       if (mixerSpeedPercent < 0)
         mixerSpeedPercent = 100;
@@ -497,7 +503,8 @@ void loop() {
       drawFanTestPick();
     } else if (currentAppState == FAN_TEST_MENU) {
       fanTestSpeed -= 10;
-      if (fanTestSpeed < 0) fanTestSpeed = 100;
+      if (fanTestSpeed < 0)
+        fanTestSpeed = 100;
       setFanSpeed(fanTestSpeed);
       drawFanTestMenu();
     } else if (currentAppState == LIGHT_TEST_MENU) {
@@ -505,7 +512,8 @@ void loop() {
       drawLightTestMenu();
     } else if (currentAppState == MOTOR_TEST_MENU && cDown) {
       motorTestSpeed -= 25;
-      if (motorTestSpeed < 0) motorTestSpeed = 0;
+      if (motorTestSpeed < 0)
+        motorTestSpeed = 0;
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
     }
@@ -528,7 +536,8 @@ void loop() {
         currentSpeedPercent = 0;
       setFanSpeed(currentSpeedPercent);
       drawCoolingMenu();
-    } else if (currentAppState == MIXER_MENU && currentMixerMode == MIXER_MANUAL) {
+    } else if (currentAppState == MIXER_MENU &&
+               currentMixerMode == MIXER_MANUAL) {
       mixerSpeedPercent += 10;
       if (mixerSpeedPercent > 100)
         mixerSpeedPercent = 0;
@@ -548,7 +557,8 @@ void loop() {
       drawFanTestPick();
     } else if (currentAppState == FAN_TEST_MENU) {
       fanTestSpeed += 10;
-      if (fanTestSpeed > 100) fanTestSpeed = 0;
+      if (fanTestSpeed > 100)
+        fanTestSpeed = 0;
       setFanSpeed(fanTestSpeed);
       drawFanTestMenu();
     } else if (currentAppState == LIGHT_TEST_MENU) {
@@ -556,7 +566,8 @@ void loop() {
       drawLightTestMenu();
     } else if (currentAppState == MOTOR_TEST_MENU) {
       motorTestSpeed += 25;
-      if (motorTestSpeed > 100) motorTestSpeed = 100;
+      if (motorTestSpeed > 100)
+        motorTestSpeed = 100;
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
     }
@@ -695,7 +706,7 @@ void loop() {
         isFermFanOn = false;
       }
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN,  isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
       drawFanTestMenu();
     } else if (currentAppState == LIGHT_TEST_MENU) {
@@ -835,8 +846,10 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == RELAY_TEST_MENU) {
-      if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
-      else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      if (relayTestChannel < 8)
+        mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+      else
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -857,11 +870,15 @@ void loop() {
 
   // Relay test auto-advance (500ms per channel)
   if (currentAppState == RELAY_TEST_MENU && millis() - relayTestTimer > 500) {
-    if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
-    else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+    if (relayTestChannel < 8)
+      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+    else
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
     relayTestChannel = (relayTestChannel + 1) % 9;
-    if (relayTestChannel < 8) mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
-    else                      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
+    if (relayTestChannel < 8)
+      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
+    else
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
     relayTestTimer = millis();
     drawRelayTestMenu();
   }
@@ -942,38 +959,40 @@ void loop() {
   static uint32_t lastScaleMillis = 0;
   if (hx711Status && scale.is_ready() && (millis() - lastScaleMillis > 1000)) {
     lastScaleMillis = millis();
-    
-    // Single read — is_ready() already confirmed data is waiting, so no blocking delay
+
+    // Single read — is_ready() already confirmed data is waiting, so no
+    // blocking delay
     float rawW = scale.get_units(1);
-    
+    rawHX711 = (long)(rawW * calibrationFactor) + scale.get_offset();
+
     // 1. Ignore extreme garbage (massive spikes)
     if (rawW < -5.0f || rawW > 70.0f) {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
-    } 
-    else {
-      // 2. Allow negative drift/values through for debugging inverted load cells
+    } else {
+      // 2. Allow negative drift/values through for debugging inverted load
+      // cells
       float inputW = rawW;
 
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
         hx711WeightSeeded = true;
-      } 
-      else {
+      } else {
         float diff = abs(inputW - currentWeight);
-        
+
         if (diff > 0.5f) {
           // Significant change (Object added/removed): Snap instantly
           currentWeight = inputW;
-        } 
-        else {
+        } else {
           // Small change or drift: Apply EMA smoothing (alpha = 0.2)
           currentWeight = (currentWeight * 0.8f) + (inputW * 0.2f);
         }
       }
-      
-      // Floor final currentWeight slightly, but allow negative values for debugging
-      if (currentWeight > -0.05f && currentWeight < 0.05f) currentWeight = 0.0f;
-      
+
+      // Floor final currentWeight slightly, but allow negative values for
+      // debugging
+      if (currentWeight > -0.05f && currentWeight < 0.05f)
+        currentWeight = 0.0f;
+
       Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
     }
   }
@@ -1081,14 +1100,17 @@ void loop() {
         tft.setTextPadding(280);
         const char *mxTxt[] = {"OFF", "MANUAL", "AUTO"};
         if (currentMixerMode == MIXER_AUTO) {
-          tft.drawCentreString(mixerRunning ? "AUTO: RUNNING" : "AUTO: STANDBY", CENTER_X, y + 310, 2);
+          tft.drawCentreString(mixerRunning ? "AUTO: RUNNING" : "AUTO: STANDBY",
+                               CENTER_X, y + 310, 2);
         } else {
           sprintf(buf, "%s: %d%%", mxTxt[currentMixerMode], mixerSpeedPercent);
           tft.drawCentreString(buf, CENTER_X, y + 310, 2);
         }
-        if (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0) {
+        if (originalGravity > 0 && incomingData.pillGravity > 0 &&
+            incomingData.pillGravity < 10.0) {
           float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
-          if (abv < 0.0f) abv = 0.0f;
+          if (abv < 0.0f)
+            abv = 0.0f;
           dtostrf(abv, 4, 2, buf);
           strcat(buf, "%");
         } else {
