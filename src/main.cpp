@@ -120,6 +120,7 @@ bool pastSterilized = false;
 bool pastHolding = false;
 uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
+float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -603,7 +604,7 @@ void loop() {
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (cDown && !ljDown) {
-        int maxRows = (stageParamStage == 1) ? 4 : 2;
+        int maxRows = (stageParamStage == 1) ? 5 : 3;
         stageParamSelection = (stageParamSelection + 1) % maxRows;
         drawStageParamMenu();
       }
@@ -662,7 +663,7 @@ void loop() {
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      int maxRows = (stageParamStage == 1) ? 4 : 2;
+      int maxRows = (stageParamStage == 1) ? 5 : 3;
       stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
       drawStageParamMenu();
     }
@@ -710,6 +711,9 @@ void loop() {
         pastSterilized = false;
         pastHolding = false;
         phAlertActive = false;
+        simTempOverride[0] = 0.0f;
+        simTempOverride[1] = 0.0f;
+        simTempOverride[2] = 0.0f;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -853,7 +857,7 @@ void loop() {
         drawLoadCellPage();
       }
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      int lastRow = (stageParamStage == 1) ? 3 : 1;
+      int lastRow = (stageParamStage == 1) ? 4 : 2;
       if (stageParamSelection == lastRow) {
         if (activeBrewStage == stageParamStage) {
           if (activeBrewStage < 2) {
@@ -900,13 +904,17 @@ void loop() {
   }
 
   if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
-    int lastRow = (stageParamStage == 1) ? 3 : 1;
+    int lastRow = (stageParamStage == 1) ? 4 : 2;
     if (stageParamSelection < lastRow) {
-      if (stageParamSelection == 0)
+      if (stageParamSelection == 0) {
+        simTempOverride[stageParamStage] += 0.5f;
+        if (simTempOverride[stageParamStage] > 100.0f)
+          simTempOverride[stageParamStage] = 100.0f;
+      } else if (stageParamSelection == 1)
         stageTargetTemp[stageParamStage] += 0.5f;
-      else if (stageParamStage == 1 && stageParamSelection == 1)
-        fermTargetPH += 0.05f;
       else if (stageParamStage == 1 && stageParamSelection == 2)
+        fermTargetPH += 0.05f;
+      else if (stageParamStage == 1 && stageParamSelection == 3)
         fermTargetGravity += 0.001f;
       drawStageParamMenu();
     }
@@ -999,13 +1007,17 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      int lastRow = (stageParamStage == 1) ? 3 : 1;
+      int lastRow = (stageParamStage == 1) ? 4 : 2;
       if (stageParamSelection < lastRow) {
-        if (stageParamSelection == 0)
+        if (stageParamSelection == 0) {
+          simTempOverride[stageParamStage] -= 0.5f;
+          if (simTempOverride[stageParamStage] < 0.0f)
+            simTempOverride[stageParamStage] = 0.0f;
+        } else if (stageParamSelection == 1)
           stageTargetTemp[stageParamStage] -= 0.5f;
-        else if (stageParamStage == 1 && stageParamSelection == 1)
-          fermTargetPH -= 0.05f;
         else if (stageParamStage == 1 && stageParamSelection == 2)
+          fermTargetPH -= 0.05f;
+        else if (stageParamStage == 1 && stageParamSelection == 3)
           fermTargetGravity -= 0.001f;
         drawStageParamMenu();
       } else {
@@ -1196,12 +1208,15 @@ void loop() {
       }
 
       float liquidTemp = -999.0f;
-      if (activeBrewStage == 0 && liquid1Status)
+      if (simTempOverride[activeBrewStage] > 0.0f) {
+        liquidTemp = simTempOverride[activeBrewStage];
+      } else if (activeBrewStage == 0 && liquid1Status) {
         liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
-      else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+      } else if (activeBrewStage == 1 && incomingData.ds18Status == 1) {
         liquidTemp = incomingData.room2LiquidTemp;
-      else if (activeBrewStage == 2 && liquid2Status)
+      } else if (activeBrewStage == 2 && liquid2Status) {
         liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+      }
 
       if (activeBrewStage == 0) {
         if (!preHeatSterilized) {

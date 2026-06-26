@@ -219,3 +219,4 @@ extern bool pastSterilized;
 extern bool pastHolding;
 extern uint32_t pastHoldStart;
 extern bool phAlertActive;
+extern float simTempOverride[3];
