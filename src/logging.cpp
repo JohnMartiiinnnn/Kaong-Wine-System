@@ -26,8 +26,8 @@ void logDataToSD() {
   dataFile.print(now.minute(), DEC); dataFile.print(':');
   dataFile.print(now.second(), DEC); dataFile.print(',');
   dataFile.print(bme1Status   ? bme1.readTemperature()                   : 0.0); dataFile.print(',');
-  dataFile.print(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0)  : 0.0); dataFile.print(',');
   dataFile.print(liquid2Status ? sharedLiquidSensors.getTempCByIndex(1)  : 0.0); dataFile.print(',');
+  dataFile.print(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0)  : 0.0); dataFile.print(',');
   dataFile.print(incomingData.room2Temp); dataFile.print(',');
   dataFile.print(incomingData.ds18Status == 1 ? incomingData.room2LiquidTemp : 0.0); dataFile.print(',');
   dataFile.print(incomingData.pillGravity, 4); dataFile.print(',');

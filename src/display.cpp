@@ -294,14 +294,14 @@ void drawSystemCheckMenu() {
     tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
     systemCheckNeedsFullRedraw = false;
   }
-  const char *options[] = {"FAN TEST", "LIGHT INDICATORS", "RELAY TEST", "MOTOR TEST"};
-  for (int i = 0; i < 4; i++) {
+  const char *options[] = {"FAN TEST", "LIGHT INDICATORS", "RELAY TEST", "MOTOR TEST", "PID CONTROL"};
+  for (int i = 0; i < 5; i++) {
     uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 65 + (i * 90), 280, 70, color);
-    tft.drawRect(20, 65 + (i * 90), 280, 70, TFT_DARKGREY);
+    tft.fillRect(20, 60 + (i * 75), 280, 60, color);
+    tft.drawRect(20, 60 + (i * 75), 280, 60, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 83 + (i * 90), 4);
+    tft.drawCentreString(options[i], CENTER_X, 75 + (i * 75), 4);
   }
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
@@ -531,13 +531,13 @@ void drawSensorMonitorPage(bool valuesOnly) {
     char b[32];
     if (bme1Status) { sprintf(b, "%.1f C", bme1.readTemperature());                    drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)",   b,        false); }
     else              drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)",   "FAILED", true);
-    if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    b,        false); }
+    if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    b,        false); }
     else                drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    "FAILED", true);
     if (incomingData.sensor2Status > 0) { sprintf(b, "%.1f C", incomingData.room2Temp);      drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", b,        false); }
     else                                  drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", "FAILED", true);
     if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", incomingData.room2LiquidTemp); drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)",  b,        false); }
     else                                drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)",  "FAILED", true);
-    if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   b,        false); }
+    if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   b,        false); }
     else                drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   "FAILED", true);
     if (incomingData.pillGravity > 0.1) { sprintf(b, "%.4f SG", incomingData.pillGravity); drawValueTile(5, yStart + yGap * 5, "S. GRAVITY",     b,        false); }
     else                                  drawValueTile(5, yStart + yGap * 5, "S. GRAVITY",     "FAILED", true);
@@ -563,10 +563,10 @@ void drawSensorMonitorPage(bool valuesOnly) {
   };
 
   if (bme1Status) { sprintf(b, "%.1f C", bme1.readTemperature());                    rv(0, b, false); } else rv(0, "FAILED", true);
-  if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); rv(1, b, false); } else rv(1, "FAILED", true);
+  if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); rv(1, b, false); } else rv(1, "FAILED", true);
   if (incomingData.sensor2Status > 0) { sprintf(b, "%.1f C", incomingData.room2Temp);      rv(2, b, false); } else rv(2, "FAILED", true);
   if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", incomingData.room2LiquidTemp); rv(3, b, false); } else rv(3, "FAILED", true);
-  if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); rv(4, b, false); } else rv(4, "FAILED", true);
+  if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); rv(4, b, false); } else rv(4, "FAILED", true);
   if (incomingData.pillGravity > 0.1) { sprintf(b, "%.4f SG", incomingData.pillGravity); rv(5, b, false); } else rv(5, "FAILED", true);
   if (incomingData.adsStatus == 1) { sprintf(b, "%.2f pH", incomingData.phValue); rv(6, b, false); } else rv(6, "FAILED", true);
   if (hx711Status) { sprintf(b, "%.1f L", currentWeight); rv(7, b, false); } else rv(7, "FAILED", true);
@@ -723,7 +723,7 @@ void drawStageParamMenu() {
   if (stageParamStage == 0) {
     float ambT = bme1Status ? bme1.readTemperature() : -999.0f;
     float liqT = simActive ? simTempOverride[0]
-               : (liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : -999.0f);
+               : (liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : -999.0f);
 
     uint16_t ambBg = (ambT > -999 && ambT >= stageTargetTemp[0]) ? 0x0400 : 0xF800;
     tft.fillRect(10, statusY + 20, 300, 40, ambBg);
@@ -779,7 +779,7 @@ void drawStageParamMenu() {
 
   } else {
     float pastT = simActive ? simTempOverride[2]
-                : (liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : -999.0f);
+                : (liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : -999.0f);
     uint16_t pBg = (pastT > -999 && pastT >= stageTargetTemp[2]) ? 0x0400 : 0xF800;
     tft.fillRect(10, statusY + 20, 300, 40, pBg);
     tft.drawRect(10, statusY + 20, 300, 40, TFT_DARKGREY);
@@ -812,3 +812,102 @@ void drawStageParamMenu() {
   tft.drawCentreString("UP/DOWN: NAVIGATE   L/R: ADJUST", CENTER_X, 447, 1);
   tft.drawCentreString("SIM ROW: SET > 0 TO TEST  0 = REAL SENSOR", CENTER_X, 462, 1);
 }
+
+void drawPidTestPick() {
+  if (pidTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("SELECT CHAMBER", CENTER_X, 15, 4);
+    pidTestNeedsFullRedraw = false;
+  }
+  const char *options[] = {"PRE-HEAT CHAMBER", "FERMENTATION CHAMBER", "PASTEURIZATION CHAMBER"};
+  for (int i = 0; i < 3; i++) {
+    uint16_t color    = (pidTestChoice == i) ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = (pidTestChoice == i) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 80 + (i * 110), 280, 80, color);
+    tft.drawRect(20, 80 + (i * 110), 280, 80, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 105 + (i * 110), 4);
+  }
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 450, 2);
+}
+
+void drawPidTestMenu() {
+  if (pidTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("PID CONTROL TEST", CENTER_X, 15, 4);
+    pidTestNeedsFullRedraw = false;
+  }
+
+  const char *chamberTitle;
+  if (pidTestChoice == 0) chamberTitle = "PRE-HEAT";
+  else if (pidTestChoice == 1) chamberTitle = "FERMENTATION";
+  else chamberTitle = "PASTEURIZATION";
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString(chamberTitle, CENTER_X, 60, 4);
+
+  // Target Temp Setting
+  tft.fillRect(20, 100, 280, 70, 0xD6BA);
+  tft.drawRect(20, 100, 280, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString("TARGET TEMP", CENTER_X, 110, 2);
+  char buf[32];
+  sprintf(buf, "%.1f C", pidTestTarget);
+  tft.drawCentreString(buf, CENTER_X, 135, 4);
+
+  // Start / Stop Button
+  uint16_t btnColor = pidTestRunning ? TFT_RED : 0x0400;
+  tft.fillRect(20, 180, 280, 50, btnColor);
+  tft.drawRect(20, 180, 280, 50, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, btnColor);
+  tft.drawCentreString(pidTestRunning ? "STOP TEST" : "START TEST", CENTER_X, 195, 4);
+
+  // Live Data Dashboard (drawn only if running)
+  if (pidTestRunning) {
+    // Current Temp
+    float liquidTemp = -999.0f;
+    if (pidTestChoice == 0 && liquid2Status) {
+      liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+    } else if (pidTestChoice == 1 && incomingData.ds18Status == 1) {
+      liquidTemp = incomingData.room2LiquidTemp;
+    } else if (pidTestChoice == 2 && liquid1Status) {
+      liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+    }
+    
+    tft.fillRect(20, 240, 135, 60, 0x3566);
+    tft.drawRect(20, 240, 135, 60, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x3566);
+    tft.drawCentreString("LIQUID TEMP", 87, 250, 1);
+    if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
+    else strcpy(buf, "--");
+    tft.drawCentreString(buf, 87, 270, 2);
+
+    // Heating Percent
+    tft.fillRect(165, 240, 135, 60, 0x3566);
+    tft.drawRect(165, 240, 135, 60, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x3566);
+    tft.drawCentreString("HEATING %", 232, 250, 1);
+    sprintf(buf, "%d%%", currentHeatingPercent);
+    tft.drawCentreString(buf, 232, 270, 2);
+
+    // Status Banner
+    uint16_t statusBg = pidTestSuccess ? 0x0400 : TFT_ORANGE;
+    tft.fillRect(20, 310, 280, 70, statusBg);
+    tft.drawRect(20, 310, 280, 70, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, statusBg);
+    tft.drawCentreString(pidTestSuccess ? "SUCCESS - STABLE!" : "AUTOMATING...", CENTER_X, 335, 4);
+  } else {
+    tft.fillRect(20, 240, 280, 140, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("SELECT START TO BEGIN", CENTER_X, 290, 2);
+  }
+
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.drawCentreString("UP/DN: ADJ TEMP  |  SEL: START/STOP", CENTER_X, 420, 1);
+  tft.drawCentreString("RETURN TO EXIT", CENTER_X, 450, 2);
+}
+

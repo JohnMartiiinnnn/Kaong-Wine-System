@@ -82,7 +82,9 @@ enum AppState {
   LIGHT_TEST_MENU,
   RELAY_TEST_MENU,
   MOTOR_TEST_MENU,
-  STAGE_PARAM_MENU
+  STAGE_PARAM_MENU,
+  PID_TEST_PICK,
+  PID_TEST_MENU
 };
 
 extern long rawHX711;
@@ -198,6 +200,12 @@ extern uint32_t relayTestTimer;
 extern bool motorTestNeedsFullRedraw;
 extern int  motorTestSpeed;
 extern bool motorTestCW;
+extern bool pidTestNeedsFullRedraw;
+extern int pidTestChoice;
+extern float pidTestTarget;
+extern bool pidTestRunning;
+extern bool pidTestSuccess;
+extern uint32_t pidTestStableStart;
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;

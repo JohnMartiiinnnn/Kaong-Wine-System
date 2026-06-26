@@ -18,6 +18,9 @@
 #include "display.h"
 #include "logging.h"
 #include "server.h"
+// RBDdimmer removed. Using Slow PWM (Time-Proportional Control)
+const uint32_t PID_WINDOW_MS = 2000;
+uint32_t pidWindowStart = 0;
 
 // ---- Hardware Object Definitions ----
 Adafruit_MCP23X17 mcp;
@@ -103,6 +106,13 @@ uint32_t relayTestTimer = 0;
 bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
+// ---- PID Test State ----
+bool pidTestNeedsFullRedraw = true;
+int pidTestChoice = 0;
+float pidTestTarget = 40.0f;
+bool pidTestRunning = false;
+bool pidTestSuccess = false;
+uint32_t pidTestStableStart = 0;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -252,6 +262,14 @@ void setup() {
     mcp.pinMode(BTN_SELECT_PIN, INPUT_PULLUP);
   }
   pinMode(AC_ZC_PIN, INPUT_PULLUP);
+
+  pinMode(DIM2_SHARED, OUTPUT);
+  digitalWrite(DIM2_SHARED, LOW);
+  pinMode(DIM1_CH2, OUTPUT);
+  digitalWrite(DIM1_CH2, LOW);
+  pinMode(DIM1_CH1, OUTPUT);
+  digitalWrite(DIM1_CH1, LOW);
+
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
   setFanSpeed(0);
@@ -320,6 +338,9 @@ void loop() {
       if (held >= 3000) {
         isSystemHalted = false;
         haltHoldActive = false;
+        pidTestRunning = false;
+        activeBrewStage = -1;
+        currentHeatingPercent = 0;
         currentAppState = START_MENU;
         menuNeedsFullRedraw = true;
         drawStartMenu();
@@ -336,6 +357,7 @@ void loop() {
     return;
   }
 
+  // Detect ESTOP Button
   if (ces == LOW && les == HIGH) {
     if (estopState == 0) {
       prePauseFanOn = isFanOn;
@@ -346,6 +368,9 @@ void loop() {
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
+      digitalWrite(DIM2_SHARED, LOW);
+      digitalWrite(DIM1_CH2, LOW);
+      digitalWrite(DIM1_CH1, LOW);
       estopState = 1;
       drawEstopPage();
     } else if (estopState == 1) {
@@ -363,6 +388,12 @@ void loop() {
       mixerRunning = false;
       isFanOn = false;
       isFermFanOn = false;
+      pidTestRunning = false;
+      activeBrewStage = -1;
+      currentHeatingPercent = 0;
+      digitalWrite(DIM2_SHARED, LOW);
+      digitalWrite(DIM1_CH2, LOW);
+      digitalWrite(DIM1_CH1, LOW);
       tft.fillScreen(TFT_RED);
       tft.setTextColor(TFT_WHITE);
       tft.drawCentreString("SYSTEM HALTED", 160, 80, 4);
@@ -474,60 +505,72 @@ void loop() {
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
       setFanSpeed(prePauseSpeed);
       switch (currentAppState) {
-        case START_MENU:
-          menuNeedsFullRedraw = true;
-          drawStartMenu();
-          break;
-        case DASHBOARD_ACTIVE:
-          dashNeedsFullRedraw = true;
-          drawDashboardLayout();
-          break;
-        case COOLING_MENU:     drawCoolingMenu();   break;
-        case MIXER_MENU:       drawMixerMenu();     break;
-        case SENSOR_MONITOR:
-          monitorNeedsFullRedraw = true;
-          drawSensorMonitorPage();
-          break;
-        case CALIBRATION_MODE:
-          calNeedsFullRedraw = true;
-          drawCalibrationPage();
-          break;
-        case LOAD_CELL_PAGE:
-          loadCellNeedsFullRedraw = true;
-          drawLoadCellPage();
-          break;
-        case SYSTEM_CHECK_MENU:
-          systemCheckNeedsFullRedraw = true;
-          drawSystemCheckMenu();
-          break;
-        case FAN_TEST_PICK:
-          fanTestNeedsFullRedraw = true;
-          drawFanTestPick();
-          break;
-        case FAN_TEST_MENU:
-          fanTestNeedsFullRedraw = true;
-          drawFanTestMenu();
-          break;
-        case LIGHT_TEST_MENU:
-          lightTestNeedsFullRedraw = true;
-          drawLightTestMenu();
-          break;
-        case RELAY_TEST_MENU:
-          relayTestNeedsFullRedraw = true;
-          drawRelayTestMenu();
-          break;
-        case MOTOR_TEST_MENU:
-          motorTestNeedsFullRedraw = true;
-          drawMotorTestMenu();
-          break;
-        case STAGE_PARAM_MENU:
-          stageParamNeedsFullRedraw = true;
-          drawStageParamMenu();
-          break;
-        default:
-          menuNeedsFullRedraw = true;
-          drawStartMenu();
-          break;
+      case START_MENU:
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
+        break;
+      case DASHBOARD_ACTIVE:
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+        break;
+      case COOLING_MENU:
+        drawCoolingMenu();
+        break;
+      case MIXER_MENU:
+        drawMixerMenu();
+        break;
+      case SENSOR_MONITOR:
+        monitorNeedsFullRedraw = true;
+        drawSensorMonitorPage();
+        break;
+      case CALIBRATION_MODE:
+        calNeedsFullRedraw = true;
+        drawCalibrationPage();
+        break;
+      case LOAD_CELL_PAGE:
+        loadCellNeedsFullRedraw = true;
+        drawLoadCellPage();
+        break;
+      case SYSTEM_CHECK_MENU:
+        systemCheckNeedsFullRedraw = true;
+        drawSystemCheckMenu();
+        break;
+      case PID_TEST_PICK:
+        pidTestNeedsFullRedraw = true;
+        drawPidTestPick();
+        break;
+      case PID_TEST_MENU:
+        pidTestNeedsFullRedraw = true;
+        drawPidTestMenu();
+        break;
+      case FAN_TEST_PICK:
+        fanTestNeedsFullRedraw = true;
+        drawFanTestPick();
+        break;
+      case FAN_TEST_MENU:
+        fanTestNeedsFullRedraw = true;
+        drawFanTestMenu();
+        break;
+      case LIGHT_TEST_MENU:
+        lightTestNeedsFullRedraw = true;
+        drawLightTestMenu();
+        break;
+      case RELAY_TEST_MENU:
+        relayTestNeedsFullRedraw = true;
+        drawRelayTestMenu();
+        break;
+      case MOTOR_TEST_MENU:
+        motorTestNeedsFullRedraw = true;
+        drawMotorTestMenu();
+        break;
+      case STAGE_PARAM_MENU:
+        stageParamNeedsFullRedraw = true;
+        drawStageParamMenu();
+        break;
+      default:
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
+        break;
       }
     }
     ljLeft = cLeft;
@@ -582,8 +625,16 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 4;
+      systemCheckSelection = (systemCheckSelection + 1) % 5;
       drawSystemCheckMenu();
+    } else if (currentAppState == PID_TEST_PICK) {
+      pidTestChoice = (pidTestChoice + 1) % 3;
+      drawPidTestPick();
+    } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
+      pidTestTarget -= 1.0f;
+      if (pidTestTarget < 0.0f)
+        pidTestTarget = 0.0f;
+      drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -642,8 +693,16 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 3) % 4;
+      systemCheckSelection = (systemCheckSelection + 4) % 5;
       drawSystemCheckMenu();
+    } else if (currentAppState == PID_TEST_PICK) {
+      pidTestChoice = (pidTestChoice + 1) % 3;
+      drawPidTestPick();
+    } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
+      pidTestTarget += 1.0f;
+      if (pidTestTarget > 100.0f)
+        pidTestTarget = 100.0f;
+      drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -781,14 +840,46 @@ void loop() {
         mcp.digitalWrite(RELAY_PINS[0], RELAY_ON);
         currentAppState = RELAY_TEST_MENU;
         drawRelayTestMenu();
-      } else {
+      } else if (systemCheckSelection == 3) {
         motorTestSpeed = 0;
         motorTestCW = true;
         motorTestNeedsFullRedraw = true;
         sendMotorCommand(0, true);
         currentAppState = MOTOR_TEST_MENU;
         drawMotorTestMenu();
+      } else {
+        currentAppState = PID_TEST_PICK;
+        pidTestNeedsFullRedraw = true;
+        pidTestChoice = 0;
+        drawPidTestPick();
       }
+    } else if (currentAppState == PID_TEST_PICK) {
+      currentAppState = PID_TEST_MENU;
+      pidTestNeedsFullRedraw = true;
+      if (pidTestChoice == 0)
+        pidTestTarget = 80.0f;
+      else if (pidTestChoice == 1)
+        pidTestTarget = 28.5f;
+      else
+        pidTestTarget = 80.0f;
+      pidTestRunning = false;
+      pidTestSuccess = false;
+      drawPidTestMenu();
+    } else if (currentAppState == PID_TEST_MENU) {
+      if (!pidTestRunning) {
+        pidTestRunning = true;
+        pidTestSuccess = false;
+        pidTestStableStart = 0;
+      } else {
+        pidTestRunning = false;
+        currentHeatingPercent = 0;
+        isFermFanOn = false;
+        isFanOn = false;
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      }
+      drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       currentAppState = FAN_TEST_MENU;
       fanTestNeedsFullRedraw = true;
@@ -895,7 +986,8 @@ void loop() {
     drawMotorTestMenu();
   }
 
-  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
+  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE &&
+      moduleViewActive) {
     stageParamStage = dashSelection;
     stageParamSelection = 0;
     stageParamNeedsFullRedraw = true;
@@ -1006,6 +1098,21 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
+    } else if (currentAppState == PID_TEST_PICK) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == PID_TEST_MENU) {
+      pidTestRunning = false;
+      currentHeatingPercent = 0;
+      isFermFanOn = false;
+      isFanOn = false;
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      currentAppState = PID_TEST_PICK;
+      pidTestNeedsFullRedraw = true;
+      drawPidTestPick();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       int lastRow = (stageParamStage == 1) ? 4 : 2;
       if (stageParamSelection < lastRow) {
@@ -1195,6 +1302,67 @@ void loop() {
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
+    // ---- PID Test Control ----
+    if (currentAppState == PID_TEST_MENU && pidTestRunning) {
+      static float pidTestIntegral = 0.0f;
+      static float pidTestPrevError = 0.0f;
+
+      float liquidTemp = -999.0f;
+      if (pidTestChoice == 0 && liquid2Status) {
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+      } else if (pidTestChoice == 1 && incomingData.ds18Status == 1) {
+        liquidTemp = incomingData.room2LiquidTemp;
+      } else if (pidTestChoice == 2 && liquid1Status) {
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      }
+
+      if (liquidTemp > -100.0f) {
+        float error = pidTestTarget - liquidTemp;
+        if (liquidTemp >= pidTestTarget - 5.0f) {
+          pidTestIntegral += error;
+          if (pidTestIntegral > 100.0f)
+            pidTestIntegral = 100.0f;
+          if (pidTestIntegral < -100.0f)
+            pidTestIntegral = -100.0f;
+        } else {
+          pidTestIntegral = 0.0f;
+        }
+
+        float pidOut = (PID_KP * error) + (PID_KI * pidTestIntegral) +
+                       (PID_KD * (error - pidTestPrevError));
+        pidTestPrevError = error;
+        if (pidOut < 0.0f)
+          pidOut = 0.0f;
+        if (pidOut > 100.0f)
+          pidOut = 100.0f;
+
+        currentHeatingPercent = (int)pidOut;
+
+        if (pidTestChoice == 1) {
+          if (error < -0.5f) {
+            isFermFanOn = true;
+          } else if (error > 0.0f) {
+            isFermFanOn = false;
+          }
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN,
+                           isFermFanOn ? RELAY_ON : RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
+                           isFermFanOn ? RELAY_ON : RELAY_OFF);
+        }
+
+        if (abs(error) <= 0.5f) {
+          if (pidTestStableStart == 0)
+            pidTestStableStart = millis();
+          else if (millis() - pidTestStableStart > 15000UL) {
+            pidTestSuccess = true;
+          }
+        } else {
+          pidTestStableStart = 0;
+          pidTestSuccess = false;
+        }
+      }
+      drawPidTestMenu();
+    }
 
     // ---- Closed-Loop Brew Stage Control ----
     if (activeBrewStage >= 0 && activeBrewStage <= 2) {
@@ -1210,12 +1378,12 @@ void loop() {
       float liquidTemp = -999.0f;
       if (simTempOverride[activeBrewStage] > 0.0f) {
         liquidTemp = simTempOverride[activeBrewStage];
-      } else if (activeBrewStage == 0 && liquid1Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      } else if (activeBrewStage == 0 && liquid2Status) {
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
       } else if (activeBrewStage == 1 && incomingData.ds18Status == 1) {
         liquidTemp = incomingData.room2LiquidTemp;
-      } else if (activeBrewStage == 2 && liquid2Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+      } else if (activeBrewStage == 2 && liquid1Status) {
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
       }
 
       if (activeBrewStage == 0) {
@@ -1224,20 +1392,27 @@ void loop() {
             float error = 80.0f - liquidTemp;
             if (liquidTemp >= PID_THROTTLE_TEMP) {
               pidIntegral += error;
-              if (pidIntegral > 100.0f) pidIntegral = 100.0f;
-              if (pidIntegral < -100.0f) pidIntegral = -100.0f;
+              if (pidIntegral > 100.0f)
+                pidIntegral = 100.0f;
+              if (pidIntegral < -100.0f)
+                pidIntegral = -100.0f;
             } else {
               pidIntegral = 0.0f;
             }
-            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) + (PID_KD * (error - pidPrevError));
+            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) +
+                           (PID_KD * (error - pidPrevError));
             pidPrevError = error;
-            if (pidOut < 0.0f) pidOut = 0.0f;
-            if (pidOut > 100.0f) pidOut = 100.0f;
+            if (pidOut < 0.0f)
+              pidOut = 0.0f;
+            if (pidOut > 100.0f)
+              pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
-            // STUB: [AC Dimmer not yet wired — replace with RBDDimmer call here]
 
             if (liquidTemp >= 80.0f) {
-              if (!preHeatHolding) { preHeatHolding = true; preHeatHoldStart = millis(); }
+              if (!preHeatHolding) {
+                preHeatHolding = true;
+                preHeatHoldStart = millis();
+              }
               if (millis() - preHeatHoldStart >= 15000UL) {
                 preHeatSterilized = true;
                 preHeatHolding = false;
@@ -1267,7 +1442,6 @@ void loop() {
         if (liquidTemp > -100.0f) {
           if (liquidTemp < 27.0f) {
             currentHeatingPercent = 100;
-            // STUB: [Quartz IR dimmer — replace with RBDDimmer call here]
             isFermFanOn = false;
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
             mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
@@ -1280,8 +1454,8 @@ void loop() {
             currentHeatingPercent = 0;
           }
         }
-        if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f
-            && incomingData.phValue <= fermTargetPH && !phAlertActive) {
+        if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
+            incomingData.phValue <= fermTargetPH && !phAlertActive) {
           phAlertActive = true;
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
         }
@@ -1292,20 +1466,27 @@ void loop() {
             float error = 80.0f - liquidTemp;
             if (liquidTemp >= PID_THROTTLE_TEMP) {
               pidIntegral += error;
-              if (pidIntegral > 100.0f) pidIntegral = 100.0f;
-              if (pidIntegral < -100.0f) pidIntegral = -100.0f;
+              if (pidIntegral > 100.0f)
+                pidIntegral = 100.0f;
+              if (pidIntegral < -100.0f)
+                pidIntegral = -100.0f;
             } else {
               pidIntegral = 0.0f;
             }
-            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) + (PID_KD * (error - pidPrevError));
+            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) +
+                           (PID_KD * (error - pidPrevError));
             pidPrevError = error;
-            if (pidOut < 0.0f) pidOut = 0.0f;
-            if (pidOut > 100.0f) pidOut = 100.0f;
+            if (pidOut < 0.0f)
+              pidOut = 0.0f;
+            if (pidOut > 100.0f)
+              pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
-            // STUB: [AC Dimmer not yet wired — replace with RBDDimmer call here]
 
             if (liquidTemp >= 80.0f) {
-              if (!pastHolding) { pastHolding = true; pastHoldStart = millis(); }
+              if (!pastHolding) {
+                pastHolding = true;
+                pastHoldStart = millis();
+              }
               if (millis() - pastHoldStart >= 15000UL) {
                 pastSterilized = true;
                 pastHolding = false;
@@ -1322,6 +1503,38 @@ void loop() {
         }
       }
     }
+
+    int activeHeaterPin = -1;
+    if (currentAppState == PID_TEST_MENU && pidTestRunning) {
+      if (pidTestChoice == 0) activeHeaterPin = DIM2_SHARED;
+      else if (pidTestChoice == 1) activeHeaterPin = DIM1_CH2;
+      else activeHeaterPin = DIM1_CH1;
+    } else if (activeBrewStage == 0) {
+      activeHeaterPin = DIM2_SHARED;
+    } else if (activeBrewStage == 1) {
+      activeHeaterPin = DIM1_CH2;
+    } else if (activeBrewStage == 2) {
+      activeHeaterPin = DIM1_CH1;
+    }
+
+    if (millis() - pidWindowStart >= PID_WINDOW_MS) {
+        pidWindowStart += PID_WINDOW_MS;
+    }
+    uint32_t onTime = (currentHeatingPercent * PID_WINDOW_MS) / 100;
+    
+    bool pState = LOW;
+    bool fState = LOW;
+    bool pastState = LOW;
+
+    if (activeHeaterPin != -1 && (millis() - pidWindowStart < onTime)) {
+        if (activeHeaterPin == DIM2_SHARED) pState = HIGH;
+        else if (activeHeaterPin == DIM1_CH2) fState = HIGH;
+        else if (activeHeaterPin == DIM1_CH1) pastState = HIGH;
+    }
+    
+    digitalWrite(DIM2_SHARED, pState);
+    digitalWrite(DIM1_CH2, fState);
+    digitalWrite(DIM1_CH1, pastState);
 
     tft.setTextPadding(0);
 
@@ -1355,8 +1568,8 @@ void loop() {
         tft.setTextColor(TFT_WHITE, colors[0]);
         tft.setTextPadding(140);
         String pa = bme1Status ? String(bme1.readTemperature(), 1) : "--";
-        String pl = liquid1Status
-                        ? String(sharedLiquidSensors.getTempCByIndex(0), 1)
+        String pl = liquid2Status
+                        ? String(sharedLiquidSensors.getTempCByIndex(1), 1)
                         : "--";
         tft.drawCentreString(pa + "C", 80, y + 80, 4);
         tft.drawCentreString(pl + "C", 240, y + 80, 4);
@@ -1419,8 +1632,8 @@ void loop() {
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);
         tft.setTextPadding(280);
-        String pt = liquid2Status
-                        ? String(sharedLiquidSensors.getTempCByIndex(1), 1)
+        String pt = liquid1Status
+                        ? String(sharedLiquidSensors.getTempCByIndex(0), 1)
                         : "--";
         tft.drawCentreString(pt + "C", CENTER_X, y + 85, 4);
         tft.drawCentreString("READY", CENTER_X, y + 155, 4);

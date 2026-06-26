@@ -63,7 +63,7 @@ void handleData() {
   String json = "{";
   json += "\"vol\":" + String(currentWeight) + ",";
   json += "\"la\":" + String(bme1Status ? bme1.readTemperature() : 0) + ",";
-  json += "\"ll\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0) + ",";
+  json += "\"ll\":" + String(liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : 0) + ",";
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue) + ",";
