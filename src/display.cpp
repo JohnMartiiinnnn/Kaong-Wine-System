@@ -131,13 +131,20 @@ void drawDashboardLayout() {
   uint16_t    colors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
 
   if (!moduleViewActive) {
+    tft.fillRect(0, 106, 320, 184, TFT_WHITE);
     for (int i = 0; i < 3; i++) {
       int y = 110 + (i * 60);
-      tft.drawRect(3, y - 2, 314, 54, (i == dashSelection) ? TFT_BLACK : TFT_WHITE);
+      bool sel = (i == dashSelection);
+      if (sel) {
+        tft.fillRect(1, y - 3, 318, 56, TFT_BLACK);
+      }
       tft.fillRect(5, y, 310, 50, colors[i]);
       tft.drawRect(5, y, 310, 50, TFT_DARKGREY);
       tft.setTextColor(TFT_WHITE, colors[i]);
       tft.drawCentreString(titles[i], CENTER_X, y + 15, 2);
+      if (sel) {
+        tft.drawString(">", 278, y + 15, 2);
+      }
     }
     tft.fillRect(0, 290, 320, 190, TFT_WHITE);
   } else {

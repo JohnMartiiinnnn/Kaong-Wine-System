@@ -277,6 +277,10 @@ void loop() {
   static uint32_t haltHoldStart = 0;
   static bool haltHoldActive = false;
   static uint8_t lastHoldPct = 255;
+  static bool prePauseFanOn = false;
+  static bool prePauseFermFanOn = false;
+  static int prePauseSpeed = 0;
+  static FanMode prePauseFanMode = FAN_OFF;
   bool ces = mcp.digitalRead(ESTOP_BUTTON_PIN);
 
   if (isSystemHalted) {
@@ -316,6 +320,14 @@ void loop() {
 
   if (ces == LOW && les == HIGH) {
     if (estopState == 0) {
+      prePauseFanOn = isFanOn;
+      prePauseFermFanOn = isFermFanOn;
+      prePauseSpeed = currentSpeedPercent;
+      prePauseFanMode = currentFanMode;
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      setFanSpeed(0);
       estopState = 1;
       drawEstopPage();
     } else if (estopState == 1) {
@@ -436,12 +448,64 @@ void loop() {
   if (estopState == 1) {
     if (cLeft && !ljLeft) {
       estopState = 0;
-      if (currentAppState == START_MENU) {
-        menuNeedsFullRedraw = true;
-        drawStartMenu();
-      } else {
-        dashNeedsFullRedraw = true;
-        drawDashboardLayout();
+      isFanOn = prePauseFanOn;
+      isFermFanOn = prePauseFermFanOn;
+      currentFanMode = prePauseFanMode;
+      mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      setFanSpeed(prePauseSpeed);
+      switch (currentAppState) {
+        case START_MENU:
+          menuNeedsFullRedraw = true;
+          drawStartMenu();
+          break;
+        case DASHBOARD_ACTIVE:
+          dashNeedsFullRedraw = true;
+          drawDashboardLayout();
+          break;
+        case COOLING_MENU:     drawCoolingMenu();   break;
+        case MIXER_MENU:       drawMixerMenu();     break;
+        case SENSOR_MONITOR:
+          monitorNeedsFullRedraw = true;
+          drawSensorMonitorPage();
+          break;
+        case CALIBRATION_MODE:
+          calNeedsFullRedraw = true;
+          drawCalibrationPage();
+          break;
+        case LOAD_CELL_PAGE:
+          loadCellNeedsFullRedraw = true;
+          drawLoadCellPage();
+          break;
+        case SYSTEM_CHECK_MENU:
+          systemCheckNeedsFullRedraw = true;
+          drawSystemCheckMenu();
+          break;
+        case FAN_TEST_PICK:
+          fanTestNeedsFullRedraw = true;
+          drawFanTestPick();
+          break;
+        case FAN_TEST_MENU:
+          fanTestNeedsFullRedraw = true;
+          drawFanTestMenu();
+          break;
+        case LIGHT_TEST_MENU:
+          lightTestNeedsFullRedraw = true;
+          drawLightTestMenu();
+          break;
+        case RELAY_TEST_MENU:
+          relayTestNeedsFullRedraw = true;
+          drawRelayTestMenu();
+          break;
+        case MOTOR_TEST_MENU:
+          motorTestNeedsFullRedraw = true;
+          drawMotorTestMenu();
+          break;
+        default:
+          menuNeedsFullRedraw = true;
+          drawStartMenu();
+          break;
       }
     }
     ljLeft = cLeft;
