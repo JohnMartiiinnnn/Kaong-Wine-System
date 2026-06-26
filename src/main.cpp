@@ -107,12 +107,19 @@ bool motorTestCW = true;
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {30.0f, 25.0f, 70.0f};
-float fermTargetPH = 3.5f;
+float stageTargetTemp[3] = {30.0f, 28.5f, 80.0f};
+float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
 int stageParamStage = 0;
+bool preHeatSterilized = false;
+bool preHeatHolding = false;
+uint32_t preHeatHoldStart = 0;
+bool pastSterilized = false;
+bool pastHolding = false;
+uint32_t pastHoldStart = 0;
+bool phAlertActive = false;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -698,6 +705,11 @@ void loop() {
         ogCapturing = true;
         activeBrewStage = 0;
         stageStartMillis = millis();
+        preHeatSterilized = false;
+        preHeatHolding = false;
+        pastSterilized = false;
+        pastHolding = false;
+        phAlertActive = false;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -1171,6 +1183,131 @@ void loop() {
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
+
+    // ---- Closed-Loop Brew Stage Control ----
+    if (activeBrewStage >= 0 && activeBrewStage <= 2) {
+      static float pidIntegral = 0.0f;
+      static float pidPrevError = 0.0f;
+      static int lastCtrlStage = -1;
+      if (activeBrewStage != lastCtrlStage) {
+        pidIntegral = 0.0f;
+        pidPrevError = 0.0f;
+        lastCtrlStage = activeBrewStage;
+      }
+
+      float liquidTemp = -999.0f;
+      if (activeBrewStage == 0 && liquid1Status)
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+        liquidTemp = incomingData.room2LiquidTemp;
+      else if (activeBrewStage == 2 && liquid2Status)
+        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+
+      if (activeBrewStage == 0) {
+        if (!preHeatSterilized) {
+          if (liquidTemp > -100.0f) {
+            float error = 80.0f - liquidTemp;
+            if (liquidTemp >= PID_THROTTLE_TEMP) {
+              pidIntegral += error;
+              if (pidIntegral > 100.0f) pidIntegral = 100.0f;
+              if (pidIntegral < -100.0f) pidIntegral = -100.0f;
+            } else {
+              pidIntegral = 0.0f;
+            }
+            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) + (PID_KD * (error - pidPrevError));
+            pidPrevError = error;
+            if (pidOut < 0.0f) pidOut = 0.0f;
+            if (pidOut > 100.0f) pidOut = 100.0f;
+            currentHeatingPercent = (int)pidOut;
+            // STUB: [AC Dimmer not yet wired — replace with RBDDimmer call here]
+
+            if (liquidTemp >= 80.0f) {
+              if (!preHeatHolding) { preHeatHolding = true; preHeatHoldStart = millis(); }
+              if (millis() - preHeatHoldStart >= 15000UL) {
+                preHeatSterilized = true;
+                preHeatHolding = false;
+                currentHeatingPercent = 0;
+                pidIntegral = 0.0f;
+              }
+            } else {
+              preHeatHolding = false;
+            }
+          }
+        } else {
+          currentHeatingPercent = 0;
+          if (liquidTemp > -100.0f) {
+            if (liquidTemp > 32.0f) {
+              isFanOn = true;
+              mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
+              setFanSpeed(100);
+            } else if (liquidTemp <= 30.0f) {
+              isFanOn = false;
+              mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+              setFanSpeed(0);
+            }
+          }
+        }
+
+      } else if (activeBrewStage == 1) {
+        if (liquidTemp > -100.0f) {
+          if (liquidTemp < 27.0f) {
+            currentHeatingPercent = 100;
+            // STUB: [Quartz IR dimmer — replace with RBDDimmer call here]
+            isFermFanOn = false;
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          } else if (liquidTemp > 30.0f) {
+            currentHeatingPercent = 0;
+            isFermFanOn = true;
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+          } else {
+            currentHeatingPercent = 0;
+          }
+        }
+        if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f
+            && incomingData.phValue <= fermTargetPH && !phAlertActive) {
+          phAlertActive = true;
+          mcp.digitalWrite(LIGHT_R, RELAY_ON);
+        }
+
+      } else if (activeBrewStage == 2) {
+        if (!pastSterilized) {
+          if (liquidTemp > -100.0f) {
+            float error = 80.0f - liquidTemp;
+            if (liquidTemp >= PID_THROTTLE_TEMP) {
+              pidIntegral += error;
+              if (pidIntegral > 100.0f) pidIntegral = 100.0f;
+              if (pidIntegral < -100.0f) pidIntegral = -100.0f;
+            } else {
+              pidIntegral = 0.0f;
+            }
+            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) + (PID_KD * (error - pidPrevError));
+            pidPrevError = error;
+            if (pidOut < 0.0f) pidOut = 0.0f;
+            if (pidOut > 100.0f) pidOut = 100.0f;
+            currentHeatingPercent = (int)pidOut;
+            // STUB: [AC Dimmer not yet wired — replace with RBDDimmer call here]
+
+            if (liquidTemp >= 80.0f) {
+              if (!pastHolding) { pastHolding = true; pastHoldStart = millis(); }
+              if (millis() - pastHoldStart >= 15000UL) {
+                pastSterilized = true;
+                pastHolding = false;
+                currentHeatingPercent = 0;
+                pidIntegral = 0.0f;
+                mcp.digitalWrite(LIGHT_G, RELAY_ON);
+              }
+            } else {
+              pastHolding = false;
+            }
+          }
+        } else {
+          currentHeatingPercent = 0;
+        }
+      }
+    }
+
     tft.setTextPadding(0);
 
     if (liquid1Status || liquid2Status)

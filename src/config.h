@@ -44,6 +44,11 @@ const int ESTOP_BUTTON_PIN = 6;  // GPA6
 #define RELAY_OFF HIGH
 #define GRAVITY_OFFSET 0.009
 
+const float PID_KP = 2.0f;
+const float PID_KI = 0.05f;
+const float PID_KD = 1.0f;
+const float PID_THROTTLE_TEMP = 75.0f;
+
 const int PWM_PIN = 25;
 const int SD_CS_PIN = 5;
 const int pwmFreq = 25000;
@@ -207,3 +212,10 @@ extern float fermTargetGravity;
 extern int stageParamSelection;
 extern bool stageParamNeedsFullRedraw;
 extern int stageParamStage;
+extern bool preHeatSterilized;
+extern bool preHeatHolding;
+extern uint32_t preHeatHoldStart;
+extern bool pastSterilized;
+extern bool pastHolding;
+extern uint32_t pastHoldStart;
+extern bool phAlertActive;
