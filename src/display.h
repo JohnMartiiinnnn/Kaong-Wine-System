@@ -21,3 +21,4 @@ void drawCalibrationValueTile(int y, const char *label, String value, bool isSel
 void drawCalibrationPage(bool valuesOnly = false);
 void drawSensorMonitorPage(bool valuesOnly = false);
 void drawInitTile(int x, int y, const char *label, int status);
+void drawStageParamMenu();

@@ -76,7 +76,8 @@ enum AppState {
   FAN_TEST_MENU,
   LIGHT_TEST_MENU,
   RELAY_TEST_MENU,
-  MOTOR_TEST_MENU
+  MOTOR_TEST_MENU,
+  STAGE_PARAM_MENU
 };
 
 extern long rawHX711;
@@ -196,3 +197,13 @@ extern bool motorTestCW;
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;
 extern bool lastLjRight, lastLjLeft, lastLjUp, lastLjDown, lastLjSelect;
+
+// ---- Brew Stage & Stage Params ----
+extern int activeBrewStage;
+extern uint32_t stageStartMillis;
+extern float stageTargetTemp[3];
+extern float fermTargetPH;
+extern float fermTargetGravity;
+extern int stageParamSelection;
+extern bool stageParamNeedsFullRedraw;
+extern int stageParamStage;

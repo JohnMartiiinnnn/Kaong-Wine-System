@@ -104,6 +104,16 @@ bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
 
+// ---- Brew Stage & Stage Params ----
+int activeBrewStage = -1;
+uint32_t stageStartMillis = 0;
+float stageTargetTemp[3] = {30.0f, 25.0f, 70.0f};
+float fermTargetPH = 3.5f;
+float fermTargetGravity = 1.010f;
+int stageParamSelection = 0;
+bool stageParamNeedsFullRedraw = true;
+int stageParamStage = 0;
+
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
      ljSelect = false;
@@ -502,6 +512,10 @@ void loop() {
           motorTestNeedsFullRedraw = true;
           drawMotorTestMenu();
           break;
+        case STAGE_PARAM_MENU:
+          stageParamNeedsFullRedraw = true;
+          drawStageParamMenu();
+          break;
         default:
           menuNeedsFullRedraw = true;
           drawStartMenu();
@@ -580,6 +594,12 @@ void loop() {
         motorTestSpeed = 0;
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
+    } else if (currentAppState == STAGE_PARAM_MENU) {
+      if (cDown && !ljDown) {
+        int maxRows = (stageParamStage == 1) ? 4 : 2;
+        stageParamSelection = (stageParamSelection + 1) % maxRows;
+        drawStageParamMenu();
+      }
     }
   }
 
@@ -634,6 +654,10 @@ void loop() {
         motorTestSpeed = 100;
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
+    } else if (currentAppState == STAGE_PARAM_MENU) {
+      int maxRows = (stageParamStage == 1) ? 4 : 2;
+      stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
+      drawStageParamMenu();
     }
   }
 
@@ -672,6 +696,8 @@ void loop() {
         ogSampleSum = 0.0f;
         ogSampleCount = 0;
         ogCapturing = true;
+        activeBrewStage = 0;
+        stageStartMillis = millis();
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -814,6 +840,22 @@ void loop() {
         hx711WeightSeeded = false;
         drawLoadCellPage();
       }
+    } else if (currentAppState == STAGE_PARAM_MENU) {
+      int lastRow = (stageParamStage == 1) ? 3 : 1;
+      if (stageParamSelection == lastRow) {
+        if (activeBrewStage == stageParamStage) {
+          if (activeBrewStage < 2) {
+            activeBrewStage++;
+            stageStartMillis = millis();
+          } else {
+            activeBrewStage = -1;
+          }
+        }
+        currentAppState = DASHBOARD_ACTIVE;
+        moduleViewActive = false;
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+      }
     }
   }
 
@@ -835,6 +877,27 @@ void loop() {
     motorTestCW = !motorTestCW;
     sendMotorCommand(motorTestSpeed, motorTestCW);
     drawMotorTestMenu();
+  }
+
+  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
+    stageParamStage = dashSelection;
+    stageParamSelection = 0;
+    stageParamNeedsFullRedraw = true;
+    currentAppState = STAGE_PARAM_MENU;
+    drawStageParamMenu();
+  }
+
+  if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
+    int lastRow = (stageParamStage == 1) ? 3 : 1;
+    if (stageParamSelection < lastRow) {
+      if (stageParamSelection == 0)
+        stageTargetTemp[stageParamStage] += 0.5f;
+      else if (stageParamStage == 1 && stageParamSelection == 1)
+        fermTargetPH += 0.05f;
+      else if (stageParamStage == 1 && stageParamSelection == 2)
+        fermTargetGravity += 0.001f;
+      drawStageParamMenu();
+    }
   }
 
   // Navigation: Left / Return
@@ -923,6 +986,22 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
+    } else if (currentAppState == STAGE_PARAM_MENU) {
+      int lastRow = (stageParamStage == 1) ? 3 : 1;
+      if (stageParamSelection < lastRow) {
+        if (stageParamSelection == 0)
+          stageTargetTemp[stageParamStage] -= 0.5f;
+        else if (stageParamStage == 1 && stageParamSelection == 1)
+          fermTargetPH -= 0.05f;
+        else if (stageParamStage == 1 && stageParamSelection == 2)
+          fermTargetGravity -= 0.001f;
+        drawStageParamMenu();
+      } else {
+        currentAppState = DASHBOARD_ACTIVE;
+        moduleViewActive = true;
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+      }
     }
   }
 
@@ -1112,6 +1191,9 @@ void loop() {
 
     if (currentAppState == LOAD_CELL_PAGE)
       drawLoadCellPage(true);
+
+    if (currentAppState == STAGE_PARAM_MENU)
+      drawStageParamMenu();
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;

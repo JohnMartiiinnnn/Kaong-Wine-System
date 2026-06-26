@@ -145,6 +145,9 @@ void drawDashboardLayout() {
       if (sel) {
         tft.drawString(">", 278, y + 15, 2);
       }
+      if (i == activeBrewStage) {
+        tft.fillCircle(22, y + 25, 5, TFT_WHITE);
+      }
     }
     tft.fillRect(0, 290, 320, 190, TFT_WHITE);
   } else {
@@ -614,4 +617,166 @@ void drawInitTile(int x, int y, const char *label, int status) {
   tft.setTextColor(textColor);
   tft.drawString(label, 20, y + 13, 2);
   tft.drawRightString(stTxt, 300, y + 13, 2);
+}
+
+void drawStageParamMenu() {
+  const char    *stageNames[]  = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
+  const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+  char buf[40];
+
+  if (stageParamNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, stageColors[stageParamStage]);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString(stageNames[stageParamStage], CENTER_X, 8, 2);
+    tft.drawCentreString("PARAMETERS", CENTER_X, 28, 4);
+    stageParamNeedsFullRedraw = false;
+  }
+
+  // Show elapsed time in header if this is the active stage
+  tft.fillRect(0, 0, 320, 50, stageColors[stageParamStage]);
+  tft.setTextColor(TFT_WHITE, stageColors[stageParamStage]);
+  tft.drawCentreString(stageNames[stageParamStage], CENTER_X, 8, 2);
+  if (activeBrewStage == stageParamStage && stageStartMillis > 0) {
+    uint32_t elapsedSec = (millis() - stageStartMillis) / 1000;
+    uint32_t d = elapsedSec / 86400;
+    uint32_t h = (elapsedSec % 86400) / 3600;
+    sprintf(buf, "%ld d  %ld h elapsed", (long)d, (long)h);
+    tft.drawCentreString(buf, CENTER_X, 30, 1);
+  } else {
+    tft.drawCentreString("PARAMETERS", CENTER_X, 28, 4);
+  }
+
+  // --- Param rows ---
+  int lastRow = (stageParamStage == 1) ? 3 : 1;
+
+  // Row 0: Target Temp (all stages)
+  {
+    bool sel = (stageParamSelection == 0);
+    uint16_t bg = sel ? 0x3566 : 0xD6BA;
+    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 58, 300, 48, bg);
+    tft.drawRect(10, 58, 300, 48, TFT_DARKGREY);
+    tft.setTextColor(fg, bg);
+    tft.drawString("TARGET TEMP", 20, 74, 2);
+    sprintf(buf, "%.1f C", stageTargetTemp[stageParamStage]);
+    tft.drawRightString(buf, 300, 74, 2);
+  }
+
+  if (stageParamStage == 1) {
+    // Row 1: Target pH
+    bool sel1 = (stageParamSelection == 1);
+    uint16_t bg1 = sel1 ? 0x3566 : 0xD6BA;
+    tft.fillRect(10, 112, 300, 48, bg1);
+    tft.drawRect(10, 112, 300, 48, TFT_DARKGREY);
+    tft.setTextColor(sel1 ? TFT_WHITE : TFT_BLACK, bg1);
+    tft.drawString("TARGET PH", 20, 128, 2);
+    sprintf(buf, "%.2f", fermTargetPH);
+    tft.drawRightString(buf, 300, 128, 2);
+
+    // Row 2: Target Gravity
+    bool sel2 = (stageParamSelection == 2);
+    uint16_t bg2 = sel2 ? 0x3566 : 0xD6BA;
+    tft.fillRect(10, 166, 300, 48, bg2);
+    tft.drawRect(10, 166, 300, 48, TFT_DARKGREY);
+    tft.setTextColor(sel2 ? TFT_WHITE : TFT_BLACK, bg2);
+    tft.drawString("TARGET GRAVITY", 20, 182, 2);
+    sprintf(buf, "%.3f", fermTargetGravity);
+    tft.drawRightString(buf, 300, 182, 2);
+  }
+
+  // --- Live Status section ---
+  int statusY = (stageParamStage == 1) ? 224 : 116;
+  tft.fillRect(0, statusY - 4, 320, 20, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
+  tft.drawCentreString("LIVE STATUS", CENTER_X, statusY, 2);
+
+  if (stageParamStage == 0) {
+    float ambT = bme1Status ? bme1.readTemperature() : -999.0f;
+    float liqT = liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : -999.0f;
+
+    uint16_t ambBg = (ambT > -999 && ambT >= stageTargetTemp[0]) ? 0x0400 : 0xF800;
+    tft.fillRect(10, statusY + 22, 300, 42, ambBg);
+    tft.drawRect(10, statusY + 22, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, ambBg);
+    tft.drawString("AMBIENT", 20, statusY + 34, 2);
+    if (ambT > -999) sprintf(buf, "%.1fC  %s", ambT, ambT >= stageTargetTemp[0] ? "AT TARGET" : "BELOW");
+    else strcpy(buf, "NO SENSOR");
+    tft.drawRightString(buf, 300, statusY + 34, 2);
+
+    uint16_t liqBg = (liqT > -999 && liqT >= stageTargetTemp[0]) ? 0x0400 : 0xF800;
+    tft.fillRect(10, statusY + 70, 300, 42, liqBg);
+    tft.drawRect(10, statusY + 70, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, liqBg);
+    tft.drawString("LIQUID", 20, statusY + 82, 2);
+    if (liqT > -999) sprintf(buf, "%.1fC  %s", liqT, liqT >= stageTargetTemp[0] ? "AT TARGET" : "BELOW");
+    else strcpy(buf, "NO SENSOR");
+    tft.drawRightString(buf, 300, statusY + 82, 2);
+
+  } else if (stageParamStage == 1) {
+    float ambT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : -999.0f;
+    float ph   = (incomingData.adsStatus == 1) ? incomingData.phValue : -999.0f;
+    float grav = (incomingData.pillGravity > 0.1f && incomingData.pillGravity < 10.0f)
+                   ? incomingData.pillGravity : -999.0f;
+
+    uint16_t tBg = (ambT > -999 && ambT >= stageTargetTemp[1]) ? 0x0400 : 0xF800;
+    tft.fillRect(10, statusY + 22, 300, 42, tBg);
+    tft.drawRect(10, statusY + 22, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, tBg);
+    tft.drawString("AMBIENT", 20, statusY + 34, 2);
+    if (ambT > -999) sprintf(buf, "%.1fC  %s", ambT, ambT >= stageTargetTemp[1] ? "OK" : "BELOW");
+    else strcpy(buf, "NO DATA");
+    tft.drawRightString(buf, 300, statusY + 34, 2);
+
+    uint16_t phBg = (ph > -999 && ph <= fermTargetPH) ? 0x0400 : 0xF800;
+    tft.fillRect(10, statusY + 70, 300, 42, phBg);
+    tft.drawRect(10, statusY + 70, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, phBg);
+    tft.drawString("PH", 20, statusY + 82, 2);
+    if (ph > -999) sprintf(buf, "%.2f  %s", ph, ph <= fermTargetPH ? "OK" : "ABOVE");
+    else strcpy(buf, "NO DATA");
+    tft.drawRightString(buf, 300, statusY + 82, 2);
+
+    uint16_t gBg = (grav > -999 && grav <= fermTargetGravity) ? 0x0400 : 0x001F;
+    tft.fillRect(10, statusY + 118, 300, 42, gBg);
+    tft.drawRect(10, statusY + 118, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, gBg);
+    tft.drawString("GRAVITY", 20, statusY + 130, 2);
+    if (grav > -999) sprintf(buf, "%.3f  %s", grav, grav <= fermTargetGravity ? "AT TARGET" : "FERMENTING");
+    else strcpy(buf, "NO DATA");
+    tft.drawRightString(buf, 300, statusY + 130, 2);
+
+  } else {
+    float pastT = liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : -999.0f;
+    uint16_t pBg = (pastT > -999 && pastT >= stageTargetTemp[2]) ? 0x0400 : 0xF800;
+    tft.fillRect(10, statusY + 22, 300, 42, pBg);
+    tft.drawRect(10, statusY + 22, 300, 42, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, pBg);
+    tft.drawString("PAST. TEMP", 20, statusY + 34, 2);
+    if (pastT > -999) sprintf(buf, "%.1fC  %s", pastT, pastT >= stageTargetTemp[2] ? "AT TARGET" : "BELOW");
+    else strcpy(buf, "NO SENSOR");
+    tft.drawRightString(buf, 300, statusY + 34, 2);
+  }
+
+  // --- Action button (ADVANCE STAGE / COMPLETE) ---
+  const char *btnLabels[] = {
+    "ADVANCE TO FERMENTATION",
+    "ADVANCE TO PASTEURIZATION",
+    "MARK BREW COMPLETE"
+  };
+  int btnY = (stageParamStage == 1) ? 390 : (stageParamStage == 2 ? 192 : 240);
+  bool btnSel = (stageParamSelection == lastRow);
+  bool isActive = (activeBrewStage == stageParamStage);
+  uint16_t btnBg = btnSel ? 0x3566 : (isActive ? TFT_NAVY : TFT_DARKGREY);
+  tft.fillRect(10, btnY, 300, 50, btnBg);
+  tft.drawRect(10, btnY, 300, 50, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, btnBg);
+  tft.drawCentreString(btnLabels[stageParamStage], CENTER_X, btnY + 10, 2);
+  tft.drawCentreString(isActive ? "SELECT TO CONFIRM" : "NOT CURRENT STAGE", CENTER_X, btnY + 32, 1);
+
+  // --- Hints ---
+  tft.fillRect(0, 440, 320, 40, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("UP/DOWN: NAVIGATE   L/R: ADJUST", CENTER_X, 447, 1);
+  tft.drawCentreString("RETURN: BACK TO STAGE VIEW", CENTER_X, 462, 1);
 }
