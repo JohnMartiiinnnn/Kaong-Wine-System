@@ -1180,9 +1180,12 @@ void loop() {
           } else if (activeBrewStage == 2) {
             mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_G, RELAY_ON);
           } else {
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+            // Brew complete: all lights on
+            mcp.digitalWrite(LIGHT_R, RELAY_ON);
+            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+            mcp.digitalWrite(LIGHT_G, RELAY_ON);
           }
         }
         currentAppState = DASHBOARD_ACTIVE;
@@ -1833,13 +1836,18 @@ void loop() {
             mcp.digitalWrite(LIGHT_Y, RELAY_ON);
             mcp.digitalWrite(LIGHT_G, RELAY_OFF);
           } else {
+            // Entering pasteurization: clear pH alert light, green on
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_G, RELAY_ON);
           }
         } else {
           activeBrewStage = -1;
           simRunActive = false;
-          mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          // Brew complete: all lights on
+          mcp.digitalWrite(LIGHT_R, RELAY_ON);
+          mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+          mcp.digitalWrite(LIGHT_G, RELAY_ON);
         }
         dashNeedsFullRedraw = true;
         if (currentAppState == DASHBOARD_ACTIVE) drawDashboardLayout();
