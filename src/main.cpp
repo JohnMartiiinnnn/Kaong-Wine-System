@@ -619,6 +619,21 @@ void loop() {
       mcp.digitalWrite(LIGHT_R, RELAY_OFF);
       mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
       mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+      // Clear all sim/demo state so sensor checks show real data
+      simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 0.0f;
+      simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
+      simManual[0]  = simManual[1]  = simManual[2]  = false;
+      incomingData.bleStatus       = 0;
+      incomingData.sensor2Status   = 0;
+      incomingData.adsStatus       = 0;
+      incomingData.ds18Status      = 0;
+      incomingData.pillGravity     = 0.0f;
+      incomingData.phValue         = 0.0f;
+      incomingData.room2LiquidTemp = 0.0f;
+      incomingData.room2Temp       = 0.0f;
+      incomingData.pillRSSI        = 0;
+      incomingData.pillBattery     = 0;
+      remoteStatusReceived         = false;
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
       drawStartMenu();
