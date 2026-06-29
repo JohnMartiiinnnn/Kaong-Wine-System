@@ -104,6 +104,20 @@ void drawNewBrewWizard() {
   }
 }
 
+static void formatStageTimer(uint32_t ms, char *out) {
+  uint32_t totalSec = ms / 1000;
+  uint32_t hours    = totalSec / 3600;
+  uint32_t days     = hours / 24;
+  if (days > 0) {
+    sprintf(out, "%lud %02luh", (unsigned long)days, (unsigned long)(hours % 24));
+  } else {
+    sprintf(out, "%02lu:%02lu:%02lu",
+            (unsigned long)hours,
+            (unsigned long)((totalSec % 3600) / 60),
+            (unsigned long)(totalSec % 60));
+  }
+}
+
 void drawDashboardLayout() {
   if (dashNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
@@ -148,10 +162,29 @@ void drawDashboardLayout() {
       if (i == activeBrewStage) {
         tft.fillCircle(22, y + 25, 5, TFT_WHITE);
       }
+      {
+        char timerBuf[16] = "";
+        if (i == activeBrewStage) {
+          formatStageTimer(millis() - stageStartMillis, timerBuf);
+        } else if (stageElapsedMs[i] > 0) {
+          formatStageTimer(stageElapsedMs[i], timerBuf);
+        }
+        tft.setTextColor(TFT_WHITE, colors[i]);
+        tft.setTextPadding(130);
+        tft.drawString(timerBuf, 35, y + 35, 1);
+        tft.setTextPadding(0);
+      }
       if (simTempOverride[i] > 0.0f) {
-        char simBuf[14];
-        sprintf(simBuf, "[%s %.0fC]", simDynamic[i] ? "DYN" : "SIM", simTempOverride[i]);
+        char simBuf[16];
+        const char *tag = simManual[i] ? "MAN" : (simDynamic[i] ? "DYN" : "SIM");
+        sprintf(simBuf, "[%s %.0fC]", tag, simTempOverride[i]);
         tft.drawRightString(simBuf, 305, y + 35, 1);
+      } else if (i == 0 && preHeatSterilized && isFanOn) {
+        tft.drawRightString("[COOLING]", 305, y + 35, 1);
+      } else if (i == 0 && preHeatHolding) {
+        tft.drawRightString("[HOLDING]", 305, y + 35, 1);
+      } else if (i == 2 && pastHolding) {
+        tft.drawRightString("[HOLDING]", 305, y + 35, 1);
       }
     }
     tft.fillRect(0, 290, 320, 190, TFT_WHITE);
@@ -161,12 +194,23 @@ void drawDashboardLayout() {
     tft.drawRect(5, y, 310, h, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE);
     tft.drawCentreString(titles[dashSelection], CENTER_X, y + 10, 4);
+    {
+      char timerBuf[16] = "";
+      if (dashSelection == activeBrewStage) {
+        formatStageTimer(millis() - stageStartMillis, timerBuf);
+      } else if (stageElapsedMs[dashSelection] > 0) {
+        formatStageTimer(stageElapsedMs[dashSelection], timerBuf);
+      }
+      tft.setTextPadding(130);
+      tft.drawString(timerBuf, 25, y + 38, 1);
+      tft.setTextPadding(0);
+    }
     if (simTempOverride[dashSelection] > 0.0f) {
       char simBuf[22];
       sprintf(simBuf, "[%s: %.1f C]",
               simDynamic[dashSelection] ? "DYN" : "SIM",
               simTempOverride[dashSelection]);
-      tft.drawCentreString(simBuf, CENTER_X, y + 38, 1);
+      tft.drawRightString(simBuf, 295, y + 38, 1);
     }
     tft.drawFastHLine(20, y + 48, 280, TFT_WHITE);
     if (dashSelection == 0) {
@@ -191,6 +235,19 @@ void drawDashboardLayout() {
     }
   }
   lastDashSelection = dashSelection;
+}
+
+void updateDashboardTimers() {
+  if (moduleViewActive || activeBrewStage < 0) return;
+  const uint16_t colors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+  int i = activeBrewStage;
+  int y = 110 + (i * 60);
+  char timerBuf[16] = "";
+  formatStageTimer(millis() - stageStartMillis, timerBuf);
+  tft.setTextColor(TFT_WHITE, colors[i]);
+  tft.setTextPadding(130);
+  tft.drawString(timerBuf, 35, y + 35, 1);
+  tft.setTextPadding(0);
 }
 
 void drawStartMenu() {
@@ -642,6 +699,7 @@ void drawStageParamMenu() {
   char buf[40];
   bool simActive  = (simTempOverride[stageParamStage] > 0.0f);
   bool simIsDyn   = simActive && simDynamic[stageParamStage];
+  bool simIsMan   = simActive && simManual[stageParamStage];
 
   if (stageParamNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
@@ -654,6 +712,8 @@ void drawStageParamMenu() {
   tft.drawCentreString(stageNames[stageParamStage], CENTER_X, 8, 2);
   if (simIsDyn) {
     tft.drawCentreString("[SIM DYNAMIC RUNNING]", CENTER_X, 28, 2);
+  } else if (simIsMan) {
+    tft.drawCentreString("[SIM MANUAL - UP/DOWN = TEMP]", CENTER_X, 28, 2);
   } else if (simActive) {
     tft.drawCentreString("[SIM STATIC ACTIVE]", CENTER_X, 28, 2);
   } else if (activeBrewStage == stageParamStage && stageStartMillis > 0) {
@@ -671,8 +731,8 @@ void drawStageParamMenu() {
   // Row 0: SIM TEMP — L/R adjusts value, SELECT toggles DYN mode
   {
     bool sel = (stageParamSelection == 0);
-    uint16_t bg  = sel ? 0x3566 : (simIsDyn ? 0xD7FF : (simActive ? 0xFBE0 : 0xD6BA));
-    uint16_t bdr = simIsDyn ? 0x001F : (simActive ? TFT_ORANGE : TFT_DARKGREY);
+    uint16_t bg  = sel ? 0x3566 : (simIsDyn ? 0xD7FF : (simIsMan ? 0xCFFD : (simActive ? 0xFBE0 : 0xD6BA)));
+    uint16_t bdr = simIsDyn ? 0x001F : (simIsMan ? 0x07FF : (simActive ? TFT_ORANGE : TFT_DARKGREY));
     uint16_t fg  = sel ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 52, 300, 42, bg);
     tft.drawRect(10, 52, 300, 42, bdr);
@@ -680,6 +740,8 @@ void drawStageParamMenu() {
     tft.drawString("SIM TEMP", 20, 65, 2);
     if (simIsDyn)
       sprintf(buf, "%.1f C [DYN]", simTempOverride[stageParamStage]);
+    else if (simIsMan)
+      sprintf(buf, "%.1f C [MANUAL]", simTempOverride[stageParamStage]);
     else if (simActive)
       sprintf(buf, "%.1f C [STATIC]", simTempOverride[stageParamStage]);
     else
@@ -823,7 +885,10 @@ void drawStageParamMenu() {
   tft.fillRect(0, 440, 320, 40, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("UP/DOWN: NAVIGATE   L/R: ADJUST", CENTER_X, 447, 1);
-  tft.drawCentreString("SIM: L/R=VALUE  SELECT=TOGGLE DYN MODE", CENTER_X, 462, 1);
+  if (simIsMan)
+    tft.drawCentreString("MANUAL: UP/DOWN ON DASHBOARD ADJUSTS TEMP", CENTER_X, 462, 1);
+  else
+    tft.drawCentreString("SIM: L/R=VALUE  SELECT=CYCLE(OFF/SIM/DYN/MAN)", CENTER_X, 462, 1);
 }
 
 void drawPidTestPick() {

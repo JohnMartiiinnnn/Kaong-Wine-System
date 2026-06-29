@@ -124,6 +124,7 @@ int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
 int stageParamStage = 0;
 bool preHeatSterilized = false;
+bool preHeatCooled = false;
 bool preHeatHolding = false;
 uint32_t preHeatHoldStart = 0;
 bool pastSterilized = false;
@@ -132,6 +133,8 @@ uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
 float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
 bool  simDynamic[3]      = {false, false, false};
+bool  simManual[3]       = {false, false, false};
+uint32_t stageElapsedMs[3] = {0, 0, 0};
 bool     heaterTestNeedsFullRedraw = true;
 int      heaterTestStage   = 0;
 int      heaterTestPercent = 0;
@@ -163,12 +166,10 @@ void setFanSpeed(int percent) {
   if (percent > 100)
     percent = 100;
   currentSpeedPercent = percent;
-  // Pre-Heating logic: 0% = 255 PWM, 100% = 0 PWM
-  // Fermentation logic: 0% = 0 PWM, 100% = 255 PWM
-  if (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1) {
-    ledcWrite(pwmChannel, map(percent, 0, 100, 0, 255));
-  } else {
+  if (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 0) {
     ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
+  } else {
+    ledcWrite(pwmChannel, map(percent, 0, 100, 0, 255));
   }
 }
 
@@ -618,7 +619,12 @@ void loop() {
       wizardSelection = (wizardSelection + 1) % 2;
       drawNewBrewWizard();
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      dashSelection = (dashSelection + 1) % 3;
+      if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
+        simTempOverride[activeBrewStage] -= 5.0f;
+        if (simTempOverride[activeBrewStage] < 0.0f) simTempOverride[activeBrewStage] = 0.0f;
+      } else {
+        dashSelection = (dashSelection + 1) % 3;
+      }
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent -= 10;
@@ -698,7 +704,12 @@ void loop() {
       wizardSelection = (wizardSelection + 1) % 2;
       drawNewBrewWizard();
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      dashSelection = (dashSelection + 2) % 3;
+      if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
+        simTempOverride[activeBrewStage] += 5.0f;
+        if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
+      } else {
+        dashSelection = (dashSelection + 2) % 3;
+      }
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent += 10;
@@ -720,7 +731,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 4) % 9;
+      systemCheckSelection = (systemCheckSelection + 8) % 9;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -801,6 +812,7 @@ void loop() {
         activeBrewStage = 0;
         stageStartMillis = millis();
         preHeatSterilized = false;
+        preHeatCooled = false;
         preHeatHolding = false;
         pastSterilized = false;
         pastHolding = false;
@@ -809,6 +821,8 @@ void loop() {
         simTempOverride[1] = 0.0f;
         simTempOverride[2] = 0.0f;
         simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
+        simManual[0]  = simManual[1]  = simManual[2]  = false;
+        stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -1050,16 +1064,28 @@ void loop() {
     } else if (currentAppState == STAGE_PARAM_MENU) {
       int lastRow = (stageParamStage == 1) ? 4 : 2;
       if (stageParamSelection == 0) {
-        if (simTempOverride[stageParamStage] == 0.0f)
+        if (simTempOverride[stageParamStage] == 0.0f) {
           simTempOverride[stageParamStage] = 25.0f;
-        simDynamic[stageParamStage] = !simDynamic[stageParamStage];
+          simDynamic[stageParamStage] = false;
+          simManual[stageParamStage]  = false;
+        } else if (!simDynamic[stageParamStage] && !simManual[stageParamStage]) {
+          simDynamic[stageParamStage] = true;
+        } else if (simDynamic[stageParamStage]) {
+          simDynamic[stageParamStage] = false;
+          simManual[stageParamStage]  = true;
+        } else {
+          simTempOverride[stageParamStage] = 0.0f;
+          simManual[stageParamStage]       = false;
+        }
         drawStageParamMenu();
       } else if (stageParamSelection == lastRow) {
         if (activeBrewStage == stageParamStage) {
           if (activeBrewStage < 2) {
+            stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage++;
             stageStartMillis = millis();
           } else {
+            stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage = -1;
           }
         }
@@ -1542,6 +1568,7 @@ void loop() {
             if (pidOut > 100.0f)
               pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
+            if (simManual[0]) currentHeatingPercent = 0;
 
             if (liquidTemp >= 80.0f) {
               if (!preHeatHolding) {
@@ -1560,12 +1587,16 @@ void loop() {
           }
         } else {
           currentHeatingPercent = 0;
-          if (liquidTemp > -100.0f) {
-            if (liquidTemp > 32.0f) {
+          if (liquidTemp > -100.0f && !preHeatCooled) {
+            if (liquidTemp > 30.0f) {
+              int fanPct = (int)((liquidTemp - 30.0f) / 50.0f * 100.0f);
+              if (fanPct > 100) fanPct = 100;
+              if (fanPct < 10) fanPct = 10;
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
-              setFanSpeed(100);
-            } else if (liquidTemp <= 30.0f) {
+              setFanSpeed(fanPct);
+            } else {
+              preHeatCooled = true;
               isFanOn = false;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
               setFanSpeed(0);
@@ -1726,6 +1757,9 @@ void loop() {
       drawHeaterTestMenu();
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
+
+    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive && activeBrewStage >= 0)
+      updateDashboardTimers();
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;
