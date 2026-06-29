@@ -1774,9 +1774,9 @@ void loop() {
         tft.setTextColor(TFT_WHITE, colors[0]);
         tft.setTextPadding(140);
         String pa = bme1Status ? String(bme1.readTemperature(), 1) : "--";
-        String pl = liquid2Status
-                        ? String(sharedLiquidSensors.getTempCByIndex(1), 1)
-                        : "--";
+        String pl = (simTempOverride[0] > 0.0f)
+                        ? String(simTempOverride[0], 1)
+                        : (liquid2Status ? String(sharedLiquidSensors.getTempCByIndex(1), 1) : "--");
         tft.drawCentreString(pa + "C", 80, y + 80, 4);
         tft.drawCentreString(pl + "C", 240, y + 80, 4);
         tft.drawCentreString(String(currentSpeedPercent) + "%", 80, y + 160, 4);
@@ -1793,9 +1793,9 @@ void loop() {
         String fa = (incomingData.sensor2Status > 0)
                         ? String(incomingData.room2Temp, 1)
                         : "--";
-        String fl = (incomingData.ds18Status == 1)
-                        ? String(incomingData.room2LiquidTemp, 1)
-                        : "--";
+        String fl = (simTempOverride[1] > 0.0f)
+                        ? String(simTempOverride[1], 1)
+                        : (incomingData.ds18Status == 1 ? String(incomingData.room2LiquidTemp, 1) : "--");
         tft.drawCentreString(fa + "C", 80, y + 85, 4);
         tft.drawCentreString(fl + "C", 240, y + 85, 4);
         if (incomingData.pillGravity != 0 && incomingData.pillGravity < 10.0) {
@@ -1838,9 +1838,9 @@ void loop() {
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);
         tft.setTextPadding(280);
-        String pt = liquid1Status
-                        ? String(sharedLiquidSensors.getTempCByIndex(0), 1)
-                        : "--";
+        String pt = (simTempOverride[2] > 0.0f)
+                        ? String(simTempOverride[2], 1)
+                        : (liquid1Status ? String(sharedLiquidSensors.getTempCByIndex(0), 1) : "--");
         tft.drawCentreString(pt + "C", CENTER_X, y + 85, 4);
         tft.drawCentreString("READY", CENTER_X, y + 155, 4);
       }

@@ -326,11 +326,20 @@ void updateDashboardTimers() {
   const uint16_t colors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
   int i = activeBrewStage;
   int y = 110 + (i * 60);
+  tft.setTextColor(TFT_WHITE, colors[i]);
+  // Timer (left)
   char timerBuf[16] = "";
   formatStageTimer(millis() - stageStartMillis, timerBuf);
-  tft.setTextColor(TFT_WHITE, colors[i]);
   tft.setTextPadding(130);
   tft.drawString(timerBuf, 35, y + 35, 1);
+  // Sim badge (right) — changes every second in DYN mode
+  if (simTempOverride[i] > 0.0f) {
+    char simBuf[20];
+    const char *tag = simManual[i] ? "MAN" : (simDynamic[i] ? "DYN" : "SIM");
+    sprintf(simBuf, "[%s %.0fC]", tag, simTempOverride[i]);
+    tft.setTextPadding(120);
+    tft.drawRightString(simBuf, 305, y + 35, 1);
+  }
   tft.setTextPadding(0);
 }
 
