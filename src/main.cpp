@@ -1598,12 +1598,9 @@ void loop() {
           currentHeatingPercent = 0;
           if (liquidTemp > -100.0f && !preHeatCooled) {
             if (liquidTemp > 30.0f) {
-              int fanPct = (int)((liquidTemp - 30.0f) / 50.0f * 100.0f);
-              if (fanPct > 100) fanPct = 100;
-              if (fanPct < 10) fanPct = 10;
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
-              setFanSpeed(fanPct);
+              setFanSpeed(100);
             } else {
               preHeatCooled = true;
               isFanOn = false;
