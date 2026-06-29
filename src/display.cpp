@@ -251,9 +251,24 @@ void drawDashboardLayout() {
       tft.drawRightString(wtBuf, 310, 398, 2);
     } else {
       tft.fillRect(0, 290, 320, 190, TFT_WHITE);
+      // Button hints
+      bool isManual = activeBrewStage >= 0 && simManual[activeBrewStage];
+      tft.fillRect(0, 292, 320, 1, TFT_DARKGREY);
+      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+      if (isManual) {
+        tft.drawString("UP",     10, 300, 2); tft.drawString("+5 C (SIM)",  55, 300, 2);
+        tft.drawString("DOWN",   10, 318, 2); tft.drawString("-5 C (SIM)",  55, 318, 2);
+        tft.drawString("SELECT", 10, 336, 2); tft.drawString("Expand Stage", 65, 336, 2);
+        tft.drawString("LEFT",   10, 354, 2); tft.drawString("Return to Menu", 55, 354, 2);
+      } else {
+        tft.drawString("UP / DOWN", 10, 300, 2); tft.drawString("Navigate Stages",  100, 300, 2);
+        tft.drawString("SELECT",    10, 318, 2); tft.drawString("Expand Stage",      65,  318, 2);
+        tft.drawString("LEFT",      10, 336, 2); tft.drawString("Return to Menu",    55,  336, 2);
+        tft.drawString("RIGHT",     10, 354, 2); tft.drawString("Navigate Stages",   65,  354, 2);
+      }
     }
   } else {
-    int y = 110, h = 360;
+    int y = 110, h = 340;
     tft.fillRect(5, y, 310, h, colors[dashSelection]);
     tft.drawRect(5, y, 310, h, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE);
@@ -297,6 +312,11 @@ void drawDashboardLayout() {
       tft.drawCentreString("PAST. TEMP",     CENTER_X, y + 60,  2);
       tft.drawCentreString("PROCESS STATUS", CENTER_X, y + 130, 2);
     }
+    // Module view button hints
+    tft.fillRect(0, y + h, 320, 30, TFT_WHITE);
+    tft.fillRect(0, y + h, 320, 1, TFT_DARKGREY);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("LEFT: BACK    RIGHT: STAGE PARAMS", CENTER_X, y + h + 10, 1);
   }
   lastDashSelection = dashSelection;
 }
