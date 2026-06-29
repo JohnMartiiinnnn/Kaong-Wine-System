@@ -167,11 +167,7 @@ void setFanSpeed(int percent) {
   if (percent > 100)
     percent = 100;
   currentSpeedPercent = percent;
-  if (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 0) {
-    ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
-  } else {
-    ledcWrite(pwmChannel, map(percent, 0, 100, 0, 255));
-  }
+  ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
 }
 
 // ---- Mixer Speed Helper ----
