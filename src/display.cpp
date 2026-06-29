@@ -297,10 +297,10 @@ void drawStartMenu() {
     tft.drawCentreString("MAIN MENU", CENTER_X, 15, 4);
     menuNeedsFullRedraw = false;
   }
-  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES"};
-  for (int i = 0; i < 4; i++) {
-    uint16_t color    = (menuSelection == i) ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : TFT_BLACK;
+  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES", "DEMO RUN"};
+  for (int i = 0; i < 5; i++) {
+    uint16_t color    = (menuSelection == i) ? 0x3566 : (i == 4 ? 0x0400 : 0xD6BA);
+    uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : (i == 4 ? TFT_WHITE : TFT_BLACK);
     tft.fillRect(20, 80 + (i * 70), 280, 50, color);
     tft.drawRect(20, 80 + (i * 70), 280, 50, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);

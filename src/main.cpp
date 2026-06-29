@@ -148,6 +148,7 @@ uint32_t uartPacketCount    = 0;
 uint32_t uartChecksumErrors = 0;
 bool     rtcSetNeedsFullRedraw = true;
 bool     brewSummaryNeedsFullRedraw = true;
+bool     simRunActive = false;
 int      rtcSetField   = 0;
 int      rtcSetHour    = 0;
 int      rtcSetMinute  = 0;
@@ -600,6 +601,18 @@ void loop() {
     }
     if (cLeft && !ljLeft) {
       returnConfirmState = 0;
+      simRunActive = false;
+      activeBrewStage = -1;
+      currentHeatingPercent = 0;
+      isFanOn = false;
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+      setFanSpeed(0);
+      isFermFanOn = false;
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+      mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+      mcp.digitalWrite(LIGHT_G, RELAY_OFF);
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
       drawStartMenu();
@@ -611,7 +624,7 @@ void loop() {
   // Navigation: Right / Down
   if ((cRight && !ljRight) || (cDown && !ljDown)) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 1) % 4;
+      menuSelection = (menuSelection + 1) % 5;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       wizardSelection = (wizardSelection + 1) % 2;
@@ -700,7 +713,7 @@ void loop() {
   // Navigation: Up
   if (cUp && !ljUp) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 3) % 4;
+      menuSelection = (menuSelection + 4) % 5;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       wizardSelection = (wizardSelection + 1) % 2;
@@ -800,6 +813,46 @@ void loop() {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
+      } else if (menuSelection == 4) {
+        // DEMO RUN: full automated 3-stage simulation (~2.5 min)
+        if (rtcStatus) {
+          DateTime now = rtc.now();
+          sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(), now.hour(), now.minute());
+        }
+        originalGravity  = 1.060f;
+        ogCapturing      = false;
+        ogSampleSum      = 0.0f;
+        ogSampleCount    = 0;
+        activeBrewStage  = 0;
+        stageStartMillis = millis();
+        preHeatSterilized = preHeatCooled = preHeatHolding = false;
+        pastSterilized    = pastHolding    = false;
+        phAlertActive     = false;
+        stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
+        simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 25.0f;
+        simDynamic[0]  = simDynamic[1]  = simDynamic[2]  = true;
+        simManual[0]   = simManual[1]   = simManual[2]   = false;
+        stageParamEditing = false;
+        incomingData.bleStatus       = 1;
+        incomingData.sensor2Status   = 1;
+        incomingData.adsStatus       = 1;
+        incomingData.ds18Status      = 1;
+        incomingData.pillGravity     = 1.060f;
+        incomingData.phValue         = 4.2f;
+        incomingData.room2LiquidTemp = 25.0f;
+        incomingData.room2Temp       = 26.0f;
+        incomingData.room2Pres       = 1013.0f;
+        incomingData.pillRSSI        = -65;
+        incomingData.pillBattery     = 85;
+        remoteStatusReceived = true;
+        simRunActive = true;
+        mcp.digitalWrite(LIGHT_R, RELAY_ON);
+        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+        currentAppState  = DASHBOARD_ACTIVE;
+        dashNeedsFullRedraw = true;
+        moduleViewActive = false;
+        drawDashboardLayout();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if ((wizardSelection == 0 && currentWeight > 10.0) ||
@@ -1744,6 +1797,53 @@ void loop() {
       simTempOverride[activeBrewStage] += delta;
       if (simTempOverride[activeBrewStage] < 0.0f)  simTempOverride[activeBrewStage] = 0.0f;
       if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
+    }
+
+    // ---- Demo Run: sensor simulation and auto-advance ----
+    if (simRunActive && activeBrewStage >= 0) {
+      if (activeBrewStage == 1) {
+        float prog = (float)(millis() - stageStartMillis) / 80000.0f;
+        if (prog > 1.0f) prog = 1.0f;
+        incomingData.pillGravity     = 1.060f - prog * (1.060f - 0.995f);
+        incomingData.phValue         = 4.2f   - prog * (4.2f   - 2.5f);
+        incomingData.room2LiquidTemp = simTempOverride[1];
+        incomingData.room2Temp       = 27.5f + (float)random(-5, 6) / 10.0f;
+      }
+      bool doAdv = false;
+      if      (activeBrewStage == 0 && preHeatCooled)
+        doAdv = true;
+      else if (activeBrewStage == 1 && millis() - stageStartMillis >= 80000UL)
+        doAdv = true;
+      else if (activeBrewStage == 2 && pastSterilized)
+        doAdv = true;
+      if (doAdv) {
+        currentHeatingPercent = 0;
+        isFanOn = false;
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        setFanSpeed(0);
+        isFermFanOn = false;
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+        stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
+        if (activeBrewStage < 2) {
+          activeBrewStage++;
+          stageStartMillis = millis();
+          if (activeBrewStage == 1) {
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          } else {
+            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          }
+        } else {
+          activeBrewStage = -1;
+          simRunActive = false;
+          mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+        }
+        dashNeedsFullRedraw = true;
+        if (currentAppState == DASHBOARD_ACTIVE) drawDashboardLayout();
+      }
     }
 
     // ---- Heater Test Auto-Cutoff ----
