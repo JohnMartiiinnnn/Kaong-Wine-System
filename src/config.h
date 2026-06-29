@@ -230,7 +230,6 @@ extern bool preHeatCooled;
 extern bool preHeatHolding;
 extern uint32_t preHeatHoldStart;
 extern bool pastSterilized;
-extern bool pastCooled;
 extern bool pastHolding;
 extern uint32_t pastHoldStart;
 extern bool phAlertActive;

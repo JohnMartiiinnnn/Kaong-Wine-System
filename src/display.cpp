@@ -187,7 +187,71 @@ void drawDashboardLayout() {
         tft.drawRightString("[HOLDING]", 305, y + 35, 1);
       }
     }
-    tft.fillRect(0, 290, 320, 190, TFT_WHITE);
+    if (activeBrewStage == -1) {
+      // ---- Brew Complete Summary ----
+      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
+      tft.fillRect(0, 290, 320, 20, TFT_NAVY);
+      tft.setTextColor(TFT_WHITE, TFT_NAVY);
+      tft.drawCentreString("BREW COMPLETE", CENTER_X, 295, 2);
+
+      // Total time
+      uint32_t totalMs = stageElapsedMs[0] + stageElapsedMs[1] + stageElapsedMs[2];
+      char totBuf[20];
+      formatStageTimer(totalMs, totBuf);
+      tft.setTextColor(TFT_BLACK, TFT_WHITE);
+      tft.drawString("TOTAL TIME:", 10, 315, 2);
+      tft.drawRightString(totBuf, 310, 315, 2);
+
+      // Per-stage times
+      char s0[16], s1[16], s2[16];
+      formatStageTimer(stageElapsedMs[0], s0);
+      formatStageTimer(stageElapsedMs[1], s1);
+      formatStageTimer(stageElapsedMs[2], s2);
+      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+      tft.drawString("Pre-heat:", 18, 334, 1);  tft.drawRightString(s0, 310, 334, 1);
+      tft.drawString("Ferment:",  18, 345, 1);  tft.drawRightString(s1, 310, 345, 1);
+      tft.drawString("Pasteur:",  18, 356, 1);  tft.drawRightString(s2, 310, 356, 1);
+
+      tft.drawFastHLine(10, 368, 300, TFT_DARKGREY);
+
+      // Final SG + Est. ABV
+      char sgBuf[16], abvBuf[16];
+      if (remoteStatusReceived && incomingData.bleStatus) {
+        sprintf(sgBuf, "%.3f", incomingData.pillGravity);
+        if (originalGravity > 0.0f) {
+          float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
+          if (abv < 0.0f) abv = 0.0f;
+          sprintf(abvBuf, "%.1f%%", abv);
+        } else {
+          strcpy(abvBuf, "--");
+        }
+      } else {
+        strcpy(sgBuf, "--");
+        strcpy(abvBuf, "--");
+      }
+      tft.setTextColor(TFT_BLACK, TFT_WHITE);
+      tft.drawString("FINAL SG:", 10, 375, 2);
+      tft.drawString(sgBuf, 120, 375, 2);
+      tft.drawString("ABV:", 175, 375, 2);
+      tft.drawRightString(abvBuf, 310, 375, 2);
+
+      // Final pH + Weight
+      char phBuf[16], wtBuf[16];
+      if (remoteStatusReceived && incomingData.adsStatus)
+        sprintf(phBuf, "%.2f", incomingData.phValue);
+      else
+        strcpy(phBuf, "--");
+      if (hx711Status)
+        sprintf(wtBuf, "%.0fg", currentWeight);
+      else
+        strcpy(wtBuf, "--");
+      tft.drawString("FINAL pH:", 10, 398, 2);
+      tft.drawString(phBuf, 120, 398, 2);
+      tft.drawString("WT:", 175, 398, 2);
+      tft.drawRightString(wtBuf, 310, 398, 2);
+    } else {
+      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
+    }
   } else {
     int y = 110, h = 360;
     tft.fillRect(5, y, 310, h, colors[dashSelection]);
