@@ -1726,7 +1726,6 @@ void loop() {
         if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
             incomingData.phValue <= fermTargetPH && !phAlertActive) {
           phAlertActive = true;
-          mcp.digitalWrite(LIGHT_R, RELAY_ON);
         }
 
       } else if (activeBrewStage == 2) {
