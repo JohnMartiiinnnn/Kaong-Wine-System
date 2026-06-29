@@ -620,7 +620,7 @@ void loop() {
       wizardSelection = (wizardSelection + 1) % 2;
       drawNewBrewWizard();
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
+      if (cDown && !ljDown && activeBrewStage >= 0 && simManual[activeBrewStage]) {
         simTempOverride[activeBrewStage] -= 5.0f;
         if (simTempOverride[activeBrewStage] < 0.0f) simTempOverride[activeBrewStage] = 0.0f;
       } else {
