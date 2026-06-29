@@ -151,6 +151,9 @@ bool     brewSummaryNeedsFullRedraw = true;
 bool     simRunActive = false;
 float    tempHistory[TEMP_GRAPH_W] = {};
 int      tempHistoryCount = 0;
+bool     stageTransferring = false;
+int      stageTransferTarget = -1;
+uint32_t transferStartMs = 0;
 int      rtcSetField   = 0;
 int      rtcSetHour    = 0;
 int      rtcSetMinute  = 0;
@@ -604,6 +607,7 @@ void loop() {
     if (cLeft && !ljLeft) {
       returnConfirmState = 0;
       simRunActive = false;
+      stageTransferring = false;
       activeBrewStage = -1;
       currentHeatingPercent = 0;
       isFanOn = false;
@@ -1168,26 +1172,16 @@ void loop() {
           isFermFanOn = false;
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
           if (activeBrewStage < 2) {
-            stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
-            activeBrewStage++;
-            stageStartMillis = millis();
-            tempHistoryCount = 0;
-          } else {
-            stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
-            activeBrewStage = -1;
-          }
-          // Update indicator lights for new stage
-          if (activeBrewStage == 1) {
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
-            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-          } else if (activeBrewStage == 2) {
+            stageTransferring   = true;
+            stageTransferTarget = activeBrewStage + 1;
+            transferStartMs     = millis();
             mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_G, RELAY_ON);
+            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
           } else {
-            // Brew complete: all lights on
+            activeBrewStage = -1;
             mcp.digitalWrite(LIGHT_R, RELAY_ON);
             mcp.digitalWrite(LIGHT_Y, RELAY_ON);
             mcp.digitalWrite(LIGHT_G, RELAY_ON);
@@ -1631,8 +1625,27 @@ void loop() {
       drawPidTestMenu();
     }
 
+    // ---- Transfer Completion ----
+    if (stageTransferring && millis() - transferStartMs >= 10000UL) {
+      stageTransferring = false;
+      activeBrewStage   = stageTransferTarget;
+      stageStartMillis  = millis();
+      tempHistoryCount  = 0;
+      if (activeBrewStage == 1) {
+        mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+        mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+      } else if (activeBrewStage == 2) {
+        mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+        mcp.digitalWrite(LIGHT_G, RELAY_ON);
+      }
+      dashNeedsFullRedraw = true;
+      if (currentAppState == DASHBOARD_ACTIVE) drawDashboardLayout();
+    }
+
     // ---- Closed-Loop Brew Stage Control ----
-    if (activeBrewStage >= 0 && activeBrewStage <= 2) {
+    if (activeBrewStage >= 0 && activeBrewStage <= 2 && !stageTransferring) {
       static float pidIntegral = 0.0f;
       static float pidPrevError = 0.0f;
       static int lastCtrlStage = -1;
@@ -1774,7 +1787,7 @@ void loop() {
     }
 
     // ---- Dynamic Sim Temperature Update ----
-    if (activeBrewStage >= 0 && activeBrewStage <= 2 &&
+    if (activeBrewStage >= 0 && activeBrewStage <= 2 && !stageTransferring &&
         simTempOverride[activeBrewStage] > 0.0f &&
         simDynamic[activeBrewStage]) {
       const float SIM_RATE = 5.0f;
@@ -1817,11 +1830,11 @@ void loop() {
         incomingData.room2Temp       = 27.5f + (float)random(-5, 6) / 10.0f;
       }
       bool doAdv = false;
-      if      (activeBrewStage == 0 && preHeatCooled)
+      if      (activeBrewStage == 0 && preHeatCooled && !stageTransferring)
         doAdv = true;
-      else if (activeBrewStage == 1 && millis() - stageStartMillis >= 80000UL)
+      else if (activeBrewStage == 1 && millis() - stageStartMillis >= 80000UL && !stageTransferring)
         doAdv = true;
-      else if (activeBrewStage == 2 && pastSterilized)
+      else if (activeBrewStage == 2 && pastSterilized && !stageTransferring)
         doAdv = true;
       if (doAdv) {
         currentHeatingPercent = 0;
@@ -1833,23 +1846,15 @@ void loop() {
         mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
         stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
         if (activeBrewStage < 2) {
-          activeBrewStage++;
-          stageStartMillis = millis();
-          tempHistoryCount = 0;
-          if (activeBrewStage == 1) {
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
-            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-          } else {
-            // Entering pasteurization: clear pH alert light, green on
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_G, RELAY_ON);
-          }
+          stageTransferring   = true;
+          stageTransferTarget = activeBrewStage + 1;
+          transferStartMs     = millis();
+          mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_G, RELAY_OFF);
         } else {
           activeBrewStage = -1;
           simRunActive = false;
-          // Brew complete: all lights on
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_ON);
           mcp.digitalWrite(LIGHT_G, RELAY_ON);
@@ -1934,23 +1939,25 @@ void loop() {
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive && activeBrewStage >= 0) {
       updateDashboardTimers();
-      float gTemp = -999.0f;
-      if (simTempOverride[activeBrewStage] > 0.0f)
-        gTemp = simTempOverride[activeBrewStage];
-      else if (activeBrewStage == 0 && liquid2Status)
-        gTemp = sharedLiquidSensors.getTempCByIndex(1);
-      else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
-        gTemp = incomingData.room2LiquidTemp;
-      else if (activeBrewStage == 2 && liquid1Status)
-        gTemp = sharedLiquidSensors.getTempCByIndex(0);
-      if (gTemp > -100.0f) {
-        if (tempHistoryCount < TEMP_GRAPH_W) {
-          tempHistory[tempHistoryCount++] = gTemp;
-        } else {
-          memmove(tempHistory, tempHistory + 1, (TEMP_GRAPH_W - 1) * sizeof(float));
-          tempHistory[TEMP_GRAPH_W - 1] = gTemp;
+      if (!stageTransferring) {
+        float gTemp = -999.0f;
+        if (simTempOverride[activeBrewStage] > 0.0f)
+          gTemp = simTempOverride[activeBrewStage];
+        else if (activeBrewStage == 0 && liquid2Status)
+          gTemp = sharedLiquidSensors.getTempCByIndex(1);
+        else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+          gTemp = incomingData.room2LiquidTemp;
+        else if (activeBrewStage == 2 && liquid1Status)
+          gTemp = sharedLiquidSensors.getTempCByIndex(0);
+        if (gTemp > -100.0f) {
+          if (tempHistoryCount < TEMP_GRAPH_W) {
+            tempHistory[tempHistoryCount++] = gTemp;
+          } else {
+            memmove(tempHistory, tempHistory + 1, (TEMP_GRAPH_W - 1) * sizeof(float));
+            tempHistory[TEMP_GRAPH_W - 1] = gTemp;
+          }
+          updateDashboardGraph();
         }
-        updateDashboardGraph();
       }
     }
 

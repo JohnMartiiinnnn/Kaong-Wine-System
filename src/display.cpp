@@ -195,6 +195,23 @@ void drawDashboardLayout() {
       tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
       tft.drawCentreString("SELECT: View Brew Results", CENTER_X, 390, 2);
       tft.drawCentreString("LEFT: Return to Menu", CENTER_X, 412, 2);
+    } else if (stageTransferring) {
+      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
+      tft.drawFastHLine(0, 292, 320, TFT_DARKGREY);
+      const char *toNames[] = {"", "FERMENTATION", "PASTEURIZATION"};
+      tft.setTextColor(TFT_NAVY, TFT_WHITE);
+      tft.drawCentreString("TRANSFERRING LIQUID TO", CENTER_X, 315, 2);
+      tft.drawCentreString(toNames[stageTransferTarget], CENTER_X, 340, 2);
+      int rem = 10 - (int)((millis() - transferStartMs) / 1000);
+      if (rem < 0) rem = 0;
+      char cbuf[8];
+      sprintf(cbuf, "%d", rem);
+      tft.setTextColor(TFT_NAVY, TFT_WHITE);
+      tft.setTextPadding(160);
+      tft.drawCentreString(cbuf, CENTER_X, 368, 6);
+      tft.setTextPadding(0);
+      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+      tft.drawCentreString("PLEASE WAIT", CENTER_X, 458, 1);
     } else {
       tft.fillRect(0, 290, 320, 2, TFT_WHITE);
       updateDashboardGraph();
@@ -259,13 +276,15 @@ void updateDashboardTimers() {
   int i = activeBrewStage;
   int y = 110 + (i * 60);
   tft.setTextColor(TFT_WHITE, colors[i]);
-  // Timer (left)
   char timerBuf[16] = "";
-  formatStageTimer(millis() - stageStartMillis, timerBuf);
+  if (stageTransferring) {
+    formatStageTimer(stageElapsedMs[i], timerBuf);
+  } else {
+    formatStageTimer(millis() - stageStartMillis, timerBuf);
+  }
   tft.setTextPadding(130);
   tft.drawString(timerBuf, 35, y + 35, 1);
-  // Sim badge (right) — changes every second in DYN mode
-  if (simTempOverride[i] > 0.0f) {
+  if (!stageTransferring && simTempOverride[i] > 0.0f) {
     char simBuf[20];
     const char *tag = simManual[i] ? "MAN" : (simDynamic[i] ? "DYN" : "SIM");
     sprintf(simBuf, "[%s %.0fC]", tag, simTempOverride[i]);
@@ -273,6 +292,16 @@ void updateDashboardTimers() {
     tft.drawRightString(simBuf, 305, y + 35, 1);
   }
   tft.setTextPadding(0);
+  if (stageTransferring) {
+    int rem = 10 - (int)((millis() - transferStartMs) / 1000);
+    if (rem < 0) rem = 0;
+    char cbuf[8];
+    sprintf(cbuf, "%d", rem);
+    tft.setTextColor(TFT_NAVY, TFT_WHITE);
+    tft.setTextPadding(160);
+    tft.drawCentreString(cbuf, CENTER_X, 368, 6);
+    tft.setTextPadding(0);
+  }
 }
 
 void drawStartMenu() {
@@ -1252,7 +1281,7 @@ void drawRtcSetMenu() {
 }
 
 void updateDashboardGraph() {
-  if (currentAppState != DASHBOARD_ACTIVE || moduleViewActive || activeBrewStage < 0) return;
+  if (currentAppState != DASHBOARD_ACTIVE || moduleViewActive || activeBrewStage < 0 || stageTransferring) return;
 
   const int GX  = 28;
   const int GPY = 308;
@@ -1334,7 +1363,7 @@ void updateDashboardGraph() {
   if (n >= 2) {
     int displayCount = (n < GW) ? n : GW;
     int startDataIdx = (n > GW) ? n - GW : 0;
-    int startPixelX  = (n < GW) ? GX + GW - n : GX;
+    int startPixelX  = GX;
     for (int i = 1; i < displayCount; i++) {
       int x0 = startPixelX + i - 1;
       int x1 = startPixelX + i;
@@ -1380,9 +1409,9 @@ void drawBrewSummaryMenu() {
   formatStageTimer(stageElapsedMs[1], s1);
   formatStageTimer(stageElapsedMs[2], s2);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawString("Pre-heat:", 22, 103, 2);  tft.drawRightString(s0, 302, 103, 2);
-  tft.drawString("Ferment:",  22, 123, 2);  tft.drawRightString(s1, 302, 123, 2);
-  tft.drawString("Pasteur:",  22, 143, 2);  tft.drawRightString(s2, 302, 143, 2);
+  tft.drawString("Pre-heat:",       22, 103, 2);  tft.drawRightString(s0, 302, 103, 2);
+  tft.drawString("Fermentation:",   22, 123, 2);  tft.drawRightString(s1, 302, 123, 2);
+  tft.drawString("Pasteurization:", 22, 143, 2);  tft.drawRightString(s2, 302, 143, 2);
 
   tft.drawFastHLine(10, 168, 300, TFT_DARKGREY);
 
