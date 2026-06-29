@@ -1256,25 +1256,10 @@ void loop() {
       pidTestNeedsFullRedraw = true;
       drawPidTestPick();
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      int lastRow = (stageParamStage == 1) ? 4 : 2;
-      if (stageParamSelection < lastRow) {
-        if (stageParamSelection == 0) {
-          simTempOverride[stageParamStage] -= 0.5f;
-          if (simTempOverride[stageParamStage] < 0.0f)
-            simTempOverride[stageParamStage] = 0.0f;
-        } else if (stageParamSelection == 1)
-          stageTargetTemp[stageParamStage] -= 0.5f;
-        else if (stageParamStage == 1 && stageParamSelection == 2)
-          fermTargetPH -= 0.05f;
-        else if (stageParamStage == 1 && stageParamSelection == 3)
-          fermTargetGravity -= 0.001f;
-        drawStageParamMenu();
-      } else {
-        currentAppState = DASHBOARD_ACTIVE;
-        moduleViewActive = true;
-        dashNeedsFullRedraw = true;
-        drawDashboardLayout();
-      }
+      currentAppState = DASHBOARD_ACTIVE;
+      moduleViewActive = true;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (!heaterTestRunning) {
         heaterTestPercent -= 5;

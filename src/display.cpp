@@ -884,7 +884,7 @@ void drawStageParamMenu() {
   // --- Hints ---
   tft.fillRect(0, 440, 320, 40, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: NAVIGATE   L/R: ADJUST", CENTER_X, 447, 1);
+  tft.drawCentreString("UP/DOWN: NAVIGATE   RIGHT: ADJUST   LEFT: BACK", CENTER_X, 447, 1);
   if (simIsMan)
     tft.drawCentreString("MANUAL: UP/DOWN ON DASHBOARD ADJUSTS TEMP", CENTER_X, 462, 1);
   else
