@@ -1699,15 +1699,23 @@ void loop() {
     }
 
     // ---- Dynamic Sim Temperature Update ----
+    // Uses fixed per-stage targets (same as what the control loop targets)
+    // rather than currentHeatingPercent, which rounds to 0 near setpoint.
     if (activeBrewStage >= 0 && activeBrewStage <= 2 &&
         simTempOverride[activeBrewStage] > 0.0f &&
         simDynamic[activeBrewStage]) {
-      const float SIM_RISE_RATE    = 10.0f;
-      const float SIM_COOL_RATE    = 5.0f;
-      const float SIM_PASSIVE_LOSS = 0.0f;
+      const float SIM_RATE = 5.0f;
+      const float dynTargets[3] = {80.0f, 28.0f, 80.0f};
+      float target = dynTargets[activeBrewStage];
       bool fansActive = (activeBrewStage == 0) ? isFanOn : isFermFanOn;
-      float delta = (currentHeatingPercent / 100.0f) * SIM_RISE_RATE;
-      delta -= fansActive ? SIM_COOL_RATE : SIM_PASSIVE_LOSS;
+      float delta;
+      if (fansActive) {
+        delta = -SIM_RATE;
+      } else if (simTempOverride[activeBrewStage] < target) {
+        delta = SIM_RATE;
+      } else {
+        delta = 0.0f;
+      }
       simTempOverride[activeBrewStage] += delta;
       if (simTempOverride[activeBrewStage] < 0.0f)  simTempOverride[activeBrewStage] = 0.0f;
       if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
