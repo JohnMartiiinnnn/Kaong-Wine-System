@@ -132,6 +132,20 @@ uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
 float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
 bool  simDynamic[3]      = {false, false, false};
+bool     heaterTestNeedsFullRedraw = true;
+int      heaterTestStage   = 0;
+int      heaterTestPercent = 0;
+bool     heaterTestRunning = false;
+uint32_t heaterTestStart   = 0;
+bool     sdVerifyNeedsFullRedraw = true;
+int      sdVerifyResult    = -1;
+bool     uartMonitorNeedsFullRedraw = true;
+uint32_t uartPacketCount    = 0;
+uint32_t uartChecksumErrors = 0;
+bool     rtcSetNeedsFullRedraw = true;
+int      rtcSetField   = 0;
+int      rtcSetHour    = 0;
+int      rtcSetMinute  = 0;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -626,7 +640,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 5;
+      systemCheckSelection = (systemCheckSelection + 1) % 9;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -659,6 +673,18 @@ void loop() {
         int maxRows = (stageParamStage == 1) ? 5 : 3;
         stageParamSelection = (stageParamSelection + 1) % maxRows;
         drawStageParamMenu();
+      }
+    } else if (currentAppState == HEATER_TEST_MENU) {
+      if (cDown && !ljDown) {
+        heaterTestStage = (heaterTestStage + 1) % 3;
+        heaterTestRunning = false;
+        currentHeatingPercent = 0;
+        drawHeaterTestMenu();
+      }
+    } else if (currentAppState == RTC_SET_MENU) {
+      if (cDown && !ljDown) {
+        rtcSetField = (rtcSetField + 1) % 2;
+        drawRtcSetMenu();
       }
     }
   }
@@ -694,7 +720,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 4) % 5;
+      systemCheckSelection = (systemCheckSelection + 4) % 9;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -726,6 +752,14 @@ void loop() {
       int maxRows = (stageParamStage == 1) ? 5 : 3;
       stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
       drawStageParamMenu();
+    } else if (currentAppState == HEATER_TEST_MENU) {
+      heaterTestStage = (heaterTestStage + 2) % 3;
+      heaterTestRunning = false;
+      currentHeatingPercent = 0;
+      drawHeaterTestMenu();
+    } else if (currentAppState == RTC_SET_MENU) {
+      rtcSetField = (rtcSetField + 1) % 2;
+      drawRtcSetMenu();
     }
   }
 
@@ -849,11 +883,40 @@ void loop() {
         sendMotorCommand(0, true);
         currentAppState = MOTOR_TEST_MENU;
         drawMotorTestMenu();
-      } else {
+      } else if (systemCheckSelection == 4) {
         currentAppState = PID_TEST_PICK;
         pidTestNeedsFullRedraw = true;
         pidTestChoice = 0;
         drawPidTestPick();
+      } else if (systemCheckSelection == 5) {
+        heaterTestStage = 0;
+        heaterTestPercent = 0;
+        heaterTestRunning = false;
+        heaterTestNeedsFullRedraw = true;
+        currentAppState = HEATER_TEST_MENU;
+        drawHeaterTestMenu();
+      } else if (systemCheckSelection == 6) {
+        sdVerifyResult = -1;
+        sdVerifyNeedsFullRedraw = true;
+        currentAppState = SD_VERIFY_MENU;
+        drawSdVerifyMenu();
+      } else if (systemCheckSelection == 7) {
+        uartMonitorNeedsFullRedraw = true;
+        currentAppState = UART_MONITOR_MENU;
+        drawUartMonitorMenu();
+      } else if (systemCheckSelection == 8) {
+        if (rtcStatus) {
+          DateTime now = rtc.now();
+          rtcSetHour   = now.hour();
+          rtcSetMinute = now.minute();
+        } else {
+          rtcSetHour = 0;
+          rtcSetMinute = 0;
+        }
+        rtcSetField = 0;
+        rtcSetNeedsFullRedraw = true;
+        currentAppState = RTC_SET_MENU;
+        drawRtcSetMenu();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -882,6 +945,41 @@ void loop() {
         mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       }
       drawPidTestMenu();
+    } else if (currentAppState == HEATER_TEST_MENU) {
+      if (!heaterTestRunning) {
+        heaterTestRunning = true;
+        heaterTestStart = millis();
+      } else {
+        heaterTestRunning = false;
+        currentHeatingPercent = 0;
+      }
+      drawHeaterTestMenu();
+    } else if (currentAppState == SD_VERIFY_MENU) {
+      if (sdStatus) {
+        const char *testStr = "SDVERIFY_OK";
+        File f = SD.open("/sdverify.tmp", FILE_WRITE);
+        if (f) {
+          f.print(testStr);
+          f.close();
+          f = SD.open("/sdverify.tmp", FILE_READ);
+          if (f) {
+            char rbuf[16] = {};
+            f.readBytes(rbuf, strlen(testStr));
+            f.close();
+            SD.remove("/sdverify.tmp");
+            sdVerifyResult = (strncmp(rbuf, testStr, strlen(testStr)) == 0) ? 1 : 0;
+          } else { sdVerifyResult = 0; }
+        } else { sdVerifyResult = 0; }
+      }
+      drawSdVerifyMenu();
+    } else if (currentAppState == RTC_SET_MENU) {
+      if (rtcStatus) {
+        DateTime now = rtc.now();
+        rtc.adjust(DateTime(now.year(), now.month(), now.day(), rtcSetHour, rtcSetMinute, 0));
+      }
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       currentAppState = FAN_TEST_MENU;
       fanTestNeedsFullRedraw = true;
@@ -1019,6 +1117,17 @@ void loop() {
     }
   }
 
+  if (cRight && !ljRight && currentAppState == HEATER_TEST_MENU && !heaterTestRunning) {
+    heaterTestPercent += 5;
+    if (heaterTestPercent > 100) heaterTestPercent = 100;
+    drawHeaterTestMenu();
+  }
+  if (cRight && !ljRight && currentAppState == RTC_SET_MENU) {
+    if (rtcSetField == 0) { rtcSetHour = (rtcSetHour + 1) % 24; }
+    else                  { rtcSetMinute = (rtcSetMinute + 1) % 60; }
+    drawRtcSetMenu();
+  }
+
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
@@ -1140,6 +1249,24 @@ void loop() {
         dashNeedsFullRedraw = true;
         drawDashboardLayout();
       }
+    } else if (currentAppState == HEATER_TEST_MENU) {
+      if (!heaterTestRunning) {
+        heaterTestPercent -= 5;
+        if (heaterTestPercent < 0) heaterTestPercent = 0;
+        drawHeaterTestMenu();
+      } else {
+        currentAppState = SYSTEM_CHECK_MENU;
+        heaterTestRunning = false;
+        currentHeatingPercent = 0;
+        systemCheckNeedsFullRedraw = true;
+        drawSystemCheckMenu();
+      }
+    } else if (currentAppState == SD_VERIFY_MENU ||
+               currentAppState == UART_MONITOR_MENU ||
+               currentAppState == RTC_SET_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     }
   }
 
@@ -1223,6 +1350,7 @@ void loop() {
     Serial2.readBytes((uint8_t *)&t, sizeof(t));
     if (t.signature == 0xDEADBEEF && calculateChecksum(t) == t.checksum) {
       incomingData = t;
+      uartPacketCount++;
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
       if (ogCapturing && incomingData.pillGravity > 0.5f) {
@@ -1233,7 +1361,7 @@ void loop() {
           ogCapturing = false;
         }
       }
-    }
+    } else { uartChecksumErrors++; }
   }
 
   // HX711 Hybrid EMA Filter (1Hz)
@@ -1526,10 +1654,22 @@ void loop() {
       if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
     }
 
+    // ---- Heater Test Auto-Cutoff ----
+    if (currentAppState == HEATER_TEST_MENU && heaterTestRunning &&
+        millis() - heaterTestStart >= 30000UL) {
+      heaterTestRunning = false;
+      currentHeatingPercent = 0;
+    }
+
     int activeHeaterPin = -1;
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
       if (pidTestChoice == 0) activeHeaterPin = DIM2_SHARED;
       else if (pidTestChoice == 1) activeHeaterPin = DIM1_CH2;
+      else activeHeaterPin = DIM1_CH1;
+    } else if (currentAppState == HEATER_TEST_MENU && heaterTestRunning) {
+      currentHeatingPercent = heaterTestPercent;
+      if (heaterTestStage == 0) activeHeaterPin = DIM2_SHARED;
+      else if (heaterTestStage == 1) activeHeaterPin = DIM1_CH2;
       else activeHeaterPin = DIM1_CH1;
     } else if (activeBrewStage == 0) {
       activeHeaterPin = DIM2_SHARED;
@@ -1581,6 +1721,11 @@ void loop() {
 
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();
+
+    if (currentAppState == HEATER_TEST_MENU)
+      drawHeaterTestMenu();
+    if (currentAppState == UART_MONITOR_MENU)
+      drawUartMonitorMenu();
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;

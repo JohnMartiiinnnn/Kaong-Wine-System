@@ -84,7 +84,11 @@ enum AppState {
   MOTOR_TEST_MENU,
   STAGE_PARAM_MENU,
   PID_TEST_PICK,
-  PID_TEST_MENU
+  PID_TEST_MENU,
+  HEATER_TEST_MENU,
+  SD_VERIFY_MENU,
+  UART_MONITOR_MENU,
+  RTC_SET_MENU
 };
 
 extern long rawHX711;
@@ -229,3 +233,17 @@ extern uint32_t pastHoldStart;
 extern bool phAlertActive;
 extern float simTempOverride[3];
 extern bool  simDynamic[3];
+extern bool     heaterTestNeedsFullRedraw;
+extern int      heaterTestStage;
+extern int      heaterTestPercent;
+extern bool     heaterTestRunning;
+extern uint32_t heaterTestStart;
+extern bool     sdVerifyNeedsFullRedraw;
+extern int      sdVerifyResult;
+extern bool     uartMonitorNeedsFullRedraw;
+extern uint32_t uartPacketCount;
+extern uint32_t uartChecksumErrors;
+extern bool     rtcSetNeedsFullRedraw;
+extern int      rtcSetField;
+extern int      rtcSetHour;
+extern int      rtcSetMinute;
