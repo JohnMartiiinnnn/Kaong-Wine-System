@@ -149,8 +149,8 @@ void drawDashboardLayout() {
         tft.fillCircle(22, y + 25, 5, TFT_WHITE);
       }
       if (simTempOverride[i] > 0.0f) {
-        char simBuf[12];
-        sprintf(simBuf, "[SIM %.0fC]", simTempOverride[i]);
+        char simBuf[14];
+        sprintf(simBuf, "[%s %.0fC]", simDynamic[i] ? "DYN" : "SIM", simTempOverride[i]);
         tft.drawRightString(simBuf, 305, y + 35, 1);
       }
     }
@@ -162,8 +162,10 @@ void drawDashboardLayout() {
     tft.setTextColor(TFT_WHITE);
     tft.drawCentreString(titles[dashSelection], CENTER_X, y + 10, 4);
     if (simTempOverride[dashSelection] > 0.0f) {
-      char simBuf[18];
-      sprintf(simBuf, "[SIM: %.1f C]", simTempOverride[dashSelection]);
+      char simBuf[22];
+      sprintf(simBuf, "[%s: %.1f C]",
+              simDynamic[dashSelection] ? "DYN" : "SIM",
+              simTempOverride[dashSelection]);
       tft.drawCentreString(simBuf, CENTER_X, y + 38, 1);
     }
     tft.drawFastHLine(20, y + 48, 280, TFT_WHITE);
@@ -633,7 +635,8 @@ void drawStageParamMenu() {
   const char    *stageNames[]  = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
   const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
   char buf[40];
-  bool simActive = (simTempOverride[stageParamStage] > 0.0f);
+  bool simActive  = (simTempOverride[stageParamStage] > 0.0f);
+  bool simIsDyn   = simActive && simDynamic[stageParamStage];
 
   if (stageParamNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
@@ -644,8 +647,10 @@ void drawStageParamMenu() {
   tft.fillRect(0, 0, 320, 50, stageColors[stageParamStage]);
   tft.setTextColor(TFT_WHITE, stageColors[stageParamStage]);
   tft.drawCentreString(stageNames[stageParamStage], CENTER_X, 8, 2);
-  if (simActive) {
-    tft.drawCentreString("[SIM MODE ACTIVE]", CENTER_X, 28, 2);
+  if (simIsDyn) {
+    tft.drawCentreString("[SIM DYNAMIC RUNNING]", CENTER_X, 28, 2);
+  } else if (simActive) {
+    tft.drawCentreString("[SIM STATIC ACTIVE]", CENTER_X, 28, 2);
   } else if (activeBrewStage == stageParamStage && stageStartMillis > 0) {
     uint32_t elapsedSec = (millis() - stageStartMillis) / 1000;
     uint32_t d = elapsedSec / 86400;
@@ -658,17 +663,20 @@ void drawStageParamMenu() {
 
   int lastRow = (stageParamStage == 1) ? 4 : 2;
 
-  // Row 0: SIM TEMP (all stages) — L/R sets fake sensor value; 0 = use real sensor
+  // Row 0: SIM TEMP — L/R adjusts value, SELECT toggles DYN mode
   {
     bool sel = (stageParamSelection == 0);
-    uint16_t bg = sel ? 0x3566 : (simActive ? 0xFBE0 : 0xD6BA);
-    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    uint16_t bg  = sel ? 0x3566 : (simIsDyn ? 0xD7FF : (simActive ? 0xFBE0 : 0xD6BA));
+    uint16_t bdr = simIsDyn ? 0x001F : (simActive ? TFT_ORANGE : TFT_DARKGREY);
+    uint16_t fg  = sel ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 52, 300, 42, bg);
-    tft.drawRect(10, 52, 300, 42, simActive ? TFT_ORANGE : TFT_DARKGREY);
+    tft.drawRect(10, 52, 300, 42, bdr);
     tft.setTextColor(fg, bg);
     tft.drawString("SIM TEMP", 20, 65, 2);
-    if (simActive)
-      sprintf(buf, "%.1f C [ACTIVE]", simTempOverride[stageParamStage]);
+    if (simIsDyn)
+      sprintf(buf, "%.1f C [DYN]", simTempOverride[stageParamStage]);
+    else if (simActive)
+      sprintf(buf, "%.1f C [STATIC]", simTempOverride[stageParamStage]);
     else
       strcpy(buf, "-- [OFF]");
     tft.drawRightString(buf, 300, 65, 2);
@@ -810,7 +818,7 @@ void drawStageParamMenu() {
   tft.fillRect(0, 440, 320, 40, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("UP/DOWN: NAVIGATE   L/R: ADJUST", CENTER_X, 447, 1);
-  tft.drawCentreString("SIM ROW: SET > 0 TO TEST  0 = REAL SENSOR", CENTER_X, 462, 1);
+  tft.drawCentreString("SIM: L/R=VALUE  SELECT=TOGGLE DYN MODE", CENTER_X, 462, 1);
 }
 
 void drawPidTestPick() {

@@ -131,6 +131,7 @@ bool pastHolding = false;
 uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
 float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
+bool  simDynamic[3]      = {false, false, false};
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -773,6 +774,7 @@ void loop() {
         simTempOverride[0] = 0.0f;
         simTempOverride[1] = 0.0f;
         simTempOverride[2] = 0.0f;
+        simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -949,7 +951,12 @@ void loop() {
       }
     } else if (currentAppState == STAGE_PARAM_MENU) {
       int lastRow = (stageParamStage == 1) ? 4 : 2;
-      if (stageParamSelection == lastRow) {
+      if (stageParamSelection == 0) {
+        if (simTempOverride[stageParamStage] == 0.0f)
+          simTempOverride[stageParamStage] = 25.0f;
+        simDynamic[stageParamStage] = !simDynamic[stageParamStage];
+        drawStageParamMenu();
+      } else if (stageParamSelection == lastRow) {
         if (activeBrewStage == stageParamStage) {
           if (activeBrewStage < 2) {
             activeBrewStage++;
@@ -1502,6 +1509,21 @@ void loop() {
           currentHeatingPercent = 0;
         }
       }
+    }
+
+    // ---- Dynamic Sim Temperature Update ----
+    if (activeBrewStage >= 0 && activeBrewStage <= 2 &&
+        simTempOverride[activeBrewStage] > 0.0f &&
+        simDynamic[activeBrewStage]) {
+      const float SIM_RISE_RATE    = 2.0f;
+      const float SIM_COOL_RATE    = 1.5f;
+      const float SIM_PASSIVE_LOSS = 0.1f;
+      bool fansActive = (activeBrewStage == 0) ? isFanOn : isFermFanOn;
+      float delta = (currentHeatingPercent / 100.0f) * SIM_RISE_RATE;
+      delta -= fansActive ? SIM_COOL_RATE : SIM_PASSIVE_LOSS;
+      simTempOverride[activeBrewStage] += delta;
+      if (simTempOverride[activeBrewStage] < 0.0f)  simTempOverride[activeBrewStage] = 0.0f;
+      if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
     }
 
     int activeHeaterPin = -1;
