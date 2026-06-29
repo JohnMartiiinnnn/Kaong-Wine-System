@@ -1100,6 +1100,14 @@ void loop() {
         drawStageParamMenu();
       } else if (stageParamSelection == lastRow) {
         if (activeBrewStage == stageParamStage) {
+          // Tear down all actuators before leaving the stage
+          currentHeatingPercent = 0;
+          isFanOn = false;
+          mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+          setFanSpeed(0);
+          isFermFanOn = false;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
           if (activeBrewStage < 2) {
             stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage++;
@@ -1696,7 +1704,7 @@ void loop() {
         simDynamic[activeBrewStage]) {
       const float SIM_RISE_RATE    = 10.0f;
       const float SIM_COOL_RATE    = 5.0f;
-      const float SIM_PASSIVE_LOSS = 0.1f;
+      const float SIM_PASSIVE_LOSS = 0.0f;
       bool fansActive = (activeBrewStage == 0) ? isFanOn : isFermFanOn;
       float delta = (currentHeatingPercent / 100.0f) * SIM_RISE_RATE;
       delta -= fansActive ? SIM_COOL_RATE : SIM_PASSIVE_LOSS;
