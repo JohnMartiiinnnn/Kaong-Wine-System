@@ -815,6 +815,9 @@ void loop() {
         ogCapturing = true;
         activeBrewStage = 0;
         stageStartMillis = millis();
+        mcp.digitalWrite(LIGHT_R, RELAY_ON);
+        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
         preHeatSterilized = false;
         preHeatCooled = false;
         preHeatHolding = false;
@@ -1115,6 +1118,18 @@ void loop() {
           } else {
             stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage = -1;
+          }
+          // Update indicator lights for new stage
+          if (activeBrewStage == 1) {
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          } else if (activeBrewStage == 2) {
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          } else {
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           }
         }
         currentAppState = DASHBOARD_ACTIVE;
@@ -1699,23 +1714,33 @@ void loop() {
     }
 
     // ---- Dynamic Sim Temperature Update ----
-    // Uses fixed per-stage targets (same as what the control loop targets)
-    // rather than currentHeatingPercent, which rounds to 0 near setpoint.
     if (activeBrewStage >= 0 && activeBrewStage <= 2 &&
         simTempOverride[activeBrewStage] > 0.0f &&
         simDynamic[activeBrewStage]) {
       const float SIM_RATE = 5.0f;
-      const float dynTargets[3] = {80.0f, 28.0f, 80.0f};
-      float target = dynTargets[activeBrewStage];
+      float cur = simTempOverride[activeBrewStage];
       bool fansActive = (activeBrewStage == 0) ? isFanOn : isFermFanOn;
-      float delta;
-      if (fansActive) {
-        delta = -SIM_RATE;
-      } else if (simTempOverride[activeBrewStage] < target) {
-        delta = SIM_RATE;
+      float delta = 0.0f;
+
+      if (activeBrewStage == 1) {
+        // Fermentation: bounded random walk 24–33°C, crosses heater (<27) and fan (>30) thresholds
+        delta = (float)random(-30, 31) / 10.0f;
+        if (cur + delta < 24.0f) delta = 3.0f;
+        if (cur + delta > 33.0f) delta = -3.0f;
       } else {
-        delta = 0.0f;
+        // Pre-heat (0) and Pasteurization (2): rise → hold at 80 → fan cool
+        bool sterilized = (activeBrewStage == 0) ? preHeatSterilized : pastSterilized;
+        if (fansActive) {
+          // Cooling: noisy downward drift, never positive
+          delta = -(SIM_RATE + (float)random(0, 21) / 10.0f);
+        } else if (!sterilized && cur < 80.0f) {
+          // Heating: noisy upward drift, always at least 0.5°C/s
+          delta = SIM_RATE + (float)random(-10, 11) / 10.0f;
+          if (delta < 0.5f) delta = 0.5f;
+        }
+        // At 80 holding, or sterilized no fans: delta stays 0 → clean hold
       }
+
       simTempOverride[activeBrewStage] += delta;
       if (simTempOverride[activeBrewStage] < 0.0f)  simTempOverride[activeBrewStage] = 0.0f;
       if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
