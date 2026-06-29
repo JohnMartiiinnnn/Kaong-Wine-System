@@ -88,7 +88,8 @@ enum AppState {
   HEATER_TEST_MENU,
   SD_VERIFY_MENU,
   UART_MONITOR_MENU,
-  RTC_SET_MENU
+  RTC_SET_MENU,
+  BREW_SUMMARY_MENU
 };
 
 extern long rawHX711;
@@ -247,6 +248,7 @@ extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;
 extern bool     rtcSetNeedsFullRedraw;
+extern bool     brewSummaryNeedsFullRedraw;
 extern int      rtcSetField;
 extern int      rtcSetHour;
 extern int      rtcSetMinute;

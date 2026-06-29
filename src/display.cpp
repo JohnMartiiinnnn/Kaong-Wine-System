@@ -188,67 +188,13 @@ void drawDashboardLayout() {
       }
     }
     if (activeBrewStage == -1) {
-      // ---- Brew Complete Summary ----
       tft.fillRect(0, 290, 320, 190, TFT_WHITE);
-      tft.fillRect(0, 290, 320, 20, TFT_NAVY);
-      tft.setTextColor(TFT_WHITE, TFT_NAVY);
-      tft.drawCentreString("BREW COMPLETE", CENTER_X, 295, 2);
-
-      // Total time
-      uint32_t totalMs = stageElapsedMs[0] + stageElapsedMs[1] + stageElapsedMs[2];
-      char totBuf[20];
-      formatStageTimer(totalMs, totBuf);
-      tft.setTextColor(TFT_BLACK, TFT_WHITE);
-      tft.drawString("TOTAL TIME:", 10, 315, 2);
-      tft.drawRightString(totBuf, 310, 315, 2);
-
-      // Per-stage times
-      char s0[16], s1[16], s2[16];
-      formatStageTimer(stageElapsedMs[0], s0);
-      formatStageTimer(stageElapsedMs[1], s1);
-      formatStageTimer(stageElapsedMs[2], s2);
+      tft.fillRect(0, 292, 320, 1, TFT_DARKGREY);
+      tft.setTextColor(0x0400, TFT_WHITE);
+      tft.drawCentreString("BREW COMPLETE", CENTER_X, 330, 4);
       tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-      tft.drawString("Pre-heat:", 18, 334, 1);  tft.drawRightString(s0, 310, 334, 1);
-      tft.drawString("Ferment:",  18, 345, 1);  tft.drawRightString(s1, 310, 345, 1);
-      tft.drawString("Pasteur:",  18, 356, 1);  tft.drawRightString(s2, 310, 356, 1);
-
-      tft.drawFastHLine(10, 368, 300, TFT_DARKGREY);
-
-      // Final SG + Est. ABV
-      char sgBuf[16], abvBuf[16];
-      if (remoteStatusReceived && incomingData.bleStatus) {
-        sprintf(sgBuf, "%.3f", incomingData.pillGravity);
-        if (originalGravity > 0.0f) {
-          float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
-          if (abv < 0.0f) abv = 0.0f;
-          sprintf(abvBuf, "%.1f%%", abv);
-        } else {
-          strcpy(abvBuf, "--");
-        }
-      } else {
-        strcpy(sgBuf, "--");
-        strcpy(abvBuf, "--");
-      }
-      tft.setTextColor(TFT_BLACK, TFT_WHITE);
-      tft.drawString("FINAL SG:", 10, 375, 2);
-      tft.drawString(sgBuf, 120, 375, 2);
-      tft.drawString("ABV:", 175, 375, 2);
-      tft.drawRightString(abvBuf, 310, 375, 2);
-
-      // Final pH + Weight
-      char phBuf[16], wtBuf[16];
-      if (remoteStatusReceived && incomingData.adsStatus)
-        sprintf(phBuf, "%.2f", incomingData.phValue);
-      else
-        strcpy(phBuf, "--");
-      if (hx711Status)
-        sprintf(wtBuf, "%.0fg", currentWeight);
-      else
-        strcpy(wtBuf, "--");
-      tft.drawString("FINAL pH:", 10, 398, 2);
-      tft.drawString(phBuf, 120, 398, 2);
-      tft.drawString("WT:", 175, 398, 2);
-      tft.drawRightString(wtBuf, 310, 398, 2);
+      tft.drawCentreString("SELECT: View Brew Results", CENTER_X, 390, 2);
+      tft.drawCentreString("LEFT: Return to Menu", CENTER_X, 412, 2);
     } else {
       tft.fillRect(0, 290, 320, 190, TFT_WHITE);
       // Button hints
@@ -1317,4 +1263,105 @@ void drawRtcSetMenu() {
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("UP/DOWN: FIELD   L/R: ADJUST VALUE", CENTER_X, 447, 1);
   tft.drawCentreString("SELECT: SAVE   RETURN: CANCEL", CENTER_X, 462, 1);
+}
+
+void drawBrewSummaryMenu() {
+  tft.fillScreen(TFT_WHITE);
+  tft.fillRect(0, 0, 320, 50, 0x0400);
+  tft.setTextColor(TFT_WHITE, 0x0400);
+  tft.drawCentreString("BREW RESULTS", CENTER_X, 15, 4);
+
+  char buf[32];
+
+  // Total time
+  uint32_t totalMs = stageElapsedMs[0] + stageElapsedMs[1] + stageElapsedMs[2];
+  char totBuf[20];
+  formatStageTimer(totalMs, totBuf);
+  tft.fillRect(10, 60, 300, 36, 0xD6BA);
+  tft.drawRect(10, 60, 300, 36, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawString("TOTAL TIME:", 18, 70, 2);
+  tft.drawRightString(totBuf, 302, 70, 2);
+
+  // Per-stage breakdown
+  char s0[16], s1[16], s2[16];
+  formatStageTimer(stageElapsedMs[0], s0);
+  formatStageTimer(stageElapsedMs[1], s1);
+  formatStageTimer(stageElapsedMs[2], s2);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawString("Pre-heat:", 22, 103, 2);  tft.drawRightString(s0, 302, 103, 2);
+  tft.drawString("Ferment:",  22, 123, 2);  tft.drawRightString(s1, 302, 123, 2);
+  tft.drawString("Pasteur:",  22, 143, 2);  tft.drawRightString(s2, 302, 143, 2);
+
+  tft.drawFastHLine(10, 168, 300, TFT_DARKGREY);
+
+  // SG + ABV
+  char sgBuf[16], abvBuf[16];
+  if (remoteStatusReceived && incomingData.bleStatus) {
+    sprintf(sgBuf, "%.3f", incomingData.pillGravity);
+    if (originalGravity > 0.0f) {
+      float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
+      if (abv < 0.0f) abv = 0.0f;
+      sprintf(abvBuf, "%.1f%%", abv);
+    } else {
+      strcpy(abvBuf, "--");
+    }
+  } else {
+    strcpy(sgBuf, "--");
+    strcpy(abvBuf, "--");
+  }
+
+  tft.fillRect(10, 176, 145, 70, 0xD6BA);
+  tft.drawRect(10, 176, 145, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+  tft.drawCentreString("FINAL SG", 82, 183, 2);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString(sgBuf, 82, 205, 4);
+
+  tft.fillRect(165, 176, 145, 70, 0xD6BA);
+  tft.drawRect(165, 176, 145, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+  tft.drawCentreString("EST. ABV", 237, 183, 2);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString(abvBuf, 237, 205, 4);
+
+  tft.drawFastHLine(10, 252, 300, TFT_DARKGREY);
+
+  // pH + Weight
+  char phBuf[16], wtBuf[16];
+  if (remoteStatusReceived && incomingData.adsStatus)
+    sprintf(phBuf, "%.2f", incomingData.phValue);
+  else
+    strcpy(phBuf, "--");
+  if (hx711Status)
+    sprintf(wtBuf, "%.0f g", currentWeight);
+  else
+    strcpy(wtBuf, "--");
+
+  tft.fillRect(10, 260, 145, 70, 0xD6BA);
+  tft.drawRect(10, 260, 145, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+  tft.drawCentreString("FINAL pH", 82, 267, 2);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString(phBuf, 82, 289, 4);
+
+  tft.fillRect(165, 260, 145, 70, 0xD6BA);
+  tft.drawRect(165, 260, 145, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+  tft.drawCentreString("WEIGHT", 237, 267, 2);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString(wtBuf, 237, 289, 4);
+
+  // Brew start time if available
+  if (brewStartTime[0] != '\0') {
+    tft.drawFastHLine(10, 338, 300, TFT_DARKGREY);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("STARTED", CENTER_X, 347, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawCentreString(brewStartTime, CENTER_X, 367, 4);
+  }
+
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("LEFT / SELECT: BACK", CENTER_X, 455, 2);
+  brewSummaryNeedsFullRedraw = false;
 }

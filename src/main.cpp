@@ -147,6 +147,7 @@ bool     uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount    = 0;
 uint32_t uartChecksumErrors = 0;
 bool     rtcSetNeedsFullRedraw = true;
+bool     brewSummaryNeedsFullRedraw = true;
 int      rtcSetField   = 0;
 int      rtcSetHour    = 0;
 int      rtcSetMinute  = 0;
@@ -832,8 +833,17 @@ void loop() {
         moduleViewActive = false;
         drawDashboardLayout();
       }
+    } else if (currentAppState == BREW_SUMMARY_MENU) {
+      currentAppState = DASHBOARD_ACTIVE;
+      dashNeedsFullRedraw = true;
+      moduleViewActive = false;
+      drawDashboardLayout();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
-      if (!moduleViewActive) {
+      if (!moduleViewActive && activeBrewStage == -1) {
+        currentAppState = BREW_SUMMARY_MENU;
+        brewSummaryNeedsFullRedraw = true;
+        drawBrewSummaryMenu();
+      } else if (!moduleViewActive) {
         moduleViewActive = true;
         dashNeedsFullRedraw = true;
         drawDashboardLayout();
@@ -1181,6 +1191,11 @@ void loop() {
         returnConfirmTimer = millis();
         drawReturnConfirmation();
       }
+    } else if (currentAppState == BREW_SUMMARY_MENU) {
+      currentAppState = DASHBOARD_ACTIVE;
+      dashNeedsFullRedraw = true;
+      moduleViewActive = false;
+      drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentAppState = DASHBOARD_ACTIVE;
       moduleViewActive = true;
@@ -1679,8 +1694,8 @@ void loop() {
     if (activeBrewStage >= 0 && activeBrewStage <= 2 &&
         simTempOverride[activeBrewStage] > 0.0f &&
         simDynamic[activeBrewStage]) {
-      const float SIM_RISE_RATE    = 2.0f;
-      const float SIM_COOL_RATE    = 1.5f;
+      const float SIM_RISE_RATE    = 10.0f;
+      const float SIM_COOL_RATE    = 5.0f;
       const float SIM_PASSIVE_LOSS = 0.1f;
       bool fansActive = (activeBrewStage == 0) ? isFanOn : isFermFanOn;
       float delta = (currentHeatingPercent / 100.0f) * SIM_RISE_RATE;
