@@ -223,6 +223,7 @@ extern float fermTargetPH;
 extern float fermTargetGravity;
 extern int stageParamSelection;
 extern bool stageParamNeedsFullRedraw;
+extern bool stageParamEditing;
 extern int stageParamStage;
 extern bool preHeatSterilized;
 extern bool preHeatCooled;

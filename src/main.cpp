@@ -122,6 +122,7 @@ float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
+bool stageParamEditing = false;
 int stageParamStage = 0;
 bool preHeatSterilized = false;
 bool preHeatCooled = false;
@@ -676,8 +677,12 @@ void loop() {
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (cDown && !ljDown) {
-        int maxRows = (stageParamStage == 1) ? 5 : 3;
-        stageParamSelection = (stageParamSelection + 1) % maxRows;
+        if (stageParamEditing) {
+          stageParamEditing = false;
+        } else {
+          int maxRows = (stageParamStage == 1) ? 5 : 3;
+          stageParamSelection = (stageParamSelection + 1) % maxRows;
+        }
         drawStageParamMenu();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
@@ -760,9 +765,11 @@ void loop() {
       sendMotorCommand(motorTestSpeed, motorTestCW);
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      int maxRows = (stageParamStage == 1) ? 5 : 3;
-      stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
-      drawStageParamMenu();
+      if (!stageParamEditing) {
+        int maxRows = (stageParamStage == 1) ? 5 : 3;
+        stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
+        drawStageParamMenu();
+      }
     } else if (currentAppState == HEATER_TEST_MENU) {
       heaterTestStage = (heaterTestStage + 2) % 3;
       heaterTestRunning = false;
@@ -823,6 +830,7 @@ void loop() {
         simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
         simManual[0]  = simManual[1]  = simManual[2]  = false;
         stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
+        stageParamEditing = false;
         currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
@@ -1063,7 +1071,10 @@ void loop() {
       }
     } else if (currentAppState == STAGE_PARAM_MENU) {
       int lastRow = (stageParamStage == 1) ? 4 : 2;
-      if (stageParamSelection == 0) {
+      if (stageParamEditing) {
+        stageParamEditing = false;
+        drawStageParamMenu();
+      } else if (stageParamSelection == 0) {
         if (simTempOverride[stageParamStage] == 0.0f) {
           simTempOverride[stageParamStage] = 25.0f;
           simDynamic[stageParamStage] = false;
@@ -1077,6 +1088,9 @@ void loop() {
           simTempOverride[stageParamStage] = 0.0f;
           simManual[stageParamStage]       = false;
         }
+        drawStageParamMenu();
+      } else if (stageParamSelection > 0 && stageParamSelection < lastRow) {
+        stageParamEditing = true;
         drawStageParamMenu();
       } else if (stageParamSelection == lastRow) {
         if (activeBrewStage == stageParamStage) {
@@ -1121,22 +1135,23 @@ void loop() {
       moduleViewActive) {
     stageParamStage = dashSelection;
     stageParamSelection = 0;
+    stageParamEditing = false;
     stageParamNeedsFullRedraw = true;
     currentAppState = STAGE_PARAM_MENU;
     drawStageParamMenu();
   }
 
   if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
-    int lastRow = (stageParamStage == 1) ? 4 : 2;
-    if (stageParamSelection < lastRow) {
-      if (stageParamSelection == 0) {
-        simTempOverride[stageParamStage] += 0.5f;
-        if (simTempOverride[stageParamStage] > 100.0f)
-          simTempOverride[stageParamStage] = 100.0f;
-      } else if (stageParamSelection == 1)
-        stageTargetTemp[stageParamStage] += 0.5f;
+    if (stageParamSelection == 0 && simTempOverride[stageParamStage] > 0.0f) {
+      simTempOverride[stageParamStage] += 1.0f;
+      if (simTempOverride[stageParamStage] > 100.0f)
+        simTempOverride[stageParamStage] = 100.0f;
+      drawStageParamMenu();
+    } else if (stageParamEditing) {
+      if (stageParamSelection == 1)
+        stageTargetTemp[stageParamStage] += 1.0f;
       else if (stageParamStage == 1 && stageParamSelection == 2)
-        fermTargetPH += 0.05f;
+        fermTargetPH += 0.1f;
       else if (stageParamStage == 1 && stageParamSelection == 3)
         fermTargetGravity += 0.001f;
       drawStageParamMenu();
@@ -1256,10 +1271,21 @@ void loop() {
       pidTestNeedsFullRedraw = true;
       drawPidTestPick();
     } else if (currentAppState == STAGE_PARAM_MENU) {
-      currentAppState = DASHBOARD_ACTIVE;
-      moduleViewActive = true;
-      dashNeedsFullRedraw = true;
-      drawDashboardLayout();
+      if (stageParamEditing) {
+        if (stageParamSelection == 1)
+          stageTargetTemp[stageParamStage] -= 1.0f;
+        else if (stageParamStage == 1 && stageParamSelection == 2)
+          fermTargetPH -= 0.1f;
+        else if (stageParamStage == 1 && stageParamSelection == 3)
+          fermTargetGravity -= 0.001f;
+        drawStageParamMenu();
+      } else {
+        stageParamEditing = false;
+        currentAppState = DASHBOARD_ACTIVE;
+        moduleViewActive = true;
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+      }
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (!heaterTestRunning) {
         heaterTestPercent -= 5;

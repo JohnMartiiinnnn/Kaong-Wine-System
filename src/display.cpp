@@ -752,12 +752,14 @@ void drawStageParamMenu() {
   // Row 1: Target Temp (all stages)
   {
     bool sel = (stageParamSelection == 1);
-    uint16_t bg = sel ? 0x3566 : 0xD6BA;
-    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    bool editing = sel && stageParamEditing;
+    uint16_t bg  = sel ? 0x3566 : 0xD6BA;
+    uint16_t fg  = sel ? TFT_WHITE : TFT_BLACK;
+    uint16_t bdr = editing ? TFT_YELLOW : TFT_DARKGREY;
     tft.fillRect(10, 96, 300, 42, bg);
-    tft.drawRect(10, 96, 300, 42, TFT_DARKGREY);
+    tft.drawRect(10, 96, 300, 42, bdr);
     tft.setTextColor(fg, bg);
-    tft.drawString("TARGET TEMP", 20, 109, 2);
+    tft.drawString(editing ? "TARGET TEMP  [L/R=+-1  DOWN=DONE]" : "TARGET TEMP", 20, 109, 2);
     sprintf(buf, "%.1f C", stageTargetTemp[stageParamStage]);
     tft.drawRightString(buf, 300, 109, 2);
   }
@@ -766,24 +768,28 @@ void drawStageParamMenu() {
     // Row 2: Target pH
     {
       bool sel = (stageParamSelection == 2);
-      uint16_t bg = sel ? 0x3566 : 0xD6BA;
-      uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+      bool editing = sel && stageParamEditing;
+      uint16_t bg  = sel ? 0x3566 : 0xD6BA;
+      uint16_t fg  = sel ? TFT_WHITE : TFT_BLACK;
+      uint16_t bdr = editing ? TFT_YELLOW : TFT_DARKGREY;
       tft.fillRect(10, 140, 300, 42, bg);
-      tft.drawRect(10, 140, 300, 42, TFT_DARKGREY);
+      tft.drawRect(10, 140, 300, 42, bdr);
       tft.setTextColor(fg, bg);
-      tft.drawString("TARGET PH", 20, 153, 2);
+      tft.drawString(editing ? "TARGET PH  [L/R=+-0.1  DOWN=DONE]" : "TARGET PH", 20, 153, 2);
       sprintf(buf, "%.2f", fermTargetPH);
       tft.drawRightString(buf, 300, 153, 2);
     }
     // Row 3: Target Gravity
     {
       bool sel = (stageParamSelection == 3);
-      uint16_t bg = sel ? 0x3566 : 0xD6BA;
-      uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+      bool editing = sel && stageParamEditing;
+      uint16_t bg  = sel ? 0x3566 : 0xD6BA;
+      uint16_t fg  = sel ? TFT_WHITE : TFT_BLACK;
+      uint16_t bdr = editing ? TFT_YELLOW : TFT_DARKGREY;
       tft.fillRect(10, 184, 300, 42, bg);
-      tft.drawRect(10, 184, 300, 42, TFT_DARKGREY);
+      tft.drawRect(10, 184, 300, 42, bdr);
       tft.setTextColor(fg, bg);
-      tft.drawString("TARGET GRAVITY", 20, 197, 2);
+      tft.drawString(editing ? "TARGET GRAVITY  [L/R=+-0.001  DOWN=DONE]" : "TARGET GRAVITY", 20, 197, 2);
       sprintf(buf, "%.3f", fermTargetGravity);
       tft.drawRightString(buf, 300, 197, 2);
     }
@@ -884,7 +890,7 @@ void drawStageParamMenu() {
   // --- Hints ---
   tft.fillRect(0, 440, 320, 40, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: NAVIGATE   RIGHT: ADJUST   LEFT: BACK", CENTER_X, 447, 1);
+  tft.drawCentreString(stageParamEditing ? "EDITING: L/R=ADJUST   DOWN/SELECT=DONE" : "UP/DOWN: NAVIGATE   SELECT=EDIT   LEFT=BACK", CENTER_X, 447, 1);
   if (simIsMan)
     tft.drawCentreString("MANUAL: UP/DOWN ON DASHBOARD ADJUSTS TEMP", CENTER_X, 462, 1);
   else
