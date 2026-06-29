@@ -179,7 +179,7 @@ void drawDashboardLayout() {
         const char *tag = simManual[i] ? "MAN" : (simDynamic[i] ? "DYN" : "SIM");
         sprintf(simBuf, "[%s %.0fC]", tag, simTempOverride[i]);
         tft.drawRightString(simBuf, 305, y + 35, 1);
-      } else if (i == 0 && preHeatSterilized && isFanOn) {
+      } else if ((i == 0 && preHeatSterilized && isFanOn) || (i == 2 && pastSterilized && isFanOn)) {
         tft.drawRightString("[COOLING]", 305, y + 35, 1);
       } else if (i == 0 && preHeatHolding) {
         tft.drawRightString("[HOLDING]", 305, y + 35, 1);

@@ -129,6 +129,7 @@ bool preHeatCooled = false;
 bool preHeatHolding = false;
 uint32_t preHeatHoldStart = 0;
 bool pastSterilized = false;
+bool pastCooled = false;
 bool pastHolding = false;
 uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
@@ -818,6 +819,7 @@ void loop() {
         preHeatCooled = false;
         preHeatHolding = false;
         pastSterilized = false;
+        pastCooled = false;
         pastHolding = false;
         phAlertActive = false;
         simTempOverride[0] = 0.0f;
@@ -1654,6 +1656,7 @@ void loop() {
             if (pidOut > 100.0f)
               pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
+            if (simManual[2]) currentHeatingPercent = 0;
 
             if (liquidTemp >= 80.0f) {
               if (!pastHolding) {
@@ -1673,6 +1676,21 @@ void loop() {
           }
         } else {
           currentHeatingPercent = 0;
+          if (liquidTemp > -100.0f && !pastCooled) {
+            if (liquidTemp > 30.0f) {
+              int fanPct = (int)((liquidTemp - 30.0f) / 50.0f * 100.0f);
+              if (fanPct > 100) fanPct = 100;
+              if (fanPct < 10) fanPct = 10;
+              isFanOn = true;
+              mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
+              setFanSpeed(fanPct);
+            } else {
+              pastCooled = true;
+              isFanOn = false;
+              mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+              setFanSpeed(0);
+            }
+          }
         }
       }
     }
