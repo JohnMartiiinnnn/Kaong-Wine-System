@@ -196,22 +196,8 @@ void drawDashboardLayout() {
       tft.drawCentreString("SELECT: View Brew Results", CENTER_X, 390, 2);
       tft.drawCentreString("LEFT: Return to Menu", CENTER_X, 412, 2);
     } else {
-      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
-      // Button hints
-      bool isManual = activeBrewStage >= 0 && simManual[activeBrewStage];
-      tft.fillRect(0, 292, 320, 1, TFT_DARKGREY);
-      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-      if (isManual) {
-        tft.drawString("UP",     10, 300, 2); tft.drawString("+5 C (SIM)",  55, 300, 2);
-        tft.drawString("DOWN",   10, 318, 2); tft.drawString("-5 C (SIM)",  55, 318, 2);
-        tft.drawString("SELECT", 10, 336, 2); tft.drawString("Expand Stage", 65, 336, 2);
-        tft.drawString("LEFT",   10, 354, 2); tft.drawString("Return to Menu", 55, 354, 2);
-      } else {
-        tft.drawString("UP / DOWN", 10, 300, 2); tft.drawString("Navigate Stages",  100, 300, 2);
-        tft.drawString("SELECT",    10, 318, 2); tft.drawString("Expand Stage",      65,  318, 2);
-        tft.drawString("LEFT",      10, 336, 2); tft.drawString("Return to Menu",    55,  336, 2);
-        tft.drawString("RIGHT",     10, 354, 2); tft.drawString("Navigate Stages",   65,  354, 2);
-      }
+      tft.fillRect(0, 290, 320, 2, TFT_WHITE);
+      updateDashboardGraph();
     }
   } else {
     int y = 110, h = 340;
@@ -1263,6 +1249,111 @@ void drawRtcSetMenu() {
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("UP/DOWN: FIELD   L/R: ADJUST VALUE", CENTER_X, 447, 1);
   tft.drawCentreString("SELECT: SAVE   RETURN: CANCEL", CENTER_X, 462, 1);
+}
+
+void updateDashboardGraph() {
+  if (currentAppState != DASHBOARD_ACTIVE || moduleViewActive || activeBrewStage < 0) return;
+
+  const int GX  = 28;
+  const int GPY = 308;
+  const int GW  = TEMP_GRAPH_W;
+  const int GH  = 152;
+
+  const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+  uint16_t lineColor = stageColors[activeBrewStage];
+
+  float yMin, yMax;
+  float tickTemps[5];
+  if (activeBrewStage == 1) {
+    yMin = 20.0f; yMax = 40.0f;
+    tickTemps[0] = 20; tickTemps[1] = 25; tickTemps[2] = 30;
+    tickTemps[3] = 35; tickTemps[4] = 40;
+  } else {
+    yMin = 0.0f; yMax = 100.0f;
+    tickTemps[0] = 0;  tickTemps[1] = 25; tickTemps[2] = 50;
+    tickTemps[3] = 75; tickTemps[4] = 100;
+  }
+
+  auto tempToY = [&](float t) -> int {
+    int py = GPY + GH - 1 - (int)(((t) - yMin) / (yMax - yMin) * (GH - 1) + 0.5f);
+    if (py < GPY)       py = GPY;
+    if (py > GPY+GH-1)  py = GPY + GH - 1;
+    return py;
+  };
+
+  // Separator line
+  tft.drawFastHLine(0, 292, 320, TFT_DARKGREY);
+
+  // Header row
+  tft.fillRect(0, 293, 320, 15, TFT_WHITE);
+  const char *stageName[] = {"PRE-HEAT", "FERMENT", "PASTEUR."};
+  tft.setTextColor(lineColor, TFT_WHITE);
+  tft.drawString(stageName[activeBrewStage], 31, 295, 1);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawRightString("TEMP (C)", 315, 295, 1);
+
+  // Y-axis label strip
+  tft.fillRect(0, GPY, GX, GH, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.setTextPadding(0);
+  char lbuf[8];
+  for (int i = 0; i < 5; i++) {
+    int ly = tempToY(tickTemps[i]);
+    sprintf(lbuf, "%3.0f", tickTemps[i]);
+    tft.drawRightString(lbuf, GX - 2, ly - 4, 1);
+  }
+
+  // Plot area background
+  tft.fillRect(GX, GPY, GW, GH, TFT_BLACK);
+
+  // Gridlines (dark)
+  for (int i = 0; i < 5; i++) {
+    int ly = tempToY(tickTemps[i]);
+    tft.drawFastHLine(GX, ly, GW, 0x2104);
+  }
+
+  // Target dashed lines
+  if (activeBrewStage == 0 || activeBrewStage == 2) {
+    int ty = tempToY(80.0f);
+    for (int x = GX; x < GX + GW - 1; x += 4)
+      tft.drawFastHLine(x, ty, 2, TFT_YELLOW);
+  } else {
+    int hy = tempToY(27.0f);
+    int fy = tempToY(30.0f);
+    for (int x = GX; x < GX + GW - 1; x += 4) {
+      tft.drawFastHLine(x, hy, 2, TFT_YELLOW);
+      tft.drawFastHLine(x, fy, 2, TFT_CYAN);
+    }
+  }
+
+  // Border
+  tft.drawRect(GX, GPY, GW, GH, TFT_DARKGREY);
+
+  // Data line
+  int n = tempHistoryCount;
+  if (n >= 2) {
+    int displayCount = (n < GW) ? n : GW;
+    int startDataIdx = (n > GW) ? n - GW : 0;
+    int startPixelX  = (n < GW) ? GX + GW - n : GX;
+    for (int i = 1; i < displayCount; i++) {
+      int x0 = startPixelX + i - 1;
+      int x1 = startPixelX + i;
+      int y0 = tempToY(tempHistory[startDataIdx + i - 1]);
+      int y1 = tempToY(tempHistory[startDataIdx + i]);
+      tft.drawLine(x0, y0, x1, y1, lineColor);
+    }
+  }
+
+  // Footer: current temp + sample count
+  tft.fillRect(0, GPY + GH, 320, 480 - (GPY + GH), TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  if (n > 0) {
+    char fbuf[40];
+    sprintf(fbuf, "%.1f C  |  %ds", tempHistory[n - 1], n);
+    tft.drawCentreString(fbuf, CENTER_X, GPY + GH + 8, 1);
+  } else {
+    tft.drawCentreString("Collecting data...", CENTER_X, GPY + GH + 8, 1);
+  }
 }
 
 void drawBrewSummaryMenu() {

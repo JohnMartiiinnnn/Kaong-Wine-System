@@ -253,3 +253,8 @@ extern int      rtcSetField;
 extern int      rtcSetHour;
 extern int      rtcSetMinute;
 extern uint32_t stageElapsedMs[3];
+
+// ---- Temperature Graph ----
+#define TEMP_GRAPH_W 288
+extern float tempHistory[TEMP_GRAPH_W];
+extern int   tempHistoryCount;

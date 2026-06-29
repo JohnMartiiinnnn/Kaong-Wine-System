@@ -149,6 +149,8 @@ uint32_t uartChecksumErrors = 0;
 bool     rtcSetNeedsFullRedraw = true;
 bool     brewSummaryNeedsFullRedraw = true;
 bool     simRunActive = false;
+float    tempHistory[TEMP_GRAPH_W] = {};
+int      tempHistoryCount = 0;
 int      rtcSetField   = 0;
 int      rtcSetHour    = 0;
 int      rtcSetMinute  = 0;
@@ -829,6 +831,7 @@ void loop() {
         pastSterilized    = pastHolding    = false;
         phAlertActive     = false;
         stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
+        tempHistoryCount = 0;
         simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 25.0f;
         simDynamic[0]  = simDynamic[1]  = simDynamic[2]  = true;
         simManual[0]   = simManual[1]   = simManual[2]   = false;
@@ -868,6 +871,7 @@ void loop() {
         ogCapturing = true;
         activeBrewStage = 0;
         stageStartMillis = millis();
+        tempHistoryCount = 0;
         mcp.digitalWrite(LIGHT_R, RELAY_ON);
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
         mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -1168,6 +1172,7 @@ void loop() {
             stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage++;
             stageStartMillis = millis();
+            tempHistoryCount = 0;
           } else {
             stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
             activeBrewStage = -1;
@@ -1831,6 +1836,7 @@ void loop() {
         if (activeBrewStage < 2) {
           activeBrewStage++;
           stageStartMillis = millis();
+          tempHistoryCount = 0;
           if (activeBrewStage == 1) {
             mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_ON);
@@ -1927,8 +1933,27 @@ void loop() {
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
 
-    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive && activeBrewStage >= 0)
+    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive && activeBrewStage >= 0) {
       updateDashboardTimers();
+      float gTemp = -999.0f;
+      if (simTempOverride[activeBrewStage] > 0.0f)
+        gTemp = simTempOverride[activeBrewStage];
+      else if (activeBrewStage == 0 && liquid2Status)
+        gTemp = sharedLiquidSensors.getTempCByIndex(1);
+      else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+        gTemp = incomingData.room2LiquidTemp;
+      else if (activeBrewStage == 2 && liquid1Status)
+        gTemp = sharedLiquidSensors.getTempCByIndex(0);
+      if (gTemp > -100.0f) {
+        if (tempHistoryCount < TEMP_GRAPH_W) {
+          tempHistory[tempHistoryCount++] = gTemp;
+        } else {
+          memmove(tempHistory, tempHistory + 1, (TEMP_GRAPH_W - 1) * sizeof(float));
+          tempHistory[TEMP_GRAPH_W - 1] = gTemp;
+        }
+        updateDashboardGraph();
+      }
+    }
 
     if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
       int y = 110;

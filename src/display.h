@@ -9,6 +9,7 @@ void drawMixerMenu();
 void drawNewBrewWizard();
 void drawDashboardLayout();
 void updateDashboardTimers();
+void updateDashboardGraph();
 void drawStartMenu();
 void drawLoadCellPage(bool valuesOnly = false);
 void drawSystemCheckMenu();
