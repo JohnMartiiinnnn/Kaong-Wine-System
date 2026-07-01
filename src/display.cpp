@@ -1018,29 +1018,49 @@ void drawPidTestMenu() {
   if (pidTestRunning) {
     // Current Temp
     float liquidTemp = -999.0f;
-    if (pidTestChoice == 0 && liquid2Status) {
-      liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
-    } else if (pidTestChoice == 1 && incomingData.ds18Status == 1) {
-      liquidTemp = incomingData.room2LiquidTemp;
-    } else if (pidTestChoice == 2 && liquid1Status) {
-      liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+    float ambientTemp = -999.0f;
+    if (pidTestChoice == 0) {
+      if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+      if (bme1Status) ambientTemp = bme1.readTemperature();
+    } else if (pidTestChoice == 1) {
+      if (incomingData.ds18Status == 1) liquidTemp = incomingData.room2LiquidTemp;
+      if (incomingData.sensor2Status == 1) ambientTemp = incomingData.room2Temp;
+    } else if (pidTestChoice == 2) {
+      if (liquid1Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      if (bme1Status) ambientTemp = bme1.readTemperature();
     }
     
-    tft.fillRect(20, 240, 135, 60, 0x3566);
-    tft.drawRect(20, 240, 135, 60, TFT_DARKGREY);
+    // Liquid Temp
+    tft.fillRect(20, 240, 90, 60, 0x3566);
+    tft.drawRect(20, 240, 90, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, 0x3566);
-    tft.drawCentreString("LIQUID TEMP", 87, 250, 1);
-    if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
+    tft.drawCentreString("LIQUID", 65, 250, 1);
+    if (liquidTemp > -100.0f) sprintf(buf, "%.1f", liquidTemp);
     else strcpy(buf, "--");
-    tft.drawCentreString(buf, 87, 270, 2);
+    tft.drawCentreString(buf, 65, 270, 2);
 
-    // Heating Percent
-    tft.fillRect(165, 240, 135, 60, 0x3566);
-    tft.drawRect(165, 240, 135, 60, TFT_DARKGREY);
+    // Ambient Temp
+    tft.fillRect(115, 240, 90, 60, 0x3566);
+    tft.drawRect(115, 240, 90, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, 0x3566);
-    tft.drawCentreString("HEATING %", 232, 250, 1);
-    sprintf(buf, "%d%%", currentHeatingPercent);
-    tft.drawCentreString(buf, 232, 270, 2);
+    tft.drawCentreString("AMBIENT", 160, 250, 1);
+    if (ambientTemp > -100.0f) sprintf(buf, "%.1f", ambientTemp);
+    else strcpy(buf, "--");
+    tft.drawCentreString(buf, 160, 270, 2);
+
+    // Effort %
+    tft.fillRect(210, 240, 90, 60, 0x3566);
+    tft.drawRect(210, 240, 90, 60, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x3566);
+    tft.drawCentreString("EFFORT", 255, 250, 1);
+    if (currentHeatingPercent > 0) {
+      sprintf(buf, "H:%d%%", currentHeatingPercent);
+    } else if (isFanOn || isFermFanOn) {
+      sprintf(buf, "C:%d%%", currentSpeedPercent);
+    } else {
+      strcpy(buf, "0%");
+    }
+    tft.drawCentreString(buf, 255, 270, 2);
 
     // Status Banner
     uint16_t statusBg = pidTestSuccess ? 0x0400 : TFT_ORANGE;
