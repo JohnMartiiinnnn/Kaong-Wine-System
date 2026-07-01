@@ -688,16 +688,18 @@ void loop() {
       pidTestChoice = (pidTestChoice + 1) % 3;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
-      if (pidTestTargetSelection == 0) {
-        pidTestHeatTarget -= 1.0f;
-        if (pidTestHeatTarget < 0.0f)
-          pidTestHeatTarget = 0.0f;
-      } else {
-        pidTestCoolTarget -= 1.0f;
-        if (pidTestCoolTarget < 0.0f)
-          pidTestCoolTarget = 0.0f;
+      if (cDown && !ljDown) {
+        if (pidTestTargetSelection == 0) {
+          pidTestHeatTarget -= 1.0f;
+          if (pidTestHeatTarget < 0.0f)
+            pidTestHeatTarget = 0.0f;
+        } else {
+          pidTestCoolTarget -= 1.0f;
+          if (pidTestCoolTarget < 0.0f)
+            pidTestCoolTarget = 0.0f;
+        }
+        drawPidTestMenu();
       }
-      drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -1047,13 +1049,13 @@ void loop() {
       currentAppState = PID_TEST_MENU;
       pidTestNeedsFullRedraw = true;
       if (pidTestChoice == 0) {
-        pidTestHeatTarget = 80.0f;
+        pidTestHeatTarget = 35.0f;
         pidTestCoolTarget = 30.0f;
       } else if (pidTestChoice == 1) {
         pidTestHeatTarget = 27.0f;
         pidTestCoolTarget = 30.0f;
       } else {
-        pidTestHeatTarget = 80.0f;
+        pidTestHeatTarget = 35.0f;
         pidTestCoolTarget = 30.0f;
       }
       pidTestRunning = false;
