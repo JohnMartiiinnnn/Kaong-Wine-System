@@ -988,14 +988,24 @@ void drawPidTestMenu() {
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString(chamberTitle, CENTER_X, 60, 4);
 
-  // Target Temp Setting
-  tft.fillRect(20, 100, 280, 70, 0xD6BA);
-  tft.drawRect(20, 100, 280, 70, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("TARGET TEMP", CENTER_X, 110, 2);
+  // Target Heat Setting
+  uint16_t heatBg = (!pidTestRunning && pidTestTargetSelection == 0) ? TFT_YELLOW : 0xD6BA;
+  tft.fillRect(20, 100, 135, 70, heatBg);
+  tft.drawRect(20, 100, 135, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, heatBg);
+  tft.drawCentreString("HEAT TARGET", 87, 110, 2);
   char buf[32];
-  sprintf(buf, "%.1f C", pidTestTarget);
-  tft.drawCentreString(buf, CENTER_X, 135, 4);
+  sprintf(buf, "%.1f C", pidTestHeatTarget);
+  tft.drawCentreString(buf, 87, 135, 4);
+
+  // Target Cool Setting
+  uint16_t coolBg = (!pidTestRunning && pidTestTargetSelection == 1) ? TFT_YELLOW : 0xD6BA;
+  tft.fillRect(165, 100, 135, 70, coolBg);
+  tft.drawRect(165, 100, 135, 70, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, coolBg);
+  tft.drawCentreString("COOL TARGET", 232, 110, 2);
+  sprintf(buf, "%.1f C", pidTestCoolTarget);
+  tft.drawCentreString(buf, 232, 135, 4);
 
   // Start / Stop Button
   uint16_t btnColor = pidTestRunning ? TFT_RED : 0x0400;

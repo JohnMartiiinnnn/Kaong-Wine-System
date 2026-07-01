@@ -109,7 +109,9 @@ bool motorTestCW = true;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 int pidTestChoice = 0;
-float pidTestTarget = 40.0f;
+float pidTestHeatTarget = 40.0f;
+float pidTestCoolTarget = 28.5f;
+int pidTestTargetSelection = 0;
 bool pidTestRunning = false;
 bool pidTestSuccess = false;
 uint32_t pidTestStableStart = 0;
@@ -133,30 +135,30 @@ bool pastHolding = false;
 uint32_t pastHoldStart = 0;
 bool phAlertActive = false;
 float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
-bool  simDynamic[3]      = {false, false, false};
-bool  simManual[3]       = {false, false, false};
+bool simDynamic[3] = {false, false, false};
+bool simManual[3] = {false, false, false};
 uint32_t stageElapsedMs[3] = {0, 0, 0};
-bool     heaterTestNeedsFullRedraw = true;
-int      heaterTestStage   = 0;
-int      heaterTestPercent = 0;
-bool     heaterTestRunning = false;
-uint32_t heaterTestStart   = 0;
-bool     sdVerifyNeedsFullRedraw = true;
-int      sdVerifyResult    = -1;
-bool     uartMonitorNeedsFullRedraw = true;
-uint32_t uartPacketCount    = 0;
+bool heaterTestNeedsFullRedraw = true;
+int heaterTestStage = 0;
+int heaterTestPercent = 0;
+bool heaterTestRunning = false;
+uint32_t heaterTestStart = 0;
+bool sdVerifyNeedsFullRedraw = true;
+int sdVerifyResult = -1;
+bool uartMonitorNeedsFullRedraw = true;
+uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
-bool     rtcSetNeedsFullRedraw = true;
-bool     brewSummaryNeedsFullRedraw = true;
-bool     simRunActive = false;
-float    tempHistory[TEMP_GRAPH_W] = {};
-int      tempHistoryCount = 0;
-bool     stageTransferring = false;
-int      stageTransferTarget = -1;
+bool rtcSetNeedsFullRedraw = true;
+bool brewSummaryNeedsFullRedraw = true;
+bool simRunActive = false;
+float tempHistory[TEMP_GRAPH_W] = {};
+int tempHistoryCount = 0;
+bool stageTransferring = false;
+int stageTransferTarget = -1;
 uint32_t transferStartMs = 0;
-int      rtcSetField   = 0;
-int      rtcSetHour    = 0;
-int      rtcSetMinute  = 0;
+int rtcSetField = 0;
+int rtcSetHour = 0;
+int rtcSetMinute = 0;
 
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
@@ -622,18 +624,18 @@ void loop() {
       // Clear all sim/demo state so sensor checks show real data
       simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 0.0f;
       simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
-      simManual[0]  = simManual[1]  = simManual[2]  = false;
-      incomingData.bleStatus       = 0;
-      incomingData.sensor2Status   = 0;
-      incomingData.adsStatus       = 0;
-      incomingData.ds18Status      = 0;
-      incomingData.pillGravity     = 0.0f;
-      incomingData.phValue         = 0.0f;
+      simManual[0] = simManual[1] = simManual[2] = false;
+      incomingData.bleStatus = 0;
+      incomingData.sensor2Status = 0;
+      incomingData.adsStatus = 0;
+      incomingData.ds18Status = 0;
+      incomingData.pillGravity = 0.0f;
+      incomingData.phValue = 0.0f;
       incomingData.room2LiquidTemp = 0.0f;
-      incomingData.room2Temp       = 0.0f;
-      incomingData.pillRSSI        = 0;
-      incomingData.pillBattery     = 0;
-      remoteStatusReceived         = false;
+      incomingData.room2Temp = 0.0f;
+      incomingData.pillRSSI = 0;
+      incomingData.pillBattery = 0;
+      remoteStatusReceived = false;
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
       drawStartMenu();
@@ -651,9 +653,11 @@ void loop() {
       wizardSelection = (wizardSelection + 1) % 2;
       drawNewBrewWizard();
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      if (cDown && !ljDown && activeBrewStage >= 0 && simManual[activeBrewStage]) {
+      if (cDown && !ljDown && activeBrewStage >= 0 &&
+          simManual[activeBrewStage]) {
         simTempOverride[activeBrewStage] -= 5.0f;
-        if (simTempOverride[activeBrewStage] < 0.0f) simTempOverride[activeBrewStage] = 0.0f;
+        if (simTempOverride[activeBrewStage] < 0.0f)
+          simTempOverride[activeBrewStage] = 0.0f;
       } else {
         dashSelection = (dashSelection + 1) % 3;
       }
@@ -684,9 +688,15 @@ void loop() {
       pidTestChoice = (pidTestChoice + 1) % 3;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
-      pidTestTarget -= 1.0f;
-      if (pidTestTarget < 0.0f)
-        pidTestTarget = 0.0f;
+      if (pidTestTargetSelection == 0) {
+        pidTestHeatTarget -= 1.0f;
+        if (pidTestHeatTarget < 0.0f)
+          pidTestHeatTarget = 0.0f;
+      } else {
+        pidTestCoolTarget -= 1.0f;
+        if (pidTestCoolTarget < 0.0f)
+          pidTestCoolTarget = 0.0f;
+      }
       drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -742,7 +752,8 @@ void loop() {
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
       if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
         simTempOverride[activeBrewStage] += 5.0f;
-        if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
+        if (simTempOverride[activeBrewStage] > 100.0f)
+          simTempOverride[activeBrewStage] = 100.0f;
       } else {
         dashSelection = (dashSelection + 2) % 3;
       }
@@ -773,9 +784,15 @@ void loop() {
       pidTestChoice = (pidTestChoice + 1) % 3;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
-      pidTestTarget += 1.0f;
-      if (pidTestTarget > 100.0f)
-        pidTestTarget = 100.0f;
+      if (pidTestTargetSelection == 0) {
+        pidTestHeatTarget += 1.0f;
+        if (pidTestHeatTarget > 100.0f)
+          pidTestHeatTarget = 100.0f;
+      } else {
+        pidTestCoolTarget += 1.0f;
+        if (pidTestCoolTarget > 100.0f)
+          pidTestCoolTarget = 100.0f;
+      }
       drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -838,40 +855,41 @@ void loop() {
         // DEMO RUN: full automated 3-stage simulation (~2.5 min)
         if (rtcStatus) {
           DateTime now = rtc.now();
-          sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(), now.hour(), now.minute());
+          sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
+                  now.hour(), now.minute());
         }
-        originalGravity  = 1.060f;
-        ogCapturing      = false;
-        ogSampleSum      = 0.0f;
-        ogSampleCount    = 0;
-        activeBrewStage  = 0;
+        originalGravity = 1.060f;
+        ogCapturing = false;
+        ogSampleSum = 0.0f;
+        ogSampleCount = 0;
+        activeBrewStage = 0;
         stageStartMillis = millis();
         preHeatSterilized = preHeatCooled = preHeatHolding = false;
-        pastSterilized    = pastHolding    = false;
-        phAlertActive     = false;
+        pastSterilized = pastHolding = false;
+        phAlertActive = false;
         stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
         tempHistoryCount = 0;
         simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 25.0f;
-        simDynamic[0]  = simDynamic[1]  = simDynamic[2]  = true;
-        simManual[0]   = simManual[1]   = simManual[2]   = false;
+        simDynamic[0] = simDynamic[1] = simDynamic[2] = true;
+        simManual[0] = simManual[1] = simManual[2] = false;
         stageParamEditing = false;
-        incomingData.bleStatus       = 1;
-        incomingData.sensor2Status   = 1;
-        incomingData.adsStatus       = 1;
-        incomingData.ds18Status      = 1;
-        incomingData.pillGravity     = 1.060f;
-        incomingData.phValue         = 4.2f;
+        incomingData.bleStatus = 1;
+        incomingData.sensor2Status = 1;
+        incomingData.adsStatus = 1;
+        incomingData.ds18Status = 1;
+        incomingData.pillGravity = 1.060f;
+        incomingData.phValue = 4.2f;
         incomingData.room2LiquidTemp = 25.0f;
-        incomingData.room2Temp       = 26.0f;
-        incomingData.room2Pres       = 1013.0f;
-        incomingData.pillRSSI        = -65;
-        incomingData.pillBattery     = 85;
+        incomingData.room2Temp = 26.0f;
+        incomingData.room2Pres = 1013.0f;
+        incomingData.pillRSSI = -65;
+        incomingData.pillBattery = 85;
         remoteStatusReceived = true;
         simRunActive = true;
         mcp.digitalWrite(LIGHT_R, RELAY_ON);
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
         mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-        currentAppState  = DASHBOARD_ACTIVE;
+        currentAppState = DASHBOARD_ACTIVE;
         dashNeedsFullRedraw = true;
         moduleViewActive = false;
         drawDashboardLayout();
@@ -904,7 +922,7 @@ void loop() {
         simTempOverride[1] = 0.0f;
         simTempOverride[2] = 0.0f;
         simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
-        simManual[0]  = simManual[1]  = simManual[2]  = false;
+        simManual[0] = simManual[1] = simManual[2] = false;
         stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
         stageParamEditing = false;
         currentAppState = DASHBOARD_ACTIVE;
@@ -1014,7 +1032,7 @@ void loop() {
       } else if (systemCheckSelection == 8) {
         if (rtcStatus) {
           DateTime now = rtc.now();
-          rtcSetHour   = now.hour();
+          rtcSetHour = now.hour();
           rtcSetMinute = now.minute();
         } else {
           rtcSetHour = 0;
@@ -1028,12 +1046,16 @@ void loop() {
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
       pidTestNeedsFullRedraw = true;
-      if (pidTestChoice == 0)
-        pidTestTarget = 80.0f;
-      else if (pidTestChoice == 1)
-        pidTestTarget = 28.5f;
-      else
-        pidTestTarget = 80.0f;
+      if (pidTestChoice == 0) {
+        pidTestHeatTarget = 80.0f;
+        pidTestCoolTarget = 85.0f;
+      } else if (pidTestChoice == 1) {
+        pidTestHeatTarget = 27.0f;
+        pidTestCoolTarget = 30.0f;
+      } else {
+        pidTestHeatTarget = 80.0f;
+        pidTestCoolTarget = 85.0f;
+      }
       pidTestRunning = false;
       pidTestSuccess = false;
       drawPidTestMenu();
@@ -1074,15 +1096,21 @@ void loop() {
             f.readBytes(rbuf, strlen(testStr));
             f.close();
             SD.remove("/sdverify.tmp");
-            sdVerifyResult = (strncmp(rbuf, testStr, strlen(testStr)) == 0) ? 1 : 0;
-          } else { sdVerifyResult = 0; }
-        } else { sdVerifyResult = 0; }
+            sdVerifyResult =
+                (strncmp(rbuf, testStr, strlen(testStr)) == 0) ? 1 : 0;
+          } else {
+            sdVerifyResult = 0;
+          }
+        } else {
+          sdVerifyResult = 0;
+        }
       }
       drawSdVerifyMenu();
     } else if (currentAppState == RTC_SET_MENU) {
       if (rtcStatus) {
         DateTime now = rtc.now();
-        rtc.adjust(DateTime(now.year(), now.month(), now.day(), rtcSetHour, rtcSetMinute, 0));
+        rtc.adjust(DateTime(now.year(), now.month(), now.day(), rtcSetHour,
+                            rtcSetMinute, 0));
       }
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
@@ -1163,15 +1191,16 @@ void loop() {
         if (simTempOverride[stageParamStage] == 0.0f) {
           simTempOverride[stageParamStage] = 25.0f;
           simDynamic[stageParamStage] = false;
-          simManual[stageParamStage]  = false;
-        } else if (!simDynamic[stageParamStage] && !simManual[stageParamStage]) {
+          simManual[stageParamStage] = false;
+        } else if (!simDynamic[stageParamStage] &&
+                   !simManual[stageParamStage]) {
           simDynamic[stageParamStage] = true;
         } else if (simDynamic[stageParamStage]) {
           simDynamic[stageParamStage] = false;
-          simManual[stageParamStage]  = true;
+          simManual[stageParamStage] = true;
         } else {
           simTempOverride[stageParamStage] = 0.0f;
-          simManual[stageParamStage]       = false;
+          simManual[stageParamStage] = false;
         }
         drawStageParamMenu();
       } else if (stageParamSelection > 0 && stageParamSelection < lastRow) {
@@ -1189,9 +1218,9 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
           stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
           if (activeBrewStage < 2) {
-            stageTransferring   = true;
+            stageTransferring = true;
             stageTransferTarget = activeBrewStage + 1;
-            transferStartMs     = millis();
+            transferStartMs = millis();
             mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
             mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -1230,6 +1259,13 @@ void loop() {
     drawMotorTestMenu();
   }
 
+  if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
+      !pidTestRunning) {
+    pidTestTargetSelection = (pidTestTargetSelection + 1) % 2;
+    pidTestNeedsFullRedraw = true;
+    drawPidTestMenu();
+  }
+
   if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE &&
       moduleViewActive) {
     stageParamStage = dashSelection;
@@ -1257,14 +1293,19 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == HEATER_TEST_MENU && !heaterTestRunning) {
+  if (cRight && !ljRight && currentAppState == HEATER_TEST_MENU &&
+      !heaterTestRunning) {
     heaterTestPercent += 5;
-    if (heaterTestPercent > 100) heaterTestPercent = 100;
+    if (heaterTestPercent > 100)
+      heaterTestPercent = 100;
     drawHeaterTestMenu();
   }
   if (cRight && !ljRight && currentAppState == RTC_SET_MENU) {
-    if (rtcSetField == 0) { rtcSetHour = (rtcSetHour + 1) % 24; }
-    else                  { rtcSetMinute = (rtcSetMinute + 1) % 60; }
+    if (rtcSetField == 0) {
+      rtcSetHour = (rtcSetHour + 1) % 24;
+    } else {
+      rtcSetMinute = (rtcSetMinute + 1) % 60;
+    }
     drawRtcSetMenu();
   }
 
@@ -1393,7 +1434,8 @@ void loop() {
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (!heaterTestRunning) {
         heaterTestPercent -= 5;
-        if (heaterTestPercent < 0) heaterTestPercent = 0;
+        if (heaterTestPercent < 0)
+          heaterTestPercent = 0;
         drawHeaterTestMenu();
       } else {
         currentAppState = SYSTEM_CHECK_MENU;
@@ -1502,7 +1544,9 @@ void loop() {
           ogCapturing = false;
         }
       }
-    } else { uartChecksumErrors++; }
+    } else {
+      uartChecksumErrors++;
+    }
   }
 
   // HX711 Hybrid EMA Filter (1Hz)
@@ -1593,37 +1637,69 @@ void loop() {
       }
 
       if (liquidTemp > -100.0f) {
-        float error = pidTestTarget - liquidTemp;
-        if (liquidTemp >= pidTestTarget - 5.0f) {
-          pidTestIntegral += error;
-          if (pidTestIntegral > 100.0f)
-            pidTestIntegral = 100.0f;
-          if (pidTestIntegral < -100.0f)
-            pidTestIntegral = -100.0f;
+        float error = 0.0f;
+        if (liquidTemp < pidTestHeatTarget) {
+          error = pidTestHeatTarget - liquidTemp;
+          if (liquidTemp >= pidTestHeatTarget - 5.0f) {
+            pidTestIntegral += error;
+            if (pidTestIntegral > 100.0f)
+              pidTestIntegral = 100.0f;
+            if (pidTestIntegral < -100.0f)
+              pidTestIntegral = -100.0f;
+          } else {
+            pidTestIntegral = 0.0f;
+          }
+        } else if (liquidTemp > pidTestCoolTarget) {
+          error = pidTestCoolTarget - liquidTemp; // negative error for cooling
+          if (liquidTemp <= pidTestCoolTarget + 5.0f) {
+            pidTestIntegral += error;
+            if (pidTestIntegral > 100.0f)
+              pidTestIntegral = 100.0f;
+            if (pidTestIntegral < -100.0f)
+              pidTestIntegral = -100.0f;
+          } else {
+            pidTestIntegral = 0.0f;
+          }
         } else {
+          error = 0.0f;
           pidTestIntegral = 0.0f;
         }
 
         float pidOut = (PID_KP * error) + (PID_KI * pidTestIntegral) +
                        (PID_KD * (error - pidTestPrevError));
         pidTestPrevError = error;
-        if (pidOut < 0.0f)
-          pidOut = 0.0f;
+        if (pidOut < -100.0f)
+          pidOut = -100.0f;
         if (pidOut > 100.0f)
           pidOut = 100.0f;
 
-        currentHeatingPercent = (int)pidOut;
+        if (pidOut > 0.0f) {
+          currentHeatingPercent = (int)pidOut;
+          isFermFanOn = false;
+          isFanOn = false;
+        } else if (pidOut < 0.0f) {
+          currentHeatingPercent = 0;
+          if (pidTestChoice == 1) {
+            isFermFanOn = true;
+            isFanOn = false;
+          } else {
+            isFermFanOn = false;
+            isFanOn = true;
+          }
+        } else {
+          currentHeatingPercent = 0;
+          isFermFanOn = false;
+          isFanOn = false;
+        }
 
         if (pidTestChoice == 1) {
-          if (error < -0.5f) {
-            isFermFanOn = true;
-          } else if (error > 0.0f) {
-            isFermFanOn = false;
-          }
           mcp.digitalWrite(FERM_FAN_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
+        } else {
+          mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
+          setFanSpeed(isFanOn ? (int)(-pidOut) : 0);
         }
 
         if (abs(error) <= 0.5f) {
@@ -1643,9 +1719,9 @@ void loop() {
     // ---- Transfer Completion ----
     if (stageTransferring && millis() - transferStartMs >= 10000UL) {
       stageTransferring = false;
-      activeBrewStage   = stageTransferTarget;
-      stageStartMillis  = millis();
-      tempHistoryCount  = 0;
+      activeBrewStage = stageTransferTarget;
+      stageStartMillis = millis();
+      tempHistoryCount = 0;
       if (activeBrewStage == 1) {
         mcp.digitalWrite(LIGHT_R, RELAY_OFF);
         mcp.digitalWrite(LIGHT_Y, RELAY_ON);
@@ -1656,7 +1732,8 @@ void loop() {
         mcp.digitalWrite(LIGHT_G, RELAY_ON);
       }
       dashNeedsFullRedraw = true;
-      if (currentAppState == DASHBOARD_ACTIVE) drawDashboardLayout();
+      if (currentAppState == DASHBOARD_ACTIVE)
+        drawDashboardLayout();
     }
 
     // ---- Closed-Loop Brew Stage Control ----
@@ -1702,7 +1779,8 @@ void loop() {
             if (pidOut > 100.0f)
               pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
-            if (simManual[0]) currentHeatingPercent = 0;
+            if (simManual[0])
+              currentHeatingPercent = 0;
 
             if (liquidTemp >= 80.0f) {
               if (!preHeatHolding) {
@@ -1777,7 +1855,8 @@ void loop() {
             if (pidOut > 100.0f)
               pidOut = 100.0f;
             currentHeatingPercent = (int)pidOut;
-            if (simManual[2]) currentHeatingPercent = 0;
+            if (simManual[2])
+              currentHeatingPercent = 0;
 
             if (liquidTemp >= 80.0f) {
               if (!pastHolding) {
@@ -1811,43 +1890,52 @@ void loop() {
       float delta = 0.0f;
 
       if (activeBrewStage == 1) {
-        // Fermentation: bounded random walk 24–33°C, crosses heater (<27) and fan (>30) thresholds
+        // Fermentation: bounded random walk 24–33°C, crosses heater (<27) and
+        // fan (>30) thresholds
         delta = (float)random(-30, 31) / 10.0f;
-        if (cur + delta < 24.0f) delta = 3.0f;
-        if (cur + delta > 33.0f) delta = -3.0f;
+        if (cur + delta < 24.0f)
+          delta = 3.0f;
+        if (cur + delta > 33.0f)
+          delta = -3.0f;
       } else {
         // Pre-heat (0) and Pasteurization (2): rise → hold at 80 → fan cool
-        bool sterilized = (activeBrewStage == 0) ? preHeatSterilized : pastSterilized;
+        bool sterilized =
+            (activeBrewStage == 0) ? preHeatSterilized : pastSterilized;
         if (fansActive) {
           // Cooling: noisy downward drift, never positive
           delta = -(SIM_RATE + (float)random(0, 21) / 10.0f);
         } else if (!sterilized && cur < 80.0f) {
           // Heating: noisy upward drift, always at least 0.5°C/s
           delta = SIM_RATE + (float)random(-10, 11) / 10.0f;
-          if (delta < 0.5f) delta = 0.5f;
+          if (delta < 0.5f)
+            delta = 0.5f;
         }
         // At 80 holding, or sterilized no fans: delta stays 0 → clean hold
       }
 
       simTempOverride[activeBrewStage] += delta;
-      if (simTempOverride[activeBrewStage] < 0.0f)  simTempOverride[activeBrewStage] = 0.0f;
-      if (simTempOverride[activeBrewStage] > 100.0f) simTempOverride[activeBrewStage] = 100.0f;
+      if (simTempOverride[activeBrewStage] < 0.0f)
+        simTempOverride[activeBrewStage] = 0.0f;
+      if (simTempOverride[activeBrewStage] > 100.0f)
+        simTempOverride[activeBrewStage] = 100.0f;
     }
 
     // ---- Demo Run: sensor simulation and auto-advance ----
     if (simRunActive && activeBrewStage >= 0) {
       if (activeBrewStage == 1) {
         float prog = (float)(millis() - stageStartMillis) / 80000.0f;
-        if (prog > 1.0f) prog = 1.0f;
-        incomingData.pillGravity     = 1.060f - prog * (1.060f - 0.995f);
-        incomingData.phValue         = 4.2f   - prog * (4.2f   - 2.5f);
+        if (prog > 1.0f)
+          prog = 1.0f;
+        incomingData.pillGravity = 1.060f - prog * (1.060f - 0.995f);
+        incomingData.phValue = 4.2f - prog * (4.2f - 2.5f);
         incomingData.room2LiquidTemp = simTempOverride[1];
-        incomingData.room2Temp       = 27.5f + (float)random(-5, 6) / 10.0f;
+        incomingData.room2Temp = 27.5f + (float)random(-5, 6) / 10.0f;
       }
       bool doAdv = false;
-      if      (activeBrewStage == 0 && preHeatCooled && !stageTransferring)
+      if (activeBrewStage == 0 && preHeatCooled && !stageTransferring)
         doAdv = true;
-      else if (activeBrewStage == 1 && millis() - stageStartMillis >= 80000UL && !stageTransferring)
+      else if (activeBrewStage == 1 && millis() - stageStartMillis >= 80000UL &&
+               !stageTransferring)
         doAdv = true;
       else if (activeBrewStage == 2 && pastSterilized && !stageTransferring)
         doAdv = true;
@@ -1861,9 +1949,9 @@ void loop() {
         mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
         stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
         if (activeBrewStage < 2) {
-          stageTransferring   = true;
+          stageTransferring = true;
           stageTransferTarget = activeBrewStage + 1;
-          transferStartMs     = millis();
+          transferStartMs = millis();
           mcp.digitalWrite(LIGHT_R, RELAY_OFF);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -1875,7 +1963,8 @@ void loop() {
           mcp.digitalWrite(LIGHT_G, RELAY_ON);
         }
         dashNeedsFullRedraw = true;
-        if (currentAppState == DASHBOARD_ACTIVE) drawDashboardLayout();
+        if (currentAppState == DASHBOARD_ACTIVE)
+          drawDashboardLayout();
       }
     }
 
@@ -1961,7 +2050,8 @@ void loop() {
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
 
-    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive && activeBrewStage >= 0) {
+    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
+        activeBrewStage >= 0) {
       updateDashboardTimers();
       if (!stageTransferring) {
         float gTemp = -999.0f;
@@ -1977,7 +2067,8 @@ void loop() {
           if (tempHistoryCount < TEMP_GRAPH_W) {
             tempHistory[tempHistoryCount++] = gTemp;
           } else {
-            memmove(tempHistory, tempHistory + 1, (TEMP_GRAPH_W - 1) * sizeof(float));
+            memmove(tempHistory, tempHistory + 1,
+                    (TEMP_GRAPH_W - 1) * sizeof(float));
             tempHistory[TEMP_GRAPH_W - 1] = gTemp;
           }
           updateDashboardGraph();
@@ -1993,9 +2084,12 @@ void loop() {
         tft.setTextColor(TFT_WHITE, colors[0]);
         tft.setTextPadding(140);
         String pa = bme1Status ? String(bme1.readTemperature(), 1) : "--";
-        String pl = (simTempOverride[0] > 0.0f)
-                        ? String(simTempOverride[0], 1)
-                        : (liquid2Status ? String(sharedLiquidSensors.getTempCByIndex(1), 1) : "--");
+        String pl =
+            (simTempOverride[0] > 0.0f)
+                ? String(simTempOverride[0], 1)
+                : (liquid2Status
+                       ? String(sharedLiquidSensors.getTempCByIndex(1), 1)
+                       : "--");
         tft.drawCentreString(pa + "C", 80, y + 80, 4);
         tft.drawCentreString(pl + "C", 240, y + 80, 4);
         tft.drawCentreString(String(currentSpeedPercent) + "%", 80, y + 160, 4);
@@ -2014,7 +2108,9 @@ void loop() {
                         : "--";
         String fl = (simTempOverride[1] > 0.0f)
                         ? String(simTempOverride[1], 1)
-                        : (incomingData.ds18Status == 1 ? String(incomingData.room2LiquidTemp, 1) : "--");
+                        : (incomingData.ds18Status == 1
+                               ? String(incomingData.room2LiquidTemp, 1)
+                               : "--");
         tft.drawCentreString(fa + "C", 80, y + 85, 4);
         tft.drawCentreString(fl + "C", 240, y + 85, 4);
         if (incomingData.pillGravity != 0 && incomingData.pillGravity < 10.0) {
@@ -2057,9 +2153,12 @@ void loop() {
       } else if (dashSelection == 2) {
         tft.setTextColor(TFT_WHITE, colors[2]);
         tft.setTextPadding(280);
-        String pt = (simTempOverride[2] > 0.0f)
-                        ? String(simTempOverride[2], 1)
-                        : (liquid1Status ? String(sharedLiquidSensors.getTempCByIndex(0), 1) : "--");
+        String pt =
+            (simTempOverride[2] > 0.0f)
+                ? String(simTempOverride[2], 1)
+                : (liquid1Status
+                       ? String(sharedLiquidSensors.getTempCByIndex(0), 1)
+                       : "--");
         tft.drawCentreString(pt + "C", CENTER_X, y + 85, 4);
         tft.drawCentreString("READY", CENTER_X, y + 155, 4);
       }
