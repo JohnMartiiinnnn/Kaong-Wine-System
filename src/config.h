@@ -213,6 +213,7 @@ extern int pidTestTargetSelection;
 extern bool pidTestRunning;
 extern bool pidTestSuccess;
 extern uint32_t pidTestStableStart;
+extern uint32_t pidTestStartMs;
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;

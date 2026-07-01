@@ -115,6 +115,7 @@ int pidTestTargetSelection = 0;
 bool pidTestRunning = false;
 bool pidTestSuccess = false;
 uint32_t pidTestStableStart = 0;
+uint32_t pidTestStartMs = 0;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -1066,6 +1067,7 @@ void loop() {
         pidTestRunning = true;
         pidTestSuccess = false;
         pidTestStableStart = 0;
+        pidTestStartMs = millis();
       } else {
         pidTestRunning = false;
         currentHeatingPercent = 0;

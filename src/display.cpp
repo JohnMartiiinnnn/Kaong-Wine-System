@@ -1067,7 +1067,12 @@ void drawPidTestMenu() {
     tft.fillRect(20, 310, 280, 70, statusBg);
     tft.drawRect(20, 310, 280, 70, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(pidTestSuccess ? "SUCCESS - STABLE!" : "AUTOMATING...", CENTER_X, 335, 4);
+    tft.drawCentreString(pidTestSuccess ? "SUCCESS - STABLE!" : "AUTOMATING...", CENTER_X, 325, 4);
+
+    char timeStr[32];
+    uint32_t elapsedSecs = (millis() - pidTestStartMs) / 1000;
+    sprintf(timeStr, "TIME: %02d:%02d", elapsedSecs / 60, elapsedSecs % 60);
+    tft.drawCentreString(timeStr, CENTER_X, 355, 2);
   } else {
     tft.fillRect(20, 240, 280, 140, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
