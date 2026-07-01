@@ -1888,14 +1888,20 @@ void loop() {
 
     int activeHeaterPin = -1;
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
-      if (pidTestChoice == 0) activeHeaterPin = DIM2_SHARED;
-      else if (pidTestChoice == 1) activeHeaterPin = DIM1_CH2;
-      else activeHeaterPin = DIM1_CH1;
+      if (pidTestChoice == 0)
+        activeHeaterPin = DIM2_SHARED;
+      else if (pidTestChoice == 1)
+        activeHeaterPin = DIM1_CH2;
+      else
+        activeHeaterPin = DIM1_CH1;
     } else if (currentAppState == HEATER_TEST_MENU && heaterTestRunning) {
       currentHeatingPercent = heaterTestPercent;
-      if (heaterTestStage == 0) activeHeaterPin = DIM2_SHARED;
-      else if (heaterTestStage == 1) activeHeaterPin = DIM1_CH2;
-      else activeHeaterPin = DIM1_CH1;
+      if (heaterTestStage == 0)
+        activeHeaterPin = DIM2_SHARED;
+      else if (heaterTestStage == 1)
+        activeHeaterPin = DIM1_CH2;
+      else
+        activeHeaterPin = DIM1_CH1;
     } else if (activeBrewStage == 0) {
       activeHeaterPin = DIM2_SHARED;
     } else if (activeBrewStage == 1) {
@@ -1905,20 +1911,23 @@ void loop() {
     }
 
     if (millis() - pidWindowStart >= PID_WINDOW_MS) {
-        pidWindowStart += PID_WINDOW_MS;
+      pidWindowStart += PID_WINDOW_MS;
     }
     uint32_t onTime = (currentHeatingPercent * PID_WINDOW_MS) / 100;
-    
+
     bool pState = LOW;
     bool fState = LOW;
     bool pastState = LOW;
 
     if (activeHeaterPin != -1 && (millis() - pidWindowStart < onTime)) {
-        if (activeHeaterPin == DIM2_SHARED) pState = HIGH;
-        else if (activeHeaterPin == DIM1_CH2) fState = HIGH;
-        else if (activeHeaterPin == DIM1_CH1) pastState = HIGH;
+      if (activeHeaterPin == DIM2_SHARED)
+        pState = HIGH;
+      else if (activeHeaterPin == DIM1_CH2)
+        fState = HIGH;
+      else if (activeHeaterPin == DIM1_CH1)
+        pastState = HIGH;
     }
-    
+
     digitalWrite(DIM2_SHARED, pState);
     digitalWrite(DIM1_CH2, fState);
     digitalWrite(DIM1_CH1, pastState);
