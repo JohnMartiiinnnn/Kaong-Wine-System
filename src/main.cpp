@@ -1075,6 +1075,7 @@ void loop() {
         mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
         mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       }
+      pidTestNeedsFullRedraw = true;
       drawPidTestMenu();
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (!heaterTestRunning) {
