@@ -1048,13 +1048,13 @@ void loop() {
       pidTestNeedsFullRedraw = true;
       if (pidTestChoice == 0) {
         pidTestHeatTarget = 80.0f;
-        pidTestCoolTarget = 85.0f;
+        pidTestCoolTarget = 30.0f;
       } else if (pidTestChoice == 1) {
         pidTestHeatTarget = 27.0f;
         pidTestCoolTarget = 30.0f;
       } else {
         pidTestHeatTarget = 80.0f;
-        pidTestCoolTarget = 85.0f;
+        pidTestCoolTarget = 30.0f;
       }
       pidTestRunning = false;
       pidTestSuccess = false;
@@ -1262,7 +1262,6 @@ void loop() {
   if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
       !pidTestRunning) {
     pidTestTargetSelection = (pidTestTargetSelection + 1) % 2;
-    pidTestNeedsFullRedraw = true;
     drawPidTestMenu();
   }
 
