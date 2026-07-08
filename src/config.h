@@ -19,10 +19,10 @@
 #include <Wire.h>
 
 // ---- Pin Constants ----
-const int DIM1_CH1 = 14;
-const int DIM1_CH2 = 12;
-const int DIM2_SHARED = 13;
-const int AC_ZC_PIN = 32;
+const int SSR_PREHEAT = 13;   // Pre-heat tank heater SSR (was DIM2_SHARED)
+const int SSR_FERM    = 12;   // Fermentation tank heater SSR (was DIM1_CH2)
+const int SSR_PAST    = 14;   // Pasteurization tank heater SSR (was DIM1_CH1)
+const int FLOW_SENSOR_PIN = 32; // Flow sensor pulse input (was AC_ZC_PIN)
 const int ONE_WIRE_BUS = 26;
 
 // MCP23017 pin numbers (GPA = 0-7, GPB = 8-15)

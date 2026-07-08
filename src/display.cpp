@@ -1086,7 +1086,7 @@ void drawPidTestMenu() {
 
 void drawHeaterTestMenu() {
   const char *stageNames[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
-  const char *pinNames[]   = {"GPIO13 / DIM2_SHARED", "GPIO12 / DIM1_CH2", "GPIO14 / DIM1_CH1"};
+  const char *pinNames[]   = {"GPIO13 / SSR_PREHEAT", "GPIO12 / SSR_FERM", "GPIO14 / SSR_PAST"};
   char buf[40];
 
   if (heaterTestNeedsFullRedraw) {

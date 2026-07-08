@@ -5,9 +5,10 @@
  * RTC (DS3231): SDA->21, SCL->22
  * TFT LCD: CS->15, DC->2, RST->4, MOSI->23, SCLK->18
  * TOUCHSCREEN: CS->33, CLK->18, DIN->23, DO->19
- * AC DIMMER 1: CH1->14, CH2->12
- * AC DIMMER 2: SHARED->13
- * AC ZERO-CROSS: 32
+ * SSR PREHEAT:  GPIO13
+ * SSR FERM:     GPIO12
+ * SSR PAST:     GPIO14
+ * FLOW SENSOR:  GPIO32
  * MCP23017 GPB0-7: 8-Channel Relay Module
  * FAN RELAY: GPA7 (MCP)
  * KEYPAD: RIGHT->GPA0, LEFT->GPA1, UP->GPA2, DOWN->GPA3, SELECT->GPA4 (MCP)
@@ -284,14 +285,14 @@ void setup() {
     mcp.pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_SELECT_PIN, INPUT_PULLUP);
   }
-  pinMode(AC_ZC_PIN, INPUT_PULLUP);
+  pinMode(FLOW_SENSOR_PIN, INPUT_PULLUP);
 
-  pinMode(DIM2_SHARED, OUTPUT);
-  digitalWrite(DIM2_SHARED, LOW);
-  pinMode(DIM1_CH2, OUTPUT);
-  digitalWrite(DIM1_CH2, LOW);
-  pinMode(DIM1_CH1, OUTPUT);
-  digitalWrite(DIM1_CH1, LOW);
+  pinMode(SSR_PREHEAT, OUTPUT);
+  digitalWrite(SSR_PREHEAT, LOW);
+  pinMode(SSR_FERM, OUTPUT);
+  digitalWrite(SSR_FERM, LOW);
+  pinMode(SSR_PAST, OUTPUT);
+  digitalWrite(SSR_PAST, LOW);
 
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
@@ -391,9 +392,9 @@ void loop() {
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
-      digitalWrite(DIM2_SHARED, LOW);
-      digitalWrite(DIM1_CH2, LOW);
-      digitalWrite(DIM1_CH1, LOW);
+      digitalWrite(SSR_PREHEAT, LOW);
+      digitalWrite(SSR_FERM, LOW);
+      digitalWrite(SSR_PAST, LOW);
       estopState = 1;
       drawEstopPage();
     } else if (estopState == 1) {
@@ -414,9 +415,9 @@ void loop() {
       pidTestRunning = false;
       activeBrewStage = -1;
       currentHeatingPercent = 0;
-      digitalWrite(DIM2_SHARED, LOW);
-      digitalWrite(DIM1_CH2, LOW);
-      digitalWrite(DIM1_CH1, LOW);
+      digitalWrite(SSR_PREHEAT, LOW);
+      digitalWrite(SSR_FERM, LOW);
+      digitalWrite(SSR_PAST, LOW);
       tft.fillScreen(TFT_RED);
       tft.setTextColor(TFT_WHITE);
       tft.drawCentreString("SYSTEM HALTED", 160, 80, 4);
@@ -1983,25 +1984,25 @@ void loop() {
     int activeHeaterPin = -1;
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
       if (pidTestChoice == 0)
-        activeHeaterPin = DIM2_SHARED;
+        activeHeaterPin = SSR_PREHEAT;
       else if (pidTestChoice == 1)
-        activeHeaterPin = DIM1_CH2;
+        activeHeaterPin = SSR_FERM;
       else
-        activeHeaterPin = DIM1_CH1;
+        activeHeaterPin = SSR_PAST;
     } else if (currentAppState == HEATER_TEST_MENU && heaterTestRunning) {
       currentHeatingPercent = heaterTestPercent;
       if (heaterTestStage == 0)
-        activeHeaterPin = DIM2_SHARED;
+        activeHeaterPin = SSR_PREHEAT;
       else if (heaterTestStage == 1)
-        activeHeaterPin = DIM1_CH2;
+        activeHeaterPin = SSR_FERM;
       else
-        activeHeaterPin = DIM1_CH1;
+        activeHeaterPin = SSR_PAST;
     } else if (activeBrewStage == 0) {
-      activeHeaterPin = DIM2_SHARED;
+      activeHeaterPin = SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
-      activeHeaterPin = DIM1_CH2;
+      activeHeaterPin = SSR_FERM;
     } else if (activeBrewStage == 2) {
-      activeHeaterPin = DIM1_CH1;
+      activeHeaterPin = SSR_PAST;
     }
 
     if (millis() - pidWindowStart >= PID_WINDOW_MS) {
@@ -2014,17 +2015,17 @@ void loop() {
     bool pastState = LOW;
 
     if (activeHeaterPin != -1 && (millis() - pidWindowStart < onTime)) {
-      if (activeHeaterPin == DIM2_SHARED)
+      if (activeHeaterPin == SSR_PREHEAT)
         pState = HIGH;
-      else if (activeHeaterPin == DIM1_CH2)
+      else if (activeHeaterPin == SSR_FERM)
         fState = HIGH;
-      else if (activeHeaterPin == DIM1_CH1)
+      else if (activeHeaterPin == SSR_PAST)
         pastState = HIGH;
     }
 
-    digitalWrite(DIM2_SHARED, pState);
-    digitalWrite(DIM1_CH2, fState);
-    digitalWrite(DIM1_CH1, pastState);
+    digitalWrite(SSR_PREHEAT, pState);
+    digitalWrite(SSR_FERM, fState);
+    digitalWrite(SSR_PAST, pastState);
 
     tft.setTextPadding(0);
 
