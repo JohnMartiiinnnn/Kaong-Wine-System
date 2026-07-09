@@ -93,11 +93,11 @@ All three are driven with slow PWM (time-proportional, 2 s window) via `digitalW
 
 | MCP Pin | config.h name | Function |
 |---------|---------------|----------|
-| GPB0 (8) | `FERM_FAN_RELAY_PIN`  | Fermentation fan relay 1 |
-| GPB1 (9) | `FERM_FAN2_RELAY_PIN` | Fermentation fan relay 2 |
-| GPB2 (10) | `RELAY_PINS[2]` | Relay channel 3 |
-| GPB3 (11) | `RELAY_PINS[3]` | Relay channel 4 |
-| GPB4 (12) | `RELAY_PINS[4]` | Relay channel 5 |
+| GPB0 (8) | `FERM_FAN_RELAY_PIN` / `FERM_FAN2_RELAY_PIN` | Fermentation fans (same relay) |
+| GPB1 (9) | `PUMP_PREHEAT_FERM` | Transfer pump: pre-heat → fermentation |
+| GPB2 (10) | `PUMP_FERM_PAST` | Transfer pump: fermentation → pasteurization |
+| GPB3 (11) | `RELAY_PINS[3]` | Unassigned |
+| GPB4 (12) | `RELAY_PINS[4]` | Unassigned |
 | GPB5 (13) | `LIGHT_G` | Status light — Green |
 | GPB6 (14) | `LIGHT_Y` | Status light — Yellow |
 | GPB7 (15) | `LIGHT_R` | Status light — Red |

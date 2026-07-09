@@ -410,9 +410,10 @@ void drawSystemCheckMenu() {
   const char *options[] = {
     "FAN TEST", "LIGHT INDICATORS", "RELAY TEST",
     "MOTOR TEST", "PID CONTROL",
-    "HEATER OUTPUT", "SD CARD VERIFY", "UART MONITOR", "SET RTC TIME"
+    "HEATER OUTPUT", "SD CARD VERIFY", "UART MONITOR", "SET RTC TIME",
+    "TRANSFER TEST"
   };
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < 10; i++) {
     uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 52 + (i * 43), 300, 38, color);
@@ -1519,4 +1520,81 @@ void drawBrewSummaryMenu() {
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("LEFT / SELECT: BACK", CENTER_X, 455, 2);
   brewSummaryNeedsFullRedraw = false;
+}
+
+void drawTransferTestMenu() {
+  char buf[48];
+
+  if (transferTestNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, TFT_NAVY);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("TRANSFER TEST", CENTER_X, 15, 4);
+    transferTestNeedsFullRedraw = false;
+  }
+
+  uint32_t p1 = flowPulse1;
+  uint32_t p2 = flowPulse2;
+
+  // Path 1: Pre-heat → Ferm
+  uint16_t sel1Bg = (transferTestSelection == 0) ? 0x051D : 0x2124;
+  tft.fillRect(10, 58, 300, 185, sel1Bg);
+  tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, sel1Bg);
+  tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 68, 2);
+  tft.drawFastHLine(10, 86, 300, TFT_DARKGREY);
+
+  uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0x6B4D;
+  tft.fillRect(20, 92, 130, 60, pump1Bg);
+  tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, pump1Bg);
+  tft.drawCentreString("PUMP", 85, 102, 2);
+  tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 122, 4);
+
+  tft.fillRect(160, 92, 140, 60, 0x1082);
+  tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.drawCentreString("FLOW", 230, 102, 2);
+  tft.setTextPadding(130);
+  sprintf(buf, "%lu", (unsigned long)p1);
+  tft.drawCentreString(buf, 230, 120, 4);
+  tft.setTextPadding(0);
+
+  tft.setTextColor(TFT_DARKGREY, sel1Bg);
+  tft.drawCentreString("pulses", CENTER_X, 165, 1);
+  tft.drawCentreString("GPIO32", 230, 178, 1);
+  tft.drawCentreString("GPB1", 85, 178, 1);
+
+  // Path 2: Ferm → Past
+  uint16_t sel2Bg = (transferTestSelection == 1) ? 0x2904 : 0x2124;
+  tft.fillRect(10, 253, 300, 185, sel2Bg);
+  tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, sel2Bg);
+  tft.drawCentreString("FERM  ->  PAST", CENTER_X, 263, 2);
+  tft.drawFastHLine(10, 281, 300, TFT_DARKGREY);
+
+  uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0x6B4D;
+  tft.fillRect(20, 287, 130, 60, pump2Bg);
+  tft.drawRect(20, 287, 130, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, pump2Bg);
+  tft.drawCentreString("PUMP", 85, 297, 2);
+  tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 317, 4);
+
+  tft.fillRect(160, 287, 140, 60, 0x1082);
+  tft.drawRect(160, 287, 140, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.drawCentreString("FLOW", 230, 297, 2);
+  tft.setTextPadding(130);
+  sprintf(buf, "%lu", (unsigned long)p2);
+  tft.drawCentreString(buf, 230, 315, 4);
+  tft.setTextPadding(0);
+
+  tft.setTextColor(TFT_DARKGREY, sel2Bg);
+  tft.drawCentreString("pulses", CENTER_X, 360, 1);
+  tft.drawCentreString("GPIO34", 230, 373, 1);
+  tft.drawCentreString("GPB2", 85, 373, 1);
+
+  tft.fillRect(0, 445, 320, 35, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("UP/DOWN: PATH   SELECT: PUMP   RETURN: BACK", CENTER_X, 458, 1);
 }

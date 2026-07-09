@@ -30,7 +30,9 @@ const int ONE_WIRE_BUS = 26;
 static const int RELAY_PINS[8] = {8, 9, 10, 11, 12, 13, 14, 15};
 const int FAN_RELAY_PIN = 7;     // GPA7 (Pre-Heating)
 const int FERM_FAN_RELAY_PIN  = 8; // GPB0
-const int FERM_FAN2_RELAY_PIN = 8; // GPB0
+const int FERM_FAN2_RELAY_PIN = 8; // GPB0 (same relay as FERM_FAN_RELAY_PIN)
+const int PUMP_PREHEAT_FERM   = 9; // GPB1 — transfer pump: pre-heat → ferm
+const int PUMP_FERM_PAST      = 10; // GPB2 — transfer pump: ferm → past
 const int LIGHT_R = 15;          // GPB7
 const int LIGHT_Y = 14;          // GPB6
 const int LIGHT_G = 13;          // GPB5
@@ -90,7 +92,8 @@ enum AppState {
   SD_VERIFY_MENU,
   UART_MONITOR_MENU,
   RTC_SET_MENU,
-  BREW_SUMMARY_MENU
+  BREW_SUMMARY_MENU,
+  TRANSFER_TEST_MENU
 };
 
 extern long rawHX711;
@@ -248,6 +251,12 @@ extern bool     heaterTestRunning;
 extern uint32_t heaterTestStart;
 extern bool     sdVerifyNeedsFullRedraw;
 extern int      sdVerifyResult;
+extern bool     transferTestNeedsFullRedraw;
+extern int      transferTestSelection;
+extern bool     pumpPreHeatFermOn;
+extern bool     pumpFermPastOn;
+extern volatile uint32_t flowPulse1;
+extern volatile uint32_t flowPulse2;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

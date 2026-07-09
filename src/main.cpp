@@ -148,6 +148,12 @@ bool heaterTestRunning = false;
 uint32_t heaterTestStart = 0;
 bool sdVerifyNeedsFullRedraw = true;
 int sdVerifyResult = -1;
+bool transferTestNeedsFullRedraw = true;
+int  transferTestSelection = 0;
+bool pumpPreHeatFermOn = false;
+bool pumpFermPastOn    = false;
+volatile uint32_t flowPulse1 = 0;
+volatile uint32_t flowPulse2 = 0;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -204,6 +210,10 @@ void sendMotorCommand(int speed, bool cw) {
     cmd.checksum ^= p[i];
   Serial2.write((uint8_t *)&cmd, sizeof(cmd));
 }
+
+// ---- Flow Sensor ISRs ----
+void IRAM_ATTR flowISR1() { flowPulse1++; }
+void IRAM_ATTR flowISR2() { flowPulse2++; }
 
 // ---- Setup ----
 void setup() {
@@ -273,6 +283,10 @@ void setup() {
     mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
     mcp.pinMode(FERM_FAN2_RELAY_PIN, OUTPUT);
     mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+    mcp.pinMode(PUMP_PREHEAT_FERM, OUTPUT);
+    mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+    mcp.pinMode(PUMP_FERM_PAST, OUTPUT);
+    mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
     mcp.pinMode(LIGHT_R, OUTPUT);
     mcp.digitalWrite(LIGHT_R, RELAY_OFF);
     mcp.pinMode(LIGHT_Y, OUTPUT);
@@ -288,6 +302,8 @@ void setup() {
   }
   pinMode(FLOW_PREHEAT_FERM, INPUT_PULLUP);
   pinMode(FLOW_FERM_PAST, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(FLOW_PREHEAT_FERM), flowISR1, RISING);
+  attachInterrupt(digitalPinToInterrupt(FLOW_FERM_PAST), flowISR2, RISING);
 
   pinMode(SSR_PREHEAT, OUTPUT);
   digitalWrite(SSR_PREHEAT, LOW);
@@ -569,6 +585,10 @@ void loop() {
         pidTestNeedsFullRedraw = true;
         drawPidTestMenu();
         break;
+      case TRANSFER_TEST_MENU:
+        transferTestNeedsFullRedraw = true;
+        drawTransferTestMenu();
+        break;
       case FAN_TEST_PICK:
         fanTestNeedsFullRedraw = true;
         drawFanTestPick();
@@ -686,7 +706,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 9;
+      systemCheckSelection = (systemCheckSelection + 1) % 10;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -744,6 +764,11 @@ void loop() {
         rtcSetField = (rtcSetField + 1) % 2;
         drawRtcSetMenu();
       }
+    } else if (currentAppState == TRANSFER_TEST_MENU) {
+      if (cDown && !ljDown) {
+        transferTestSelection = (transferTestSelection + 1) % 2;
+        drawTransferTestMenu();
+      }
     }
   }
 
@@ -784,7 +809,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 8) % 9;
+      systemCheckSelection = (systemCheckSelection + 9) % 10;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -832,6 +857,9 @@ void loop() {
     } else if (currentAppState == RTC_SET_MENU) {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
+    } else if (currentAppState == TRANSFER_TEST_MENU) {
+      transferTestSelection = (transferTestSelection + 1) % 2;
+      drawTransferTestMenu();
     }
   }
 
@@ -1048,6 +1076,10 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         currentAppState = RTC_SET_MENU;
         drawRtcSetMenu();
+      } else if (systemCheckSelection == 9) {
+        transferTestNeedsFullRedraw = true;
+        currentAppState = TRANSFER_TEST_MENU;
+        drawTransferTestMenu();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -1091,6 +1123,15 @@ void loop() {
         currentHeatingPercent = 0;
       }
       drawHeaterTestMenu();
+    } else if (currentAppState == TRANSFER_TEST_MENU) {
+      if (transferTestSelection == 0) {
+        pumpPreHeatFermOn = !pumpPreHeatFermOn;
+        mcp.digitalWrite(PUMP_PREHEAT_FERM, pumpPreHeatFermOn ? RELAY_ON : RELAY_OFF);
+      } else {
+        pumpFermPastOn = !pumpFermPastOn;
+        mcp.digitalWrite(PUMP_FERM_PAST, pumpFermPastOn ? RELAY_ON : RELAY_OFF);
+      }
+      drawTransferTestMenu();
     } else if (currentAppState == SD_VERIFY_MENU) {
       if (sdStatus) {
         const char *testStr = "SDVERIFY_OK";
@@ -1454,6 +1495,14 @@ void loop() {
     } else if (currentAppState == SD_VERIFY_MENU ||
                currentAppState == UART_MONITOR_MENU ||
                currentAppState == RTC_SET_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == TRANSFER_TEST_MENU) {
+      pumpPreHeatFermOn = false;
+      pumpFermPastOn = false;
+      mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+      mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -2057,6 +2106,9 @@ void loop() {
       drawHeaterTestMenu();
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
+
+    if (currentAppState == TRANSFER_TEST_MENU)
+      drawTransferTestMenu();
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
         activeBrewStage >= 0) {
