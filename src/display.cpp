@@ -1526,20 +1526,22 @@ void drawTransferTestMenu(bool valuesOnly) {
   char buf[48];
   uint32_t p1 = flowPulse1;
   uint32_t p2 = flowPulse2;
+  float liters1 = (flowKFactor[0] > 0.0f) ? (float)p1 / flowKFactor[0] : 0.0f;
+  float liters2 = (flowKFactor[1] > 0.0f) ? (float)p2 / flowKFactor[1] : 0.0f;
 
   if (valuesOnly) {
     tft.fillRect(161, 93, 138, 58, 0x1082);
     tft.setTextColor(TFT_WHITE, 0x1082);
     tft.drawCentreString("FLOW", 230, 102, 2);
     tft.setTextPadding(130);
-    sprintf(buf, "%lu", (unsigned long)p1);
-    tft.drawCentreString(buf, 230, 120, 4);
+    sprintf(buf, "%.2f L", liters1);
+    tft.drawCentreString(buf, 230, 118, 4);
 
     tft.fillRect(161, 288, 138, 58, 0x1082);
     tft.setTextColor(TFT_WHITE, 0x1082);
     tft.drawCentreString("FLOW", 230, 297, 2);
-    sprintf(buf, "%lu", (unsigned long)p2);
-    tft.drawCentreString(buf, 230, 315, 4);
+    sprintf(buf, "%.2f L", liters2);
+    tft.drawCentreString(buf, 230, 313, 4);
     tft.setTextPadding(0);
     return;
   }
@@ -1567,16 +1569,16 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 122, 4);
 
   tft.fillRect(160, 92, 140, 60, 0x1082);
-  tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, 0x1082);
   tft.drawCentreString("FLOW", 230, 102, 2);
   tft.setTextPadding(130);
-  sprintf(buf, "%lu", (unsigned long)p1);
-  tft.drawCentreString(buf, 230, 120, 4);
+  sprintf(buf, "%.2f L", liters1);
+  tft.drawCentreString(buf, 230, 118, 4);
   tft.setTextPadding(0);
+  tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
 
   tft.setTextColor(TFT_DARKGREY, sel1Bg);
-  tft.drawCentreString("pulses", CENTER_X, 165, 1);
+  tft.drawCentreString("RIGHT: CALIBRATE", CENTER_X, 165, 1);
   tft.drawCentreString("GPIO32", 230, 178, 1);
   tft.drawCentreString("GPB1", 85, 178, 1);
   tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
@@ -1596,21 +1598,105 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 317, 4);
 
   tft.fillRect(160, 287, 140, 60, 0x1082);
-  tft.drawRect(160, 287, 140, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, 0x1082);
   tft.drawCentreString("FLOW", 230, 297, 2);
   tft.setTextPadding(130);
-  sprintf(buf, "%lu", (unsigned long)p2);
-  tft.drawCentreString(buf, 230, 315, 4);
+  sprintf(buf, "%.2f L", liters2);
+  tft.drawCentreString(buf, 230, 313, 4);
   tft.setTextPadding(0);
+  tft.drawRect(160, 287, 140, 60, TFT_DARKGREY);
 
   tft.setTextColor(TFT_DARKGREY, sel2Bg);
-  tft.drawCentreString("pulses", CENTER_X, 360, 1);
+  tft.drawCentreString("RIGHT: CALIBRATE", CENTER_X, 360, 1);
   tft.drawCentreString("GPIO34", 230, 373, 1);
   tft.drawCentreString("GPB2", 85, 373, 1);
   tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
 
   tft.fillRect(0, 445, 320, 35, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: PATH   SELECT: PUMP   RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("SEL: PUMP   RIGHT: CALIBRATE   RETURN: BACK", CENTER_X, 458, 1);
+}
+
+void drawFlowCalMenu(bool valuesOnly) {
+  char buf[48];
+  uint32_t pulses = (flowCalSensor == 0) ? flowPulse1 : flowPulse2;
+  float liters = (flowKFactor[flowCalSensor] > 0.0f)
+                   ? (float)pulses / flowKFactor[flowCalSensor]
+                   : 0.0f;
+
+  if (valuesOnly) {
+    tft.fillRect(10, 154, 300, 80, 0x1082);
+    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.setTextPadding(290);
+    sprintf(buf, "%lu pulses", (unsigned long)pulses);
+    tft.drawCentreString(buf, CENTER_X, 162, 2);
+    sprintf(buf, "%.3f L", liters);
+    tft.drawCentreString(buf, CENTER_X, 182, 4);
+    tft.setTextPadding(0);
+    tft.drawRect(10, 154, 300, 80, TFT_DARKGREY);
+    return;
+  }
+
+  if (flowCalNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, TFT_NAVY);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("FLOW CALIBRATION", CENTER_X, 15, 4);
+    flowCalNeedsFullRedraw = false;
+  }
+
+  // Sensor name bar
+  tft.fillRect(0, 52, 320, 28, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
+  const char *sName = (flowCalSensor == 0) ? "SENSOR 1: PRE-HEAT -> FERM"
+                                           : "SENSOR 2: FERM -> PAST";
+  tft.drawCentreString(sName, CENTER_X, 60, 2);
+
+  // Row 0: Known Volume (selectable, L/R to adjust)
+  uint16_t knownBg = (flowCalSelection == 0) ? 0x051D : 0x2124;
+  tft.fillRect(10, 84, 300, 60, knownBg);
+  tft.setTextColor(TFT_DARKGREY, knownBg);
+  tft.drawCentreString("KNOWN VOLUME  (L/R TO ADJUST)", CENTER_X, 93, 1);
+  tft.setTextColor(TFT_WHITE, knownBg);
+  sprintf(buf, "%.1f L", flowCalKnownVolume);
+  tft.drawCentreString(buf, CENTER_X, 108, 4);
+  tft.drawRect(10, 84, 300, 60, (flowCalSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
+
+  // Live data box (pulse count + calculated liters)
+  tft.fillRect(10, 154, 300, 80, 0x1082);
+  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.setTextPadding(290);
+  sprintf(buf, "%lu pulses", (unsigned long)pulses);
+  tft.drawCentreString(buf, CENTER_X, 162, 2);
+  sprintf(buf, "%.3f L", liters);
+  tft.drawCentreString(buf, CENTER_X, 182, 4);
+  tft.setTextPadding(0);
+  tft.drawRect(10, 154, 300, 80, TFT_DARKGREY);
+
+  // K-factor readout
+  tft.fillRect(10, 238, 300, 32, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  sprintf(buf, "K-FACTOR: %.1f pulses/L", flowKFactor[flowCalSensor]);
+  tft.drawCentreString(buf, CENTER_X, 248, 2);
+
+  // Row 1: RESET
+  uint16_t resetBg = (flowCalSelection == 1) ? 0x8000 : 0x4208;
+  tft.fillRect(10, 276, 300, 50, resetBg);
+  tft.setTextColor(TFT_WHITE, resetBg);
+  tft.drawCentreString("RESET PULSE COUNT", CENTER_X, 295, 2);
+  tft.drawRect(10, 276, 300, 50, (flowCalSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
+
+  // Row 2: CAPTURE
+  uint16_t capBg = (flowCalSelection == 2) ? 0x0400 : 0x2104;
+  tft.fillRect(10, 334, 300, 84, capBg);
+  tft.setTextColor(TFT_WHITE, capBg);
+  tft.drawCentreString("CAPTURE K-FACTOR", CENTER_X, 354, 2);
+  tft.setTextColor(TFT_DARKGREY, capBg);
+  tft.drawCentreString("flow known vol, then SELECT", CENTER_X, 374, 1);
+  tft.drawRect(10, 334, 300, 84, (flowCalSelection == 2) ? TFT_WHITE : TFT_DARKGREY);
+
+  // Footer
+  tft.fillRect(0, 432, 320, 48, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("UP/DN: ROW   L/R: ADJUST   RETURN: BACK", CENTER_X, 458, 1);
 }

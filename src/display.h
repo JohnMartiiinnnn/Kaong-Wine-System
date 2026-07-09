@@ -32,3 +32,4 @@ void drawInitTile(int x, int y, const char *label, int status);
 void drawStageParamMenu();
 void drawBrewSummaryMenu();
 void drawTransferTestMenu(bool valuesOnly = false);
+void drawFlowCalMenu(bool valuesOnly = false);

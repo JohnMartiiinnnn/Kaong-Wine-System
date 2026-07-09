@@ -93,7 +93,8 @@ enum AppState {
   UART_MONITOR_MENU,
   RTC_SET_MENU,
   BREW_SUMMARY_MENU,
-  TRANSFER_TEST_MENU
+  TRANSFER_TEST_MENU,
+  FLOW_CAL_MENU
 };
 
 extern long rawHX711;
@@ -257,6 +258,11 @@ extern bool     pumpPreHeatFermOn;
 extern bool     pumpFermPastOn;
 extern volatile uint32_t flowPulse1;
 extern volatile uint32_t flowPulse2;
+extern float     flowKFactor[2];
+extern int       flowCalSensor;
+extern float     flowCalKnownVolume;
+extern int       flowCalSelection;
+extern bool      flowCalNeedsFullRedraw;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;
