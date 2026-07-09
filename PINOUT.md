@@ -6,7 +6,7 @@
 |------|--------|-------|
 | 2 | TFT LCD DC | SPI |
 | 4 | TFT LCD RST | SPI |
-| 5 | SD Card CS | SPI |
+| 5 | SD  Card CS | SPI |
 | 12 | Fermentation heater SSR (`SSR_FERM`) | SSR control signal |
 | 13 | Pre-heat heater SSR (`SSR_PREHEAT`) | SSR control signal |
 | 14 | Pasteurization heater SSR (`SSR_PAST`) | SSR control signal |
