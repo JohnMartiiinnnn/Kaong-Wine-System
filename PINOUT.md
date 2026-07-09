@@ -7,9 +7,9 @@
 | 2 | TFT LCD DC | SPI |
 | 4 | TFT LCD RST | SPI |
 | 5 | SD Card CS | SPI |
-| 12 | AC Dimmer 1 CH2 (`DIM1_CH2`) | TRIAC fire pulse |
-| 13 | AC Dimmer 2 Shared (`DIM2_SHARED`) | TRIAC fire pulse |
-| 14 | AC Dimmer 1 CH1 (`DIM1_CH1`) | TRIAC fire pulse |
+| 12 | Fermentation heater SSR (`SSR_FERM`) | SSR control signal |
+| 13 | Pre-heat heater SSR (`SSR_PREHEAT`) | SSR control signal |
+| 14 | Pasteurization heater SSR (`SSR_PAST`) | SSR control signal |
 | 15 | TFT LCD CS | SPI |
 | 16 | UART2 RX | Serial2 — from Secondary ESP32 |
 | 17 | UART2 TX | Serial2 — to Secondary ESP32 |
@@ -21,12 +21,11 @@
 | 25 | Heater/Fan PWM (`PWM_PIN`) | LEDC ch0, 25 kHz, 8-bit |
 | 26 | OneWire Bus (`ONE_WIRE_BUS`) | DS18B20 (shared bus, both liquid temp sensors) |
 | 27 | HX711 SCK (`HX711_SCK_PIN`) | Load cell clock |
-| 32 | AC Zero-Cross (`AC_ZC_PIN`) | INPUT_PULLUP, shared by all dimmer channels |
+| 32 | Flow sensor 1 (`FLOW_PREHEAT_FERM`) | INPUT_PULLUP, pulse input — pre-heat → ferm |
+| 34 | Flow sensor 2 (`FLOW_FERM_PAST`) | INPUT_PULLUP, pulse input — ferm → past (input-only pin) |
 | 33 | Touchscreen CS | SPI |
 | 36 | HX711 DT (`HX711_DT_PIN`) | Load cell data (input-only pin) |
-| 0 | Motor PWM (`MOTOR_PWM_PIN`) | TB6612FN PWMA — LEDC ch1, 1 kHz; boot-strap pin, disconnect driver during flashing |
-
-> **Note:** `MOTOR_PWM_PIN` is currently set to `-1` in config.h (unassigned). GPIO0 is documented in PROJECT_OVERVIEW.md as the intended pin once confirmed safe.
+| — | Motor PWM (`MOTOR_PWM_PIN`) | Unassigned (`-1`); no free output GPIO available on Primary ESP32 |
 
 ---
 
@@ -56,16 +55,22 @@
 
 ---
 
-## AC Dimmer Detail
+## SSR Heater Control
 
-| Signal | ESP32 Pin | Role |
-|--------|-----------|------|
-| Zero-Cross | GPIO 32 | Shared input for all dimmer boards |
-| Dimmer 1 CH1 | GPIO 14 | TRIAC trigger — channel 1 |
-| Dimmer 1 CH2 | GPIO 12 | TRIAC trigger — channel 2 |
-| Dimmer 2 Shared | GPIO 13 | TRIAC trigger — single-channel board |
+| config.h name | ESP32 Pin | Tank |
+|---------------|-----------|------|
+| `SSR_PREHEAT` | GPIO 13 | Pre-heating tank |
+| `SSR_FERM` | GPIO 12 | Fermentation tank |
+| `SSR_PAST` | GPIO 14 | Pasteurization tank |
 
-Zero-cross fires an interrupt on GPIO 32; after a delay proportional to the desired power level, the firmware pulses the corresponding trigger pin to fire the TRIAC.
+All three are driven with slow PWM (time-proportional, 2 s window) via `digitalWrite()`. SSRs switch on the HIGH pulse within each window; no zero-cross input required.
+
+## Flow Sensors
+
+| config.h name | ESP32 Pin | Transfer | Notes |
+|---------------|-----------|----------|-------|
+| `FLOW_PREHEAT_FERM` | GPIO 32 | Pre-heat → Fermentation | INPUT_PULLUP, pulse counting |
+| `FLOW_FERM_PAST` | GPIO 34 | Fermentation → Pasteurization | INPUT_PULLUP, pulse counting (input-only pin) |
 
 ---
 
