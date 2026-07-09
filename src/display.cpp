@@ -1522,8 +1522,27 @@ void drawBrewSummaryMenu() {
   brewSummaryNeedsFullRedraw = false;
 }
 
-void drawTransferTestMenu() {
+void drawTransferTestMenu(bool valuesOnly) {
   char buf[48];
+  uint32_t p1 = flowPulse1;
+  uint32_t p2 = flowPulse2;
+
+  if (valuesOnly) {
+    tft.fillRect(161, 93, 138, 58, 0x1082);
+    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.drawCentreString("FLOW", 230, 102, 2);
+    tft.setTextPadding(130);
+    sprintf(buf, "%lu", (unsigned long)p1);
+    tft.drawCentreString(buf, 230, 120, 4);
+
+    tft.fillRect(161, 288, 138, 58, 0x1082);
+    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.drawCentreString("FLOW", 230, 297, 2);
+    sprintf(buf, "%lu", (unsigned long)p2);
+    tft.drawCentreString(buf, 230, 315, 4);
+    tft.setTextPadding(0);
+    return;
+  }
 
   if (transferTestNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
@@ -1533,16 +1552,12 @@ void drawTransferTestMenu() {
     transferTestNeedsFullRedraw = false;
   }
 
-  uint32_t p1 = flowPulse1;
-  uint32_t p2 = flowPulse2;
-
-  // Path 1: Pre-heat → Ferm
+  // Path 1: Pre-heat → Ferm — border drawn last so inner fills can't overwrite it
   uint16_t sel1Bg = (transferTestSelection == 0) ? 0x051D : 0x2124;
   tft.fillRect(10, 58, 300, 185, sel1Bg);
-  tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, sel1Bg);
   tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 68, 2);
-  tft.drawFastHLine(10, 86, 300, TFT_DARKGREY);
+  tft.drawFastHLine(11, 86, 298, TFT_DARKGREY);
 
   uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0x6B4D;
   tft.fillRect(20, 92, 130, 60, pump1Bg);
@@ -1564,14 +1579,14 @@ void drawTransferTestMenu() {
   tft.drawCentreString("pulses", CENTER_X, 165, 1);
   tft.drawCentreString("GPIO32", 230, 178, 1);
   tft.drawCentreString("GPB1", 85, 178, 1);
+  tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
 
-  // Path 2: Ferm → Past
+  // Path 2: Ferm → Past — same pattern
   uint16_t sel2Bg = (transferTestSelection == 1) ? 0x2904 : 0x2124;
   tft.fillRect(10, 253, 300, 185, sel2Bg);
-  tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, sel2Bg);
   tft.drawCentreString("FERM  ->  PAST", CENTER_X, 263, 2);
-  tft.drawFastHLine(10, 281, 300, TFT_DARKGREY);
+  tft.drawFastHLine(11, 281, 298, TFT_DARKGREY);
 
   uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0x6B4D;
   tft.fillRect(20, 287, 130, 60, pump2Bg);
@@ -1593,6 +1608,7 @@ void drawTransferTestMenu() {
   tft.drawCentreString("pulses", CENTER_X, 360, 1);
   tft.drawCentreString("GPIO34", 230, 373, 1);
   tft.drawCentreString("GPB2", 85, 373, 1);
+  tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
 
   tft.fillRect(0, 445, 320, 35, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);

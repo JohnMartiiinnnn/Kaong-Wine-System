@@ -2108,7 +2108,7 @@ void loop() {
       drawUartMonitorMenu();
 
     if (currentAppState == TRANSFER_TEST_MENU)
-      drawTransferTestMenu();
+      drawTransferTestMenu(true);
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
         activeBrewStage >= 0) {
