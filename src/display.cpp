@@ -416,14 +416,14 @@ void drawSystemCheckMenu() {
   for (int i = 0; i < 10; i++) {
     uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 52 + (i * 43), 300, 38, color);
-    tft.drawRect(10, 52 + (i * 43), 300, 38, TFT_DARKGREY);
+    tft.fillRect(10, 52 + (i * 38), 300, 34, color);
+    tft.drawRect(10, 52 + (i * 38), 300, 34, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 62 + (i * 43), 2);
+    tft.drawCentreString(options[i], CENTER_X, 60 + (i * 38), 2);
   }
-  tft.fillRect(0, 440, 320, 40, TFT_WHITE);
+  tft.fillRect(0, 432, 320, 48, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 455, 2);
+  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 458, 2);
 }
 
 void drawFanTestPick() {
