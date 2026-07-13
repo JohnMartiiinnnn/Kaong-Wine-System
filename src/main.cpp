@@ -159,6 +159,7 @@ int       flowCalSensor      = 0;
 float     flowCalKnownVolume = 1.0f;
 int       flowCalSelection   = 0;
 bool      flowCalNeedsFullRedraw = true;
+bool      flowCalEditing         = false;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -775,12 +776,17 @@ void loop() {
       }
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       if (cDown && !ljDown) {
-        transferTestSelection = (transferTestSelection + 1) % 2;
+        transferTestSelection = (transferTestSelection + 1) % 4;
         drawTransferTestMenu();
       }
     } else if (currentAppState == FLOW_CAL_MENU) {
       if (cDown && !ljDown) {
-        flowCalSelection = (flowCalSelection + 1) % 3;
+        if (flowCalEditing) {
+          flowCalKnownVolume -= 0.5f;
+          if (flowCalKnownVolume < 0.5f) flowCalKnownVolume = 0.5f;
+        } else {
+          flowCalSelection = (flowCalSelection + 1) % 3;
+        }
         drawFlowCalMenu();
       }
     }
@@ -872,10 +878,15 @@ void loop() {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
     } else if (currentAppState == TRANSFER_TEST_MENU) {
-      transferTestSelection = (transferTestSelection + 1) % 2;
+      transferTestSelection = (transferTestSelection + 3) % 4;
       drawTransferTestMenu();
     } else if (currentAppState == FLOW_CAL_MENU) {
-      flowCalSelection = (flowCalSelection + 2) % 3;
+      if (flowCalEditing) {
+        flowCalKnownVolume += 0.5f;
+        if (flowCalKnownVolume > 20.0f) flowCalKnownVolume = 20.0f;
+      } else {
+        flowCalSelection = (flowCalSelection + 2) % 3;
+      }
       drawFlowCalMenu();
     }
   }
@@ -1143,24 +1154,39 @@ void loop() {
       if (transferTestSelection == 0) {
         pumpPreHeatFermOn = !pumpPreHeatFermOn;
         mcp.digitalWrite(PUMP_PREHEAT_FERM, pumpPreHeatFermOn ? RELAY_ON : RELAY_OFF);
-      } else {
+        drawTransferTestMenu();
+      } else if (transferTestSelection == 1) {
+        flowCalSensor = 0;
+        flowCalSelection = 0;
+        flowCalEditing = false;
+        flowCalNeedsFullRedraw = true;
+        currentAppState = FLOW_CAL_MENU;
+        drawFlowCalMenu();
+      } else if (transferTestSelection == 2) {
         pumpFermPastOn = !pumpFermPastOn;
         mcp.digitalWrite(PUMP_FERM_PAST, pumpFermPastOn ? RELAY_ON : RELAY_OFF);
+        drawTransferTestMenu();
+      } else {
+        flowCalSensor = 1;
+        flowCalSelection = 0;
+        flowCalEditing = false;
+        flowCalNeedsFullRedraw = true;
+        currentAppState = FLOW_CAL_MENU;
+        drawFlowCalMenu();
       }
-      drawTransferTestMenu();
     } else if (currentAppState == FLOW_CAL_MENU) {
-      if (flowCalSelection == 1) {
+      if (flowCalSelection == 0) {
+        flowCalEditing = !flowCalEditing;
+      } else if (flowCalSelection == 1) {
         if (flowCalSensor == 0) flowPulse1 = 0;
         else                    flowPulse2 = 0;
-        drawFlowCalMenu();
       } else if (flowCalSelection == 2) {
         uint32_t pulses = (flowCalSensor == 0) ? flowPulse1 : flowPulse2;
-        if (pulses > 0 && flowCalKnownVolume > 0.0f) {
+        if (pulses > 0 && flowCalKnownVolume > 0.0f)
           flowKFactor[flowCalSensor] = (float)pulses / flowCalKnownVolume;
-        }
         flowCalNeedsFullRedraw = true;
-        drawFlowCalMenu();
       }
+      drawFlowCalMenu();
     } else if (currentAppState == SD_VERIFY_MENU) {
       if (sdStatus) {
         const char *testStr = "SDVERIFY_OK";
@@ -1385,19 +1411,6 @@ void loop() {
     }
     drawRtcSetMenu();
   }
-  if (cRight && !ljRight && currentAppState == TRANSFER_TEST_MENU) {
-    flowCalSensor = transferTestSelection;
-    flowCalSelection = 0;
-    flowCalNeedsFullRedraw = true;
-    currentAppState = FLOW_CAL_MENU;
-    drawFlowCalMenu();
-  }
-  if (cRight && !ljRight && currentAppState == FLOW_CAL_MENU && flowCalSelection == 0) {
-    flowCalKnownVolume += 0.5f;
-    if (flowCalKnownVolume > 20.0f) flowCalKnownVolume = 20.0f;
-    drawFlowCalMenu();
-  }
-
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
@@ -1548,12 +1561,12 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == FLOW_CAL_MENU) {
-      if (flowCalSelection == 0) {
-        flowCalKnownVolume -= 0.5f;
-        if (flowCalKnownVolume < 0.5f) flowCalKnownVolume = 0.5f;
+      if (flowCalEditing) {
+        flowCalEditing = false;
         drawFlowCalMenu();
       } else {
         transferTestNeedsFullRedraw = true;
+        transferTestSelection = (flowCalSensor == 0) ? 1 : 3;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
       }

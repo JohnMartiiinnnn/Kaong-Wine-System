@@ -1525,19 +1525,23 @@ void drawTransferTestMenu(bool valuesOnly) {
   float liters1 = (flowKFactor[0] > 0.0f) ? (float)p1 / flowKFactor[0] : 0.0f;
   float liters2 = (flowKFactor[1] > 0.0f) ? (float)p2 / flowKFactor[1] : 0.0f;
 
+  // selection 0/1 = panel 1 (pump / cal), selection 2/3 = panel 2 (pump / cal)
+  bool panel1Active = (transferTestSelection <= 1);
+  bool panel2Active = (transferTestSelection >= 2);
+
   if (valuesOnly) {
-    tft.fillRect(161, 93, 138, 58, 0x1082);
+    tft.fillRect(161, 93, 138, 56, 0x1082);
     tft.setTextColor(TFT_WHITE, 0x1082);
     tft.drawCentreString("FLOW", 230, 102, 2);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters1);
     tft.drawCentreString(buf, 230, 118, 4);
 
-    tft.fillRect(161, 288, 138, 58, 0x1082);
+    tft.fillRect(161, 290, 138, 56, 0x1082);
     tft.setTextColor(TFT_WHITE, 0x1082);
-    tft.drawCentreString("FLOW", 230, 297, 2);
+    tft.drawCentreString("FLOW", 230, 299, 2);
     sprintf(buf, "%.2f L", liters2);
-    tft.drawCentreString(buf, 230, 313, 4);
+    tft.drawCentreString(buf, 230, 315, 4);
     tft.setTextPadding(0);
     return;
   }
@@ -1550,20 +1554,30 @@ void drawTransferTestMenu(bool valuesOnly) {
     transferTestNeedsFullRedraw = false;
   }
 
-  // Path 1: Pre-heat → Ferm — border drawn last so inner fills can't overwrite it
-  uint16_t sel1Bg = (transferTestSelection == 0) ? 0x051D : 0x2124;
-  tft.fillRect(10, 58, 300, 185, sel1Bg);
-  tft.setTextColor(TFT_WHITE, sel1Bg);
-  tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 68, 2);
-  tft.drawFastHLine(11, 86, 298, TFT_DARKGREY);
+  // ---- Panel 1: Pre-Heat → Ferm ----
+  uint16_t hdr1Bg  = panel1Active ? TFT_NAVY : 0x4208;
+  uint16_t body1Bg = panel1Active ? 0x0212 : 0x2104;
+  tft.fillRect(10, 58, 300, 28, hdr1Bg);
+  tft.setTextColor(TFT_WHITE, hdr1Bg);
+  tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 67, 2);
+  tft.fillRect(10, 86, 300, 155, body1Bg);
 
+  // pump box
   uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0x6B4D;
   tft.fillRect(20, 92, 130, 60, pump1Bg);
-  tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, pump1Bg);
   tft.drawCentreString("PUMP", 85, 102, 2);
-  tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 122, 4);
+  tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 120, 4);
+  // pump border: thick if selected, thin otherwise
+  if (transferTestSelection == 0) {
+    tft.drawRect(20, 92, 130, 60, TFT_WHITE);
+    tft.drawRect(21, 93, 128, 58, TFT_WHITE);
+    tft.drawRect(22, 94, 126, 56, TFT_WHITE);
+  } else {
+    tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
+  }
 
+  // flow box (never selected, always dark border)
   tft.fillRect(160, 92, 140, 60, 0x1082);
   tft.setTextColor(TFT_WHITE, 0x1082);
   tft.drawCentreString("FLOW", 230, 102, 2);
@@ -1573,43 +1587,74 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.setTextPadding(0);
   tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
 
-  tft.setTextColor(TFT_DARKGREY, sel1Bg);
-  tft.drawCentreString("SELECT: TOGGLE PUMP ON / OFF", CENTER_X, 163, 1);
-  tft.drawCentreString("RIGHT: CALIBRATE FLOW SENSOR", CENTER_X, 178, 1);
-  tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
+  // calibrate button
+  uint16_t cal1Bg = (transferTestSelection == 1) ? 0x0410 : 0x2124;
+  tft.fillRect(20, 158, 280, 52, cal1Bg);
+  tft.setTextColor(TFT_WHITE, cal1Bg);
+  tft.drawCentreString("CALIBRATE FLOW SENSOR", CENTER_X, 178, 2);
+  if (transferTestSelection == 1) {
+    tft.drawRect(20, 158, 280, 52, TFT_WHITE);
+    tft.drawRect(21, 159, 278, 50, TFT_WHITE);
+    tft.drawRect(22, 160, 276, 48, TFT_WHITE);
+  } else {
+    tft.drawRect(20, 158, 280, 52, TFT_DARKGREY);
+  }
 
-  // Path 2: Ferm → Past — same pattern
-  uint16_t sel2Bg = (transferTestSelection == 1) ? 0x2904 : 0x2124;
-  tft.fillRect(10, 253, 300, 185, sel2Bg);
-  tft.setTextColor(TFT_WHITE, sel2Bg);
-  tft.drawCentreString("FERM  ->  PAST", CENTER_X, 263, 2);
-  tft.drawFastHLine(11, 281, 298, TFT_DARKGREY);
+  // panel 1 outer border
+  tft.drawRect(10, 58, 300, 185, panel1Active ? TFT_WHITE : TFT_DARKGREY);
 
+  // ---- Panel 2: Ferm → Past ----
+  uint16_t hdr2Bg  = panel2Active ? 0x0320 : 0x4208;
+  uint16_t body2Bg = panel2Active ? 0x0110 : 0x2104;
+  tft.fillRect(10, 251, 300, 28, hdr2Bg);
+  tft.setTextColor(TFT_WHITE, hdr2Bg);
+  tft.drawCentreString("FERM  ->  PAST", CENTER_X, 260, 2);
+  tft.fillRect(10, 279, 300, 155, body2Bg);
+
+  // pump box
   uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0x6B4D;
-  tft.fillRect(20, 287, 130, 60, pump2Bg);
-  tft.drawRect(20, 287, 130, 60, TFT_DARKGREY);
+  tft.fillRect(20, 285, 130, 60, pump2Bg);
   tft.setTextColor(TFT_WHITE, pump2Bg);
-  tft.drawCentreString("PUMP", 85, 297, 2);
-  tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 317, 4);
+  tft.drawCentreString("PUMP", 85, 295, 2);
+  tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 313, 4);
+  if (transferTestSelection == 2) {
+    tft.drawRect(20, 285, 130, 60, TFT_WHITE);
+    tft.drawRect(21, 286, 128, 58, TFT_WHITE);
+    tft.drawRect(22, 287, 126, 56, TFT_WHITE);
+  } else {
+    tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
+  }
 
-  tft.fillRect(160, 287, 140, 60, 0x1082);
+  // flow box
+  tft.fillRect(160, 285, 140, 60, 0x1082);
   tft.setTextColor(TFT_WHITE, 0x1082);
-  tft.drawCentreString("FLOW", 230, 297, 2);
+  tft.drawCentreString("FLOW", 230, 295, 2);
   tft.setTextPadding(130);
   sprintf(buf, "%.2f L", liters2);
-  tft.drawCentreString(buf, 230, 313, 4);
+  tft.drawCentreString(buf, 230, 311, 4);
   tft.setTextPadding(0);
-  tft.drawRect(160, 287, 140, 60, TFT_DARKGREY);
+  tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
 
-  tft.setTextColor(TFT_DARKGREY, sel2Bg);
-  tft.drawCentreString("SELECT: TOGGLE PUMP ON / OFF", CENTER_X, 358, 1);
-  tft.drawCentreString("RIGHT: CALIBRATE FLOW SENSOR", CENTER_X, 373, 1);
-  tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
+  // calibrate button
+  uint16_t cal2Bg = (transferTestSelection == 3) ? 0x0410 : 0x2124;
+  tft.fillRect(20, 351, 280, 52, cal2Bg);
+  tft.setTextColor(TFT_WHITE, cal2Bg);
+  tft.drawCentreString("CALIBRATE FLOW SENSOR", CENTER_X, 371, 2);
+  if (transferTestSelection == 3) {
+    tft.drawRect(20, 351, 280, 52, TFT_WHITE);
+    tft.drawRect(21, 352, 278, 50, TFT_WHITE);
+    tft.drawRect(22, 353, 276, 48, TFT_WHITE);
+  } else {
+    tft.drawRect(20, 351, 280, 52, TFT_DARKGREY);
+  }
 
-  tft.fillRect(0, 445, 320, 35, TFT_WHITE);
+  // panel 2 outer border
+  tft.drawRect(10, 251, 300, 185, panel2Active ? TFT_WHITE : TFT_DARKGREY);
+
+  // footer
+  tft.fillRect(0, 443, 320, 37, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP / DOWN: CHANGE PATH", CENTER_X, 451, 1);
-  tft.drawCentreString("SELECT: PUMP   RIGHT: CALIBRATE   RETURN: BACK", CENTER_X, 466, 1);
+  tft.drawCentreString("UP/DOWN: NAVIGATE   SELECT: ACTIVATE   RETURN: BACK", CENTER_X, 458, 1);
 }
 
 void drawFlowCalMenu(bool valuesOnly) {
@@ -1647,15 +1692,23 @@ void drawFlowCalMenu(bool valuesOnly) {
                                            : "SENSOR 2: FERM -> PAST";
   tft.drawCentreString(sName, CENTER_X, 60, 2);
 
-  // Row 0: Known Volume (selectable, L/R to adjust)
-  uint16_t knownBg = (flowCalSelection == 0) ? 0x051D : 0x2124;
+  // Row 0: Known Volume
+  uint16_t knownBg = flowCalEditing ? 0x8C20 : (flowCalSelection == 0) ? 0x051D : 0x2124;
   tft.fillRect(10, 84, 300, 60, knownBg);
   tft.setTextColor(TFT_DARKGREY, knownBg);
-  tft.drawCentreString("KNOWN VOLUME  (L/R TO ADJUST)", CENTER_X, 93, 1);
+  if (flowCalEditing)
+    tft.drawCentreString("KNOWN VOLUME  (UP/DOWN TO ADJUST)", CENTER_X, 93, 1);
+  else
+    tft.drawCentreString("KNOWN VOLUME  (SELECT TO EDIT)", CENTER_X, 93, 1);
   tft.setTextColor(TFT_WHITE, knownBg);
   sprintf(buf, "%.1f L", flowCalKnownVolume);
   tft.drawCentreString(buf, CENTER_X, 108, 4);
-  tft.drawRect(10, 84, 300, 60, (flowCalSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
+  if (flowCalSelection == 0) {
+    tft.drawRect(10, 84, 300, 60, TFT_WHITE);
+    tft.drawRect(11, 85, 298, 58, TFT_WHITE);
+  } else {
+    tft.drawRect(10, 84, 300, 60, TFT_DARKGREY);
+  }
 
   // Live data box (pulse count + calculated liters)
   tft.fillRect(10, 154, 300, 80, 0x1082);
@@ -1693,5 +1746,11 @@ void drawFlowCalMenu(bool valuesOnly) {
   // Footer
   tft.fillRect(0, 432, 320, 48, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DN: ROW   L/R: ADJUST   RETURN: BACK", CENTER_X, 458, 1);
+  if (flowCalEditing) {
+    tft.drawCentreString("UP/DOWN: ADJUST VOLUME", CENTER_X, 446, 1);
+    tft.drawCentreString("SELECT / RETURN: DONE EDITING", CENTER_X, 462, 1);
+  } else {
+    tft.drawCentreString("UP/DOWN: NAVIGATE   SELECT: ACTIVATE", CENTER_X, 446, 1);
+    tft.drawCentreString("RETURN: BACK TO TRANSFER TEST", CENTER_X, 462, 1);
+  }
 }
