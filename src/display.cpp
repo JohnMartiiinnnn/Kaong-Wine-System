@@ -1118,15 +1118,11 @@ void drawHeaterTestMenu() {
 
   // Status
   if (heaterTestRunning) {
-    uint32_t elapsed   = (millis() - heaterTestStart) / 1000;
-    uint32_t remaining = (elapsed < 30) ? 30 - elapsed : 0;
     tft.fillRect(10, 199, 300, 55, 0xF800);
     tft.drawRect(10, 199, 300, 55, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, 0xF800);
     tft.drawString("RUNNING", 20, 209, 2);
-    sprintf(buf, "AUTO-OFF IN %lds", (long)remaining);
-    tft.drawRightString(buf, 300, 209, 2);
-    tft.drawCentreString("SELECT TO STOP NOW", CENTER_X, 232, 2);
+    tft.drawCentreString("SELECT TO STOP", CENTER_X, 232, 2);
   } else {
     tft.fillRect(10, 199, 300, 55, 0x0400);
     tft.drawRect(10, 199, 300, 55, TFT_DARKGREY);
@@ -1135,10 +1131,10 @@ void drawHeaterTestMenu() {
     tft.drawCentreString("SELECT TO START", CENTER_X, 232, 2);
   }
 
-  // Warning
+  // Safety note
   tft.fillRect(0, 262, 320, 30, 0xFFE0);
   tft.setTextColor(TFT_BLACK, 0xFFE0);
-  tft.drawCentreString("! HEATER CUTS OFF AFTER 30 SECONDS !", CENTER_X, 273, 1);
+  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 273, 1);
 
   // Hints
   tft.fillRect(0, 440, 320, 40, TFT_WHITE);
@@ -1578,9 +1574,8 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
 
   tft.setTextColor(TFT_DARKGREY, sel1Bg);
-  tft.drawCentreString("RIGHT: CALIBRATE", CENTER_X, 165, 1);
-  tft.drawCentreString("GPIO32", 230, 178, 1);
-  tft.drawCentreString("GPB1", 85, 178, 1);
+  tft.drawCentreString("SELECT: TOGGLE PUMP ON / OFF", CENTER_X, 163, 1);
+  tft.drawCentreString("RIGHT: CALIBRATE FLOW SENSOR", CENTER_X, 178, 1);
   tft.drawRect(10, 58, 300, 185, (transferTestSelection == 0) ? TFT_WHITE : TFT_DARKGREY);
 
   // Path 2: Ferm → Past — same pattern
@@ -1607,14 +1602,14 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawRect(160, 287, 140, 60, TFT_DARKGREY);
 
   tft.setTextColor(TFT_DARKGREY, sel2Bg);
-  tft.drawCentreString("RIGHT: CALIBRATE", CENTER_X, 360, 1);
-  tft.drawCentreString("GPIO34", 230, 373, 1);
-  tft.drawCentreString("GPB2", 85, 373, 1);
+  tft.drawCentreString("SELECT: TOGGLE PUMP ON / OFF", CENTER_X, 358, 1);
+  tft.drawCentreString("RIGHT: CALIBRATE FLOW SENSOR", CENTER_X, 373, 1);
   tft.drawRect(10, 253, 300, 185, (transferTestSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
 
   tft.fillRect(0, 445, 320, 35, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SEL: PUMP   RIGHT: CALIBRATE   RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("UP / DOWN: CHANGE PATH", CENTER_X, 451, 1);
+  tft.drawCentreString("SELECT: PUMP   RIGHT: CALIBRATE   RETURN: BACK", CENTER_X, 466, 1);
 }
 
 void drawFlowCalMenu(bool valuesOnly) {

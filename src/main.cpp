@@ -1134,7 +1134,6 @@ void loop() {
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (!heaterTestRunning) {
         heaterTestRunning = true;
-        heaterTestStart = millis();
       } else {
         heaterTestRunning = false;
         currentHeatingPercent = 0;
@@ -2075,13 +2074,6 @@ void loop() {
         if (currentAppState == DASHBOARD_ACTIVE)
           drawDashboardLayout();
       }
-    }
-
-    // ---- Heater Test Auto-Cutoff ----
-    if (currentAppState == HEATER_TEST_MENU && heaterTestRunning &&
-        millis() - heaterTestStart >= 30000UL) {
-      heaterTestRunning = false;
-      currentHeatingPercent = 0;
     }
 
     int activeHeaterPin = -1;
