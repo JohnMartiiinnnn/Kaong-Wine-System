@@ -145,7 +145,8 @@ bool heaterTestNeedsFullRedraw = true;
 int heaterTestStage = 0;
 int heaterTestPercent = 0;
 bool heaterTestRunning = false;
-bool heaterTestUnlocked = false;
+int heaterTestSelection = 0;
+bool heaterTestEditing = false;
 uint32_t heaterTestStart = 0;
 bool sdVerifyNeedsFullRedraw = true;
 int sdVerifyResult = -1;
@@ -764,11 +765,20 @@ void loop() {
         drawStageParamMenu();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (cDown && !ljDown && heaterTestUnlocked) {
-        heaterTestStage = (heaterTestStage + 1) % 3;
-        heaterTestRunning = false;
-        heaterTestPercent = 0;
-        currentHeatingPercent = 0;
+      if (cDown && !ljDown) {
+        if (heaterTestEditing) {
+          if (heaterTestSelection == 0) {
+            heaterTestStage = (heaterTestStage + 1) % 3;
+            heaterTestRunning = false;
+            heaterTestPercent = 0;
+            currentHeatingPercent = 0;
+          } else if (heaterTestSelection == 1) {
+            if (heaterTestPercent >= 5) heaterTestPercent -= 5;
+            else heaterTestPercent = 100;
+          }
+        } else {
+          heaterTestSelection = (heaterTestSelection + 1) % 3;
+        }
         drawHeaterTestMenu();
       }
     } else if (currentAppState == RTC_SET_MENU) {
@@ -872,13 +882,20 @@ void loop() {
         drawStageParamMenu();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (heaterTestUnlocked) {
-        heaterTestStage = (heaterTestStage + 2) % 3;
-        heaterTestRunning = false;
-        heaterTestPercent = 0;
-        currentHeatingPercent = 0;
-        drawHeaterTestMenu();
+      if (heaterTestEditing) {
+        if (heaterTestSelection == 0) {
+          heaterTestStage = (heaterTestStage + 2) % 3;
+          heaterTestRunning = false;
+          heaterTestPercent = 0;
+          currentHeatingPercent = 0;
+        } else if (heaterTestSelection == 1) {
+          heaterTestPercent += 5;
+          if (heaterTestPercent > 100) heaterTestPercent = 0;
+        }
+      } else {
+        heaterTestSelection = (heaterTestSelection + 2) % 3;
       }
+      drawHeaterTestMenu();
     } else if (currentAppState == RTC_SET_MENU) {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
@@ -1084,7 +1101,8 @@ void loop() {
         heaterTestStage = 0;
         heaterTestPercent = 0;
         heaterTestRunning = false;
-        heaterTestUnlocked = false;
+        heaterTestSelection = 0;
+        heaterTestEditing = false;
         heaterTestNeedsFullRedraw = true;
         currentAppState = HEATER_TEST_MENU;
         drawHeaterTestMenu();
@@ -1149,13 +1167,17 @@ void loop() {
       pidTestNeedsFullRedraw = true;
       drawPidTestMenu();
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (!heaterTestUnlocked) {
-        heaterTestUnlocked = true;
-      } else if (!heaterTestRunning) {
-        heaterTestRunning = true;
+      if (heaterTestEditing) {
+        heaterTestEditing = false;
+      } else if (heaterTestSelection == 2) {
+        if (!heaterTestRunning) {
+          heaterTestRunning = true;
+        } else {
+          heaterTestRunning = false;
+          currentHeatingPercent = 0;
+        }
       } else {
-        heaterTestRunning = false;
-        currentHeatingPercent = 0;
+        heaterTestEditing = true;
       }
       drawHeaterTestMenu();
     } else if (currentAppState == TRANSFER_TEST_MENU) {
@@ -1404,13 +1426,6 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == HEATER_TEST_MENU &&
-      heaterTestUnlocked && !heaterTestRunning) {
-    heaterTestPercent += 5;
-    if (heaterTestPercent > 100)
-      heaterTestPercent = 0;
-    drawHeaterTestMenu();
-  }
   if (cRight && !ljRight && currentAppState == RTC_SET_MENU) {
     if (rtcSetField == 0) {
       rtcSetHour = (rtcSetHour + 1) % 24;
@@ -1543,7 +1558,8 @@ void loop() {
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
       heaterTestRunning = false;
-      heaterTestUnlocked = false;
+      heaterTestEditing = false;
+      heaterTestSelection = 0;
       currentHeatingPercent = 0;
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
