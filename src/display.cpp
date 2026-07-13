@@ -1596,15 +1596,15 @@ void drawTransferTestMenu(bool valuesOnly) {
   bool panel2Active = (transferTestSelection >= 2);
 
   if (valuesOnly) {
-    tft.fillRect(161, 93, 138, 56, 0x2124);
-    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.fillRect(161, 93, 138, 56, 0xD6BA);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("FLOW", 230, 102, 2);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters1);
     tft.drawCentreString(buf, 230, 118, 4);
 
-    tft.fillRect(161, 290, 138, 56, 0x2124);
-    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.fillRect(161, 290, 138, 56, 0xD6BA);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("FLOW", 230, 299, 2);
     sprintf(buf, "%.2f L", liters2);
     tft.drawCentreString(buf, 230, 315, 4);
@@ -1628,31 +1628,27 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 67, 2);
   tft.fillRect(10, 86, 300, 155, TFT_WHITE);
 
-  // pump box
-  uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0xD6BA;
-  uint16_t pump1Fg = pumpPreHeatFermOn ? TFT_WHITE : TFT_BLACK;
+  // pump box — selection highlight, circle indicator for ON/OFF state
+  bool pump1Sel = (transferTestSelection == 0);
+  uint16_t pump1Bg = pump1Sel ? 0x3566 : 0xD6BA;
+  uint16_t pump1Fg = pump1Sel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 92, 130, 60, pump1Bg);
+  tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
   tft.setTextColor(pump1Fg, pump1Bg);
-  tft.drawCentreString("PUMP", 85, 102, 2);
-  tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 120, 4);
-  // pump border: thick if selected, thin otherwise
-  if (transferTestSelection == 0) {
-    tft.drawRect(20, 92, 130, 60, TFT_WHITE);
-    tft.drawRect(21, 93, 128, 58, TFT_WHITE);
-    tft.drawRect(22, 94, 126, 56, TFT_WHITE);
-  } else {
-    tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
-  }
+  tft.drawString("PUMP", 32, 100, 2);
+  tft.fillCircle(135, 107, 10, pumpPreHeatFermOn ? 0x0400 : TFT_DARKGREY);
+  tft.drawCircle(135, 107, 10, TFT_BLACK);
+  tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 70, 130, 2);
 
-  // flow box (never selected, always dark border)
-  tft.fillRect(160, 92, 140, 60, 0x2124);
-  tft.setTextColor(TFT_WHITE, 0x2124);
+  // flow box — light beige, static
+  tft.fillRect(160, 92, 140, 60, 0xD6BA);
+  tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("FLOW", 230, 102, 2);
   tft.setTextPadding(130);
   sprintf(buf, "%.2f L", liters1);
   tft.drawCentreString(buf, 230, 118, 4);
   tft.setTextPadding(0);
-  tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
 
   // calibrate button
   bool cal1Sel = (transferTestSelection == 1);
@@ -1680,30 +1676,27 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString("FERM  ->  PAST", CENTER_X, 260, 2);
   tft.fillRect(10, 279, 300, 155, TFT_WHITE);
 
-  // pump box
-  uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0xD6BA;
-  uint16_t pump2Fg = pumpFermPastOn ? TFT_WHITE : TFT_BLACK;
+  // pump box — selection highlight, circle indicator for ON/OFF state
+  bool pump2Sel = (transferTestSelection == 2);
+  uint16_t pump2Bg = pump2Sel ? 0x3566 : 0xD6BA;
+  uint16_t pump2Fg = pump2Sel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 285, 130, 60, pump2Bg);
+  tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
   tft.setTextColor(pump2Fg, pump2Bg);
-  tft.drawCentreString("PUMP", 85, 295, 2);
-  tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 313, 4);
-  if (transferTestSelection == 2) {
-    tft.drawRect(20, 285, 130, 60, TFT_WHITE);
-    tft.drawRect(21, 286, 128, 58, TFT_WHITE);
-    tft.drawRect(22, 287, 126, 56, TFT_WHITE);
-  } else {
-    tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
-  }
+  tft.drawString("PUMP", 32, 293, 2);
+  tft.fillCircle(135, 300, 10, pumpFermPastOn ? 0x0400 : TFT_DARKGREY);
+  tft.drawCircle(135, 300, 10, TFT_BLACK);
+  tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 70, 323, 2);
 
-  // flow box
-  tft.fillRect(160, 285, 140, 60, 0x2124);
-  tft.setTextColor(TFT_WHITE, 0x2124);
+  // flow box — light beige, static
+  tft.fillRect(160, 285, 140, 60, 0xD6BA);
+  tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("FLOW", 230, 295, 2);
   tft.setTextPadding(130);
   sprintf(buf, "%.2f L", liters2);
   tft.drawCentreString(buf, 230, 311, 4);
   tft.setTextPadding(0);
-  tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
 
   // calibrate button
   bool cal2Sel = (transferTestSelection == 3);
@@ -1827,20 +1820,20 @@ void drawFlowCalMenu(bool valuesOnly) {
 }
 
 void drawQuartzTestMenu(bool valuesOnly) {
-  float fermTemp = incomingData.room2LiquidTemp;
-
   if (valuesOnly) {
-    tft.fillRect(10, 284, 300, 64, 0x2124);
-    tft.drawRect(10, 284, 300, 64, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x2124);
-    tft.drawString("FERM TANK TEMP", 20, 293, 2);
+    // Update ferm temp tile only
+    float ft = incomingData.room2LiquidTemp;
+    tft.fillRect(20, 322, 280, 68, 0xD6BA);
+    tft.drawRect(20, 322, 280, 68, TFT_DARKGREY);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
+    tft.drawCentreString("FERM TANK TEMP", CENTER_X, 332, 2);
     char tbuf[16];
-    if (fermTemp > -100.0f)
-      sprintf(tbuf, "%.1f C", fermTemp);
+    if (ft > -100.0f)
+      sprintf(tbuf, "%.1f C", ft);
     else
       strcpy(tbuf, "---");
-    tft.setTextPadding(200);
-    tft.drawCentreString(tbuf, CENTER_X, 315, 4);
+    tft.setTextPadding(240);
+    tft.drawCentreString(tbuf, CENTER_X, 354, 4);
     tft.setTextPadding(0);
     return;
   }
@@ -1853,30 +1846,38 @@ void drawQuartzTestMenu(bool valuesOnly) {
     quartzTestNeedsFullRedraw = false;
   }
 
-  // Sub-info bar
-  tft.fillRect(0, 52, 320, 24, 0x2124);
-  tft.setTextColor(TFT_WHITE, 0x2124);
-  tft.drawCentreString("SSR FERM  |  GPIO 12", CENTER_X, 60, 2);
+  // Sub-info bar (same style as fan test)
+  tft.fillRect(0, 52, 320, 28, 0x4208);
+  tft.setTextColor(TFT_WHITE, 0x4208);
+  tft.drawCentreString("FERM HEATER  (SSR FERM)", CENTER_X, 60, 2);
 
-  // Status tile
-  uint16_t statusBg = quartzTestRunning ? 0x0400 : 0x4208;
-  tft.fillRect(20, 84, 280, 184, statusBg);
-  tft.drawRect(20, 84, 280, 184, TFT_DARKGREY);
+  // Large status tile — green running, red stopped (matches fan test)
+  uint16_t statusBg = quartzTestRunning ? 0x0400 : TFT_RED;
+  tft.fillRect(20, 88, 280, 140, statusBg);
+  tft.drawRect(20, 88, 280, 140, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, statusBg);
-  tft.drawCentreString(quartzTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 145, 4);
-  tft.drawCentreString(quartzTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 242, 2);
+  tft.drawCentreString(quartzTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 138, 4);
+  tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 204, 2);
 
-  // Ferm temp panel (calls valuesOnly path)
+  // Duty cycle tile (same style as fan test speed tile)
+  char buf[16];
+  tft.fillRect(20, 236, 280, 80, 0xD6BA);
+  tft.drawRect(20, 236, 280, 80, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawCentreString("UP/DOWN: DUTY CYCLE", CENTER_X, 251, 2);
+  sprintf(buf, "%d%%", quartzTestPercent);
+  tft.drawCentreString(buf, CENTER_X, 276, 4);
+
+  // Ferm temp tile (beige, updated each second)
   drawQuartzTestMenu(true);
 
   // Safety warning
-  tft.fillRect(0, 358, 320, 64, 0xFFE0);
+  tft.fillRect(0, 398, 320, 28, 0xFFE0);
   tft.setTextColor(TFT_BLACK, 0xFFE0);
-  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 376, 1);
-  tft.drawCentreString("DIRECT SSR FERM CONTROL", CENTER_X, 400, 2);
+  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 410, 1);
 
   // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT: TOGGLE HEATER   RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("UP/DN: DUTY %   SELECT: TOGGLE   RETURN: BACK", CENTER_X, 458, 1);
 }

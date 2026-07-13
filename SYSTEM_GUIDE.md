@@ -15,13 +15,14 @@ This document explains how the automated kaong wine brewing system works, from f
 7. [Brewing Stages](#7-brewing-stages)
 8. [Stage Parameters](#8-stage-parameters)
 9. [System Check Tests](#9-system-check-tests)
-10. [Flow Sensor Calibration](#10-flow-sensor-calibration)
-11. [Load Cell Calibration](#11-load-cell-calibration)
-12. [Sensor Monitor](#12-sensor-monitor)
-13. [Web Interface](#13-web-interface)
-14. [Emergency Stop](#14-emergency-stop)
-15. [Status Lights](#15-status-lights)
-16. [Data Logging](#16-data-logging)
+10. [Flow Sensor Calibration](#11-flow-sensor-calibration)
+11. [Load Cell Calibration](#12-load-cell-calibration)
+12. [Sensor Monitor](#13-sensor-monitor)
+13. [Web Interface](#14-web-interface)
+14. [Emergency Stop](#15-emergency-stop)
+15. [Status Lights](#16-status-lights)
+16. [Data Logging](#17-data-logging)
+
 
 ---
 
@@ -278,7 +279,7 @@ Press LEFT to return to the dashboard module view.
 
 ## 9. System Check Tests
 
-Access from the Main Menu → SYSTEM CHECK. Ten items, navigated with UP/DOWN, entered with SELECT, exited with LEFT.
+Access from the Main Menu → SYSTEM CHECK. Eleven items, navigated with UP/DOWN, entered with SELECT, exited with LEFT.
 
 ### 0. FAN TEST
 
@@ -393,11 +394,23 @@ The screen shows two paths — Pre-Heat → Ferm and Ferm → Past — each with
 - RIGHT: enter the flow sensor calibration screen for the selected path.
 - LEFT: turns off both pumps and returns to System Check.
 
-> The flow reading depends on calibration. Before first use, run the calibration routine (see Section 10) so the liter display is accurate.
+> The flow reading depends on calibration. Before first use, run the calibration routine (see Section 11) so the liter display is accurate.
 
 ---
 
-## 10. Flow Sensor Calibration
+### 10. QUARTZ HEATER TEST
+
+Tests the fermentation tank quartz heater SSR (SSR_FERM, GPIO 12) at a configurable duty cycle with no temperature feedback.
+
+- UP/DOWN: adjust duty cycle in 5% steps (0%–100%).
+- SELECT: toggle heater ON or OFF. Status tile turns green when running, red when stopped.
+- The ferm tank temperature (from the secondary ESP32) updates every second in the bottom tile.
+- **Monitor the tank temperature closely during this test.** The heater runs until you stop it manually.
+- LEFT: stops the heater and returns to System Check.
+
+---
+
+## 11. Flow Sensor Calibration
 
 The flow sensors count electrical pulses from a spinning wheel inside the sensor body. To convert pulses to liters, the system needs a **K-factor** (pulses per liter). The default is 450 pulses/L (typical for a YF-S201 sensor), but the actual value varies with installation and flow rate. Calibration gets it accurate.
 
@@ -429,7 +442,7 @@ Run another known volume through and watch the liter display. It should match cl
 
 ---
 
-## 11. Load Cell Calibration
+## 12. Load Cell Calibration
 
 The load cell measures the weight of liquid in the pre-heat tank and converts it to liters (1 kg ≈ 1 L for kaong sap).
 
@@ -451,7 +464,7 @@ The default calibration factor is **23012.45**, measured with a 9-liter referenc
 
 ---
 
-## 12. Sensor Monitor
+## 13. Sensor Monitor
 
 Access: Main Menu → SENSOR VALUES.
 
@@ -473,7 +486,7 @@ Press SELECT to go to the Load Cell calibration page. Press LEFT to return to th
 
 ---
 
-## 13. Web Interface
+## 14. Web Interface
 
 The system broadcasts a Wi-Fi access point and also attempts to join a local network on startup.
 
@@ -502,7 +515,7 @@ Firmware can also be updated over Wi-Fi (OTA) using the Arduino IDE or PlatformI
 
 ---
 
-## 14. Emergency Stop
+## 15. Emergency Stop
 
 The emergency stop button is on MCP23017 GPA6.
 
@@ -527,7 +540,7 @@ Hold the ESTOP button for 3 seconds. A progress bar fills on the screen. Release
 
 ---
 
-## 15. Status Lights
+## 16. Status Lights
 
 Three relay-driven indicator lights show the current brew stage at a glance.
 
@@ -541,7 +554,7 @@ All three lights turn on when a brew is complete.
 
 ---
 
-## 16. Data Logging
+## 17. Data Logging
 
 The system logs sensor data to the SD card every 60 seconds while a brew is running.
 
