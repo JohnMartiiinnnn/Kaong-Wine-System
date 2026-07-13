@@ -1881,7 +1881,7 @@ void drawQuartzTestMenu(bool valuesOnly) {
         tft.drawCentreString("HEATING  20%", CENTER_X, 338, 2);
       } else if (ft > quartzTestTempTarget + 0.5f) {
         tft.setTextColor(0x001F, 0xD6BA);
-        tft.drawCentreString("COOLING  20%", CENTER_X, 338, 2);
+        tft.drawCentreString("COOLING  100%", CENTER_X, 338, 2);
       } else {
         tft.setTextColor(0x0400, 0xD6BA);
         tft.drawCentreString("STABLE", CENTER_X, 338, 2);

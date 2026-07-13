@@ -2253,7 +2253,7 @@ void loop() {
           isFermFanOn = true;
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
-          setFanSpeed(20);
+          setFanSpeed(100);
         }
       } else {
         currentHeatingPercent = 0;
