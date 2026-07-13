@@ -95,6 +95,7 @@ enum AppState {
   BREW_SUMMARY_MENU,
   TRANSFER_TEST_MENU,
   FLOW_CAL_MENU,
+  QUARTZ_TEST_PICK,
   QUARTZ_TEST_MENU
 };
 
@@ -272,6 +273,8 @@ extern bool      quartzTestNeedsFullRedraw;
 extern int       quartzTestPercent;
 extern int       quartzTestSelection;
 extern bool      quartzTestEditing;
+extern int       quartzTestMode;
+extern float     quartzTestTempTarget;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

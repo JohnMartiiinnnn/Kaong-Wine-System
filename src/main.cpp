@@ -167,6 +167,8 @@ bool      quartzTestNeedsFullRedraw = true;
 int       quartzTestPercent         = 50;
 int       quartzTestSelection       = 0;
 bool      quartzTestEditing         = false;
+int       quartzTestMode            = 0;
+float     quartzTestTempTarget      = 35.0f;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -608,6 +610,10 @@ void loop() {
         flowCalNeedsFullRedraw = true;
         drawFlowCalMenu();
         break;
+      case QUARTZ_TEST_PICK:
+        quartzTestNeedsFullRedraw = true;
+        drawQuartzTestPick();
+        break;
       case QUARTZ_TEST_MENU:
         quartzTestRunning = false;
         quartzTestEditing = false;
@@ -799,11 +805,21 @@ void loop() {
         rtcSetField = (rtcSetField + 1) % 2;
         drawRtcSetMenu();
       }
+    } else if (currentAppState == QUARTZ_TEST_PICK) {
+      if (cDown && !ljDown) {
+        quartzTestMode = (quartzTestMode + 1) % 2;
+        drawQuartzTestPick();
+      }
     } else if (currentAppState == QUARTZ_TEST_MENU) {
       if (cDown && !ljDown) {
         if (quartzTestEditing) {
-          if (quartzTestPercent >= 5) quartzTestPercent -= 5;
-          else quartzTestPercent = 100;
+          if (quartzTestMode == 0) {
+            if (quartzTestPercent >= 5) quartzTestPercent -= 5;
+            else quartzTestPercent = 100;
+          } else {
+            quartzTestTempTarget -= 1.0f;
+            if (quartzTestTempTarget < 20.0f) quartzTestTempTarget = 20.0f;
+          }
         } else {
           quartzTestSelection = (quartzTestSelection + 1) % 2;
         }
@@ -922,10 +938,18 @@ void loop() {
     } else if (currentAppState == RTC_SET_MENU) {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
+    } else if (currentAppState == QUARTZ_TEST_PICK) {
+      quartzTestMode = (quartzTestMode + 1) % 2;
+      drawQuartzTestPick();
     } else if (currentAppState == QUARTZ_TEST_MENU) {
       if (quartzTestEditing) {
-        quartzTestPercent += 5;
-        if (quartzTestPercent > 100) quartzTestPercent = 0;
+        if (quartzTestMode == 0) {
+          quartzTestPercent += 5;
+          if (quartzTestPercent > 100) quartzTestPercent = 0;
+        } else {
+          quartzTestTempTarget += 1.0f;
+          if (quartzTestTempTarget > 80.0f) quartzTestTempTarget = 80.0f;
+        }
       } else {
         quartzTestSelection = (quartzTestSelection + 1) % 2;
       }
@@ -1138,13 +1162,10 @@ void loop() {
         currentAppState = HEATER_TEST_MENU;
         drawHeaterTestMenu();
       } else if (systemCheckSelection == 6) {
-        quartzTestRunning = false;
-        quartzTestPercent = 50;
-        quartzTestSelection = 0;
-        quartzTestEditing = false;
+        quartzTestMode = 0;
         quartzTestNeedsFullRedraw = true;
-        currentAppState = QUARTZ_TEST_MENU;
-        drawQuartzTestMenu();
+        currentAppState = QUARTZ_TEST_PICK;
+        drawQuartzTestPick();
       } else if (systemCheckSelection == 7) {
         sdVerifyResult = -1;
         sdVerifyNeedsFullRedraw = true;
@@ -1243,12 +1264,27 @@ void loop() {
         currentAppState = FLOW_CAL_MENU;
         drawFlowCalMenu();
       }
+    } else if (currentAppState == QUARTZ_TEST_PICK) {
+      quartzTestRunning = false;
+      quartzTestPercent = 50;
+      quartzTestTempTarget = 35.0f;
+      quartzTestSelection = 0;
+      quartzTestEditing = false;
+      quartzTestNeedsFullRedraw = true;
+      currentAppState = QUARTZ_TEST_MENU;
+      drawQuartzTestMenu();
     } else if (currentAppState == QUARTZ_TEST_MENU) {
       if (quartzTestEditing) {
         quartzTestEditing = false;
       } else if (quartzTestSelection == 1) {
         quartzTestRunning = !quartzTestRunning;
-        if (!quartzTestRunning) currentHeatingPercent = 0;
+        if (!quartzTestRunning) {
+          currentHeatingPercent = 0;
+          if (quartzTestMode == 1 && isFermFanOn) {
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            isFermFanOn = false;
+          }
+        }
       } else {
         quartzTestEditing = true;
       }
@@ -1641,6 +1677,10 @@ void loop() {
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
       }
+    } else if (currentAppState == QUARTZ_TEST_PICK) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == QUARTZ_TEST_MENU) {
       if (quartzTestEditing) {
         quartzTestEditing = false;
@@ -1648,9 +1688,13 @@ void loop() {
       } else {
         quartzTestRunning = false;
         currentHeatingPercent = 0;
-        currentAppState = SYSTEM_CHECK_MENU;
-        systemCheckNeedsFullRedraw = true;
-        drawSystemCheckMenu();
+        if (quartzTestMode == 1 && isFermFanOn) {
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          isFermFanOn = false;
+        }
+        quartzTestNeedsFullRedraw = true;
+        currentAppState = QUARTZ_TEST_PICK;
+        drawQuartzTestPick();
       }
     }
   }
@@ -2185,9 +2229,22 @@ void loop() {
         activeHeaterPin = SSR_PREHEAT;
       else
         activeHeaterPin = SSR_PAST;
-    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestRunning) {
+    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 0 && quartzTestRunning) {
       currentHeatingPercent = quartzTestPercent;
       activeHeaterPin = SSR_FERM;
+    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 1 && quartzTestRunning) {
+      float ct = incomingData.room2LiquidTemp;
+      if (ct > -100.0f && ct < quartzTestTempTarget - 0.5f) {
+        currentHeatingPercent = 100;
+        activeHeaterPin = SSR_FERM;
+        if (isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF); isFermFanOn = false; }
+      } else if (ct > -100.0f && ct > quartzTestTempTarget + 0.5f) {
+        currentHeatingPercent = 0;
+        if (!isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON); isFermFanOn = true; }
+      } else {
+        currentHeatingPercent = 0;
+        if (isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF); isFermFanOn = false; }
+      }
     } else if (activeBrewStage == 0) {
       activeHeaterPin = SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
