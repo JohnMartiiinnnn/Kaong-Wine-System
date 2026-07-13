@@ -92,6 +92,18 @@ Footer text format: `"KEY: ACTION   KEY: ACTION   RETURN: BACK"` — always incl
 5. Add state transitions in `main.cpp` (SELECT to enter, LEFT to exit, set `xxxNeedsFullRedraw = true` on entry)
 6. Set `needsFullRedraw = true` in the ESTOP resume block if appropriate
 
+### No `fillScreen` — draw header color first
+
+Never use `tft.fillScreen(TFT_WHITE)` in any draw function. It writes all 153,600 pixels before any content appears, causing a white flash on every screen transition. Instead:
+
+```cpp
+// In the full-redraw block:
+tft.fillRect(0, 0, 320, 50, 0x03E0);      // header first — user sees color immediately
+tft.fillRect(0, 50, 320, 384, TFT_WHITE); // body
+```
+
+This applies everywhere: full-redraw guards, unconditional redraws, and entry points.
+
 ### Preventing selection flash (`static prevSel` pattern)
 
 For any screen where only the selection highlight changes on UP/DOWN (no live data):
@@ -112,10 +124,10 @@ void drawMyPickScreen() {
   };
 
   if (myScreenNeedsFullRedraw) {
-    tft.fillScreen(TFT_WHITE);
-    // draw header
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    // draw header title, tiles, footer
     for (int i = 0; i < 3; i++) drawTile(i, mySelection == i);
-    // draw footer
     myScreenNeedsFullRedraw = false;
     prevSel = mySelection;
   } else if (prevSel != mySelection) {
@@ -127,6 +139,42 @@ void drawMyPickScreen() {
 ```
 
 This replaces redrawing all N tiles on every call with only 2 tile redraws per selection change, eliminating flicker.
+
+### Per-tile cursor model (`xxxSelection` + `xxxEditing`)
+
+For screens with navigable rows that each hold an editable value (like heater test, flow cal):
+
+- `xxxSelection` (int): which row cursor is on (0, 1, 2, ...)
+- `xxxEditing` (bool): whether that row is currently being edited
+
+Button handling:
+- UP/DOWN when not editing: move cursor
+- UP/DOWN when editing: adjust the selected row's value
+- SELECT when not editing on a value row: enter editing (`xxxEditing = true`)
+- SELECT when editing: exit editing (`xxxEditing = false`)
+- SELECT on an action row (e.g. START/STOP): toggle directly, no editing needed
+- LEFT when editing: exit editing only (`xxxEditing = false; drawMenu();`)
+- LEFT when not editing: clean up and exit screen
+
+```cpp
+// LEFT handler example
+} else if (currentAppState == MY_MENU) {
+  if (myEditing) {
+    myEditing = false;
+    drawMyMenu();
+  } else {
+    myRunning = false;
+    mySelection = 0;
+    currentAppState = SYSTEM_CHECK_MENU;
+    systemCheckNeedsFullRedraw = true;
+    drawSystemCheckMenu();
+  }
+}
+```
+
+Footer should change dynamically:
+- Editing: `"UP/DN: ADJUST VALUE   SELECT: DONE"`
+- Not editing: `"UP/DN: NAVIGATE   SELECT: EDIT / ACTION"`
 
 ### Live-data refresh (`valuesOnly` pattern)
 
@@ -151,6 +199,26 @@ Call `drawMyDataScreen(true)` from the 1-second ticker in `main.cpp`.
 - Set `true` immediately before changing `currentAppState` to enter the screen
 - The draw function clears it to `false` after the full redraw is complete
 - Setting it `true` also resets `static prevSel` automatically (the full redraw path writes `prevSel = currentSel`)
+
+---
+
+### Ferm fan hardware quirks
+
+The fermentation fan relay is **normally-closed (NC)**:
+
+| Intent | `mcp.digitalWrite` value | Why |
+|--------|--------------------------|-----|
+| Fan ON | `RELAY_OFF` (HIGH) | De-energize relay, NC contact closes, fan runs |
+| Fan OFF | `RELAY_ON` (LOW) | Energize relay, NC contact opens, fan stops |
+
+The ferm fan PWM controller is **active-high** (opposite of the pre-heat fan):
+
+| Fan | Direction | Arduino mapping |
+|-----|-----------|-----------------|
+| Pre-heat | Active-low (0 = max) | `map(percent, 0, 100, 255, 0)` |
+| Ferm | Active-high (255 = max) | `map(percent, 0, 100, 0, 255)` |
+
+`setFanSpeed` in `main.cpp` auto-selects the mapping based on `isFermFanOn` or `fanTestFanChoice == 1`.
 
 ---
 

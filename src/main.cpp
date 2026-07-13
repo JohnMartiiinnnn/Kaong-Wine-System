@@ -193,7 +193,8 @@ void setFanSpeed(int percent) {
   if (percent > 100)
     percent = 100;
   currentSpeedPercent = percent;
-  ledcWrite(pwmChannel, map(percent, 0, 100, 255, 0));
+  bool isFerm = isFermFanOn || (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1);
+  ledcWrite(pwmChannel, isFerm ? map(percent, 0, 100, 0, 255) : map(percent, 0, 100, 255, 0));
 }
 
 // ---- Mixer Speed Helper ----
@@ -1557,13 +1558,17 @@ void loop() {
         drawDashboardLayout();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      heaterTestRunning = false;
-      heaterTestEditing = false;
-      heaterTestSelection = 0;
-      currentHeatingPercent = 0;
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
+      if (heaterTestEditing) {
+        heaterTestEditing = false;
+        drawHeaterTestMenu();
+      } else {
+        heaterTestRunning = false;
+        heaterTestSelection = 0;
+        currentHeatingPercent = 0;
+        currentAppState = SYSTEM_CHECK_MENU;
+        systemCheckNeedsFullRedraw = true;
+        drawSystemCheckMenu();
+      }
     } else if (currentAppState == SD_VERIFY_MENU ||
                currentAppState == UART_MONITOR_MENU ||
                currentAppState == RTC_SET_MENU) {
@@ -1832,9 +1837,9 @@ void loop() {
 
         if (pidTestChoice == 1) {
           mcp.digitalWrite(FERM_FAN_RELAY_PIN,
-                           isFermFanOn ? RELAY_ON : RELAY_OFF);
+                           isFermFanOn ? RELAY_OFF : RELAY_ON);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
-                           isFermFanOn ? RELAY_ON : RELAY_OFF);
+                           isFermFanOn ? RELAY_OFF : RELAY_ON);
           setFanSpeed(isFermFanOn ? (int)(-pidOut) : 0);
         } else {
           mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
@@ -1962,8 +1967,8 @@ void loop() {
           } else if (liquidTemp > 30.0f) {
             currentHeatingPercent = 0;
             isFermFanOn = true;
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
           } else {
             currentHeatingPercent = 0;
           }
