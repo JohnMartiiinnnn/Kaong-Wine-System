@@ -2233,7 +2233,7 @@ void loop() {
       currentHeatingPercent = quartzTestPercent;
       activeHeaterPin = SSR_FERM;
     } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 1 && quartzTestRunning) {
-      float ct = incomingData.room2LiquidTemp;
+      float ct = incomingData.room2Temp;
       if (ct > -100.0f && ct < quartzTestTempTarget - 0.5f) {
         currentHeatingPercent = 100;
         activeHeaterPin = SSR_FERM;

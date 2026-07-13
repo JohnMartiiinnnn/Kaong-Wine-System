@@ -1844,13 +1844,12 @@ void drawQuartzTestPick() {
 
 void drawQuartzTestMenu(bool valuesOnly) {
   if (valuesOnly) {
-    float ft = incomingData.room2LiquidTemp;
-    char tbuf[16];
-    if (ft > -100.0f) sprintf(tbuf, "%.1f C", ft);
-    else strcpy(tbuf, "---");
-
     if (quartzTestMode == 0) {
-      // Manual: simple ferm temp tile at y=292
+      // Manual: show liquid temp tile at y=292
+      float ft = incomingData.room2LiquidTemp;
+      char tbuf[16];
+      if (ft > -100.0f) sprintf(tbuf, "%.1f C", ft);
+      else strcpy(tbuf, "---");
       tft.fillRect(10, 292, 300, 70, 0xD6BA);
       tft.drawRect(10, 292, 300, 70, TFT_DARKGREY);
       tft.setTextColor(TFT_BLACK, 0xD6BA);
@@ -1859,11 +1858,15 @@ void drawQuartzTestMenu(bool valuesOnly) {
       tft.drawCentreString(tbuf, CENTER_X, 318, 4);
       tft.setTextPadding(0);
     } else {
-      // Auto: live status tile at y=260 with HEATING/COOLING/STABLE indicator
+      // Auto: live status tile at y=260 using BME280 ambient (room2Temp)
+      float ft = incomingData.room2Temp;
+      char tbuf[16];
+      if (ft > -100.0f) sprintf(tbuf, "%.1f C", ft);
+      else strcpy(tbuf, "---");
       tft.fillRect(10, 260, 300, 102, 0xD6BA);
       tft.drawRect(10, 260, 300, 102, TFT_DARKGREY);
       tft.setTextColor(TFT_BLACK, 0xD6BA);
-      tft.drawString("FERM TANK TEMP", 20, 268, 2);
+      tft.drawString("FERM AMBIENT TEMP", 20, 268, 2);
       tft.setTextPadding(280);
       tft.drawCentreString(tbuf, CENTER_X, 286, 4);
       tft.setTextPadding(0);
