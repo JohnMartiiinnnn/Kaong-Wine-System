@@ -6,10 +6,10 @@
 |------|--------|-------|
 | 2 | TFT LCD DC | SPI |
 | 4 | TFT LCD RST | SPI |
-| 5 | SD  Card CS | SPI |
-| 12 | Fermentation heater SSR (`SSR_FERM`) | SSR control signal |
-| 13 | Pre-heat heater SSR (`SSR_PREHEAT`) | SSR control signal |
-| 14 | Pasteurization heater SSR (`SSR_PAST`) | SSR control signal |
+| 5 | SD Card CS | SPI |
+| 12 | AC Dimmer 1 CH2 (`DIM1_CH2`) | TRIAC fire pulse |
+| 13 | AC Dimmer 2 Shared (`DIM2_SHARED`) | TRIAC fire pulse |
+| 14 | AC Dimmer 1 CH1 (`DIM1_CH1`) | TRIAC fire pulse |
 | 15 | TFT LCD CS | SPI |
 | 16 | UART2 RX | Serial2 — from Secondary ESP32 |
 | 17 | UART2 TX | Serial2 — to Secondary ESP32 |
@@ -21,11 +21,13 @@
 | 25 | Heater/Fan PWM (`PWM_PIN`) | LEDC ch0, 25 kHz, 8-bit |
 | 26 | OneWire Bus (`ONE_WIRE_BUS`) | DS18B20 (shared bus, both liquid temp sensors) |
 | 27 | HX711 SCK (`HX711_SCK_PIN`) | Load cell clock |
-| 32 | Flow sensor 1 (`FLOW_PREHEAT_FERM`) | INPUT_PULLUP, pulse input — pre-heat → ferm |
-| 34 | Flow sensor 2 (`FLOW_FERM_PAST`) | INPUT_PULLUP, pulse input — ferm → past (input-only pin) |
-| 33 | Touchscreen CS | SPI |
+| 32 | Flow Sensor 1 (`FLOW_PREHEAT_FERM`) | Pre-heat → Ferm tank flow; INPUT_PULLUP, interrupt on RISING |
+| 33 | Touchscreen CS | SPI (touch not used in firmware) |
+| 34 | Flow Sensor 2 (`FLOW_FERM_PAST`) | Ferm → Past tank flow; input-only pin, interrupt on RISING |
 | 36 | HX711 DT (`HX711_DT_PIN`) | Load cell data (input-only pin) |
-| — | Motor PWM (`MOTOR_PWM_PIN`) | Unassigned (`-1`); no free output GPIO available on Primary ESP32 |
+| 0 | Motor PWM (`MOTOR_PWM_PIN`) | TB6612FN PWMA — LEDC ch1, 1 kHz; boot-strap pin, disconnect driver during flashing |
+
+> **Note:** `MOTOR_PWM_PIN` is currently set to `-1` in config.h (unassigned). GPIO0 is documented in PROJECT_OVERVIEW.md as the intended pin once confirmed safe.
 
 ---
 
@@ -55,22 +57,15 @@
 
 ---
 
-## SSR Heater Control
+## Heater SSR Outputs
 
-| config.h name | ESP32 Pin | Tank |
-|---------------|-----------|------|
-| `SSR_PREHEAT` | GPIO 13 | Pre-heating tank |
-| `SSR_FERM` | GPIO 12 | Fermentation tank |
-| `SSR_PAST` | GPIO 14 | Pasteurization tank |
+GPIO 13, 12, and 14 drive solid-state relays (SSRs) for the three tank heaters. The firmware uses slow time-proportional PWM (2-second window, `digitalWrite`) rather than phase-angle dimming.
 
-All three are driven with slow PWM (time-proportional, 2 s window) via `digitalWrite()`. SSRs switch on the HIGH pulse within each window; no zero-cross input required.
-
-## Flow Sensors
-
-| config.h name | ESP32 Pin | Transfer | Notes |
-|---------------|-----------|----------|-------|
-| `FLOW_PREHEAT_FERM` | GPIO 32 | Pre-heat → Fermentation | INPUT_PULLUP, pulse counting |
-| `FLOW_FERM_PAST` | GPIO 34 | Fermentation → Pasteurization | INPUT_PULLUP, pulse counting (input-only pin) |
+| Signal | ESP32 Pin | config.h name | Tank |
+|--------|-----------|---------------|------|
+| Heater SSR 1 | GPIO 13 | `SSR_PREHEAT` | Pre-heat |
+| Heater SSR 2 | GPIO 12 | `SSR_FERM` | Fermentation |
+| Heater SSR 3 | GPIO 14 | `SSR_PAST` | Pasteurization |
 
 ---
 
@@ -93,11 +88,11 @@ All three are driven with slow PWM (time-proportional, 2 s window) via `digitalW
 
 | MCP Pin | config.h name | Function |
 |---------|---------------|----------|
-| GPB0 (8) | `FERM_FAN_RELAY_PIN` / `FERM_FAN2_RELAY_PIN` | Fermentation fans (same relay) |
-| GPB1 (9) | `PUMP_PREHEAT_FERM` | Transfer pump: pre-heat → fermentation |
-| GPB2 (10) | `PUMP_FERM_PAST` | Transfer pump: fermentation → pasteurization |
-| GPB3 (11) | `RELAY_PINS[3]` | Unassigned |
-| GPB4 (12) | `RELAY_PINS[4]` | Unassigned |
+| GPB0 (8) | `FERM_FAN_RELAY_PIN` | Fermentation fan relay |
+| GPB1 (9) | `PUMP_PREHEAT_FERM` | Transfer pump: Pre-heat → Fermentation |
+| GPB2 (10) | `PUMP_FERM_PAST` | Transfer pump: Fermentation → Pasteurization |
+| GPB3 (11) | — | Spare |
+| GPB4 (12) | — | Spare |
 | GPB5 (13) | `LIGHT_G` | Status light — Green |
 | GPB6 (14) | `LIGHT_Y` | Status light — Yellow |
 | GPB7 (15) | `LIGHT_R` | Status light — Red |

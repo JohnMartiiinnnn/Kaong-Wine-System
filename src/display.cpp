@@ -400,51 +400,71 @@ void drawLoadCellPage(bool valuesOnly) {
 }
 
 void drawSystemCheckMenu() {
-  if (systemCheckNeedsFullRedraw) {
-    tft.fillScreen(TFT_WHITE);
-    tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
-    systemCheckNeedsFullRedraw = false;
-  }
+  static int prevSel = -1;
+
   const char *options[] = {
     "FAN TEST", "LIGHT INDICATORS", "RELAY TEST",
     "MOTOR TEST", "PID CONTROL",
     "HEATER OUTPUT", "SD CARD VERIFY", "UART MONITOR", "SET RTC TIME",
     "TRANSFER TEST"
   };
-  for (int i = 0; i < 10; i++) {
-    uint16_t color    = (systemCheckSelection == i) ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = (systemCheckSelection == i) ? TFT_WHITE : TFT_BLACK;
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t color    = sel ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 52 + (i * 38), 300, 34, color);
     tft.drawRect(10, 52 + (i * 38), 300, 34, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
     tft.drawCentreString(options[i], CENTER_X, 60 + (i * 38), 2);
+  };
+
+  if (systemCheckNeedsFullRedraw) {
+    tft.fillScreen(TFT_WHITE);
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("SYSTEM CHECK", CENTER_X, 15, 4);
+    for (int i = 0; i < 10; i++) drawTile(i, systemCheckSelection == i);
+    tft.fillRect(0, 432, 320, 48, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SELECT   SELECT: ENTER   RETURN: BACK", CENTER_X, 458, 1);
+    systemCheckNeedsFullRedraw = false;
+    prevSel = systemCheckSelection;
+  } else if (prevSel != systemCheckSelection) {
+    if (prevSel >= 0) drawTile(prevSel, false);
+    drawTile(systemCheckSelection, true);
+    prevSel = systemCheckSelection;
   }
-  tft.fillRect(0, 432, 320, 48, TFT_WHITE);
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString("RETURN TO GO BACK", CENTER_X, 458, 2);
 }
 
 void drawFanTestPick() {
+  static int prevSel = -1;
+
+  const char *options[] = {"PRE-HEATING FANS", "FERMENTATION FANS"};
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t color    = sel ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 80 + (i * 120), 280, 100, color);
+    tft.drawRect(20, 80 + (i * 120), 280, 100, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 120 + (i * 120), 4);
+  };
+
   if (fanTestNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.setTextColor(TFT_WHITE);
     tft.drawCentreString("SELECT FAN GROUP", CENTER_X, 15, 4);
+    for (int i = 0; i < 2; i++) drawTile(i, fanTestFanChoice == i);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
     fanTestNeedsFullRedraw = false;
+    prevSel = fanTestFanChoice;
+  } else if (prevSel != fanTestFanChoice) {
+    if (prevSel >= 0) drawTile(prevSel, false);
+    drawTile(fanTestFanChoice, true);
+    prevSel = fanTestFanChoice;
   }
-  const char *options[] = {"PRE-HEATING FANS", "FERMENTATION FANS"};
-  for (int i = 0; i < 2; i++) {
-    uint16_t color    = (fanTestFanChoice == i) ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = (fanTestFanChoice == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 80 + (i * 120), 280, 100, color);
-    tft.drawRect(20, 80 + (i * 120), 280, 100, TFT_DARKGREY);
-    tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 120 + (i * 120), 4);
-  }
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
 }
 
 void drawFanTestMenu() {
@@ -953,24 +973,34 @@ void drawStageParamMenu() {
 }
 
 void drawPidTestPick() {
+  static int prevSel = -1;
+
+  const char *options[] = {"PRE-HEAT CHAMBER", "FERMENTATION CHAMBER", "PASTEURIZATION CHAMBER"};
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t color    = sel ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 80 + (i * 110), 280, 80, color);
+    tft.drawRect(20, 80 + (i * 110), 280, 80, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 105 + (i * 110), 4);
+  };
+
   if (pidTestNeedsFullRedraw) {
     tft.fillScreen(TFT_WHITE);
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.setTextColor(TFT_WHITE);
     tft.drawCentreString("SELECT CHAMBER", CENTER_X, 15, 4);
+    for (int i = 0; i < 3; i++) drawTile(i, pidTestChoice == i);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
     pidTestNeedsFullRedraw = false;
+    prevSel = pidTestChoice;
+  } else if (prevSel != pidTestChoice) {
+    if (prevSel >= 0) drawTile(prevSel, false);
+    drawTile(pidTestChoice, true);
+    prevSel = pidTestChoice;
   }
-  const char *options[] = {"PRE-HEAT CHAMBER", "FERMENTATION CHAMBER", "PASTEURIZATION CHAMBER"};
-  for (int i = 0; i < 3; i++) {
-    uint16_t color    = (pidTestChoice == i) ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = (pidTestChoice == i) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 80 + (i * 110), 280, 80, color);
-    tft.drawRect(20, 80 + (i * 110), 280, 80, TFT_DARKGREY);
-    tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 105 + (i * 110), 4);
-  }
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
 }
 
 void drawPidTestMenu() {

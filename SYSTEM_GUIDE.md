@@ -339,10 +339,10 @@ Tests the PID temperature controller for any one of the three tanks without runn
 
 Tests each SSR heater directly at a set duty cycle, with no temperature feedback.
 
-- UP/DOWN: switch between the three heater stages.
-- LEFT/RIGHT: decrease or increase the duty cycle in 5% steps.
-- SELECT: start or stop the heater.
-- The display shows which GPIO and SSR are being driven.
+- UP/DOWN: switch between the three heater stages (Pre-heat, Fermentation, Pasteurization).
+- LEFT/RIGHT: decrease or increase the duty cycle in 5% steps (0%–100%).
+- SELECT: start or stop the heater. The status bar turns red when running.
+- A progress bar at the bottom shows the current duty cycle visually.
 - **Monitor the tank temperature with a thermometer during this test.** The heater will run until you stop it manually.
 
 ---
