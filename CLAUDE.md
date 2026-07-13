@@ -204,12 +204,12 @@ Call `drawMyDataScreen(true)` from the 1-second ticker in `main.cpp`.
 
 ### Ferm fan hardware quirks
 
-The fermentation fan relay is **normally-closed (NC)**:
+The fermentation fan relay is **normally-open (NO)**, same as the pre-heat fan. Standard behavior:
 
 | Intent | `mcp.digitalWrite` value | Why |
 |--------|--------------------------|-----|
-| Fan ON | `RELAY_OFF` (HIGH) | De-energize relay, NC contact closes, fan runs |
-| Fan OFF | `RELAY_ON` (LOW) | Energize relay, NC contact opens, fan stops |
+| Fan ON | `RELAY_ON` (LOW) | Energize relay, NO contact closes, fan runs |
+| Fan OFF | `RELAY_OFF` (HIGH) | De-energize relay, NO contact opens, fan stops |
 
 The ferm fan PWM controller is **active-high** (opposite of the pre-heat fan):
 
