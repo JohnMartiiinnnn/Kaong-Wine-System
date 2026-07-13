@@ -149,9 +149,6 @@ void drawDashboardLayout() {
     for (int i = 0; i < 3; i++) {
       int y = 110 + (i * 60);
       bool sel = (i == dashSelection);
-      if (sel) {
-        tft.fillRect(1, y - 3, 318, 56, TFT_BLACK);
-      }
       tft.fillRect(5, y, 310, 50, colors[i]);
       tft.drawRect(5, y, 310, 50, TFT_DARKGREY);
       tft.setTextColor(TFT_WHITE, colors[i]);
