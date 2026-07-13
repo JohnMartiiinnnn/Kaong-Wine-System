@@ -169,6 +169,9 @@ int       quartzTestSelection       = 0;
 bool      quartzTestEditing         = false;
 int       quartzTestMode            = 0;
 float     quartzTestTempTarget      = 35.0f;
+int       quartzAutoPercent         = 20;
+float     quartzAutoLastTemp        = -127.0f;
+uint32_t  quartzAutoCheckMs         = 0;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -1278,8 +1281,14 @@ void loop() {
         quartzTestEditing = false;
       } else if (quartzTestSelection == 1) {
         quartzTestRunning = !quartzTestRunning;
+        if (quartzTestRunning && quartzTestMode == 1) {
+          quartzAutoPercent  = 20;
+          quartzAutoLastTemp = incomingData.room2Temp;
+          quartzAutoCheckMs  = millis();
+        }
         if (!quartzTestRunning) {
           currentHeatingPercent = 0;
+          quartzAutoPercent = 20;
           if (quartzTestMode == 1 && isFermFanOn) {
             setFanSpeed(0);
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
@@ -2239,7 +2248,17 @@ void loop() {
     } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 1 && quartzTestRunning) {
       float ct = incomingData.room2Temp;
       if (ct > -100.0f && ct < quartzTestTempTarget - 0.5f) {
-        currentHeatingPercent = 20;
+        // Adaptive duty: if temp hasn't risen 0.2C in 5s, ramp up (max 60%)
+        uint32_t now = millis();
+        if (now - quartzAutoCheckMs >= 5000) {
+          if (ct - quartzAutoLastTemp < 0.2f) {
+            quartzAutoPercent += 5;
+            if (quartzAutoPercent > 60) quartzAutoPercent = 60;
+          }
+          quartzAutoLastTemp = ct;
+          quartzAutoCheckMs  = now;
+        }
+        currentHeatingPercent = quartzAutoPercent;
         activeHeaterPin = SSR_FERM;
         if (isFermFanOn) {
           setFanSpeed(0);
@@ -2248,6 +2267,7 @@ void loop() {
           isFermFanOn = false;
         }
       } else if (ct > -100.0f && ct > quartzTestTempTarget + 0.5f) {
+        quartzAutoPercent = 20;
         currentHeatingPercent = 0;
         if (!isFermFanOn) {
           isFermFanOn = true;
@@ -2256,6 +2276,7 @@ void loop() {
           setFanSpeed(100);
         }
       } else {
+        quartzAutoPercent = 20;
         currentHeatingPercent = 0;
         if (isFermFanOn) {
           setFanSpeed(0);

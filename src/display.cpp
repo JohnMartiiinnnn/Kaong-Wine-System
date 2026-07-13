@@ -1877,8 +1877,12 @@ void drawQuartzTestMenu(bool valuesOnly) {
         tft.setTextColor(TFT_DARKGREY, 0xD6BA);
         tft.drawCentreString("IDLE", CENTER_X, 338, 2);
       } else if (ft < quartzTestTempTarget - 0.5f) {
+        char hbuf[20];
+        sprintf(hbuf, "HEATING  %d%%", quartzAutoPercent);
         tft.setTextColor(TFT_RED, 0xD6BA);
-        tft.drawCentreString("HEATING  20%", CENTER_X, 338, 2);
+        tft.setTextPadding(260);
+        tft.drawCentreString(hbuf, CENTER_X, 338, 2);
+        tft.setTextPadding(0);
       } else if (ft > quartzTestTempTarget + 0.5f) {
         tft.setTextColor(0x001F, 0xD6BA);
         tft.drawCentreString("COOLING  100%", CENTER_X, 338, 2);
