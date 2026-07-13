@@ -338,17 +338,30 @@ Tests the PID temperature controller for any one of the three tanks without runn
 
 ### 5. HEATER OUTPUT
 
-Tests each SSR heater directly at a set duty cycle, with no temperature feedback.
+Tests the Pre-Heat and Pasteurization SSR heaters directly at a set duty cycle, with no temperature feedback.
 
-- UP/DOWN: switch between the three heater stages (Pre-heat, Fermentation, Pasteurization).
-- LEFT/RIGHT: decrease or increase the duty cycle in 5% steps (0%–100%).
-- SELECT: start or stop the heater. The status bar turns red when running.
-- A progress bar at the bottom shows the current duty cycle visually.
+- UP/DOWN: navigate between Stage, Duty Cycle, and Start/Stop rows.
+- SELECT on Stage: enter editing, then UP/DOWN to switch between Pre-Heat and Pasteurization. SELECT again to confirm.
+- SELECT on Duty Cycle: enter editing, then UP/DOWN to adjust in 5% steps. SELECT again to confirm.
+- SELECT on Start/Stop: toggle the heater on or off.
 - **Monitor the tank temperature with a thermometer during this test.** The heater will run until you stop it manually.
 
 ---
 
-### 6. SD CARD VERIFY
+### 6. QUARTZ HEATER TEST
+
+Tests the fermentation tank quartz heater SSR (SSR_FERM, GPIO 12) at a configurable duty cycle with no temperature feedback.
+
+- UP/DOWN: navigate between Duty Cycle and Start/Stop rows.
+- SELECT on Duty Cycle: enter editing, then UP/DOWN to adjust in 5% steps (0%–100%). SELECT again to confirm.
+- SELECT on Start/Stop: toggle the heater on or off. The status tile turns green when running, red when stopped.
+- The ferm tank temperature (from the secondary ESP32) updates every second in the bottom tile.
+- **Monitor the tank temperature closely during this test.** The heater runs until you stop it manually.
+- LEFT: stops the heater and returns to System Check.
+
+---
+
+### 7. SD CARD VERIFY
 
 Checks that the SD card can be written to and read from correctly.
 
@@ -358,7 +371,7 @@ Checks that the SD card can be written to and read from correctly.
 
 ---
 
-### 7. UART MONITOR
+### 8. UART MONITOR
 
 Shows the live health of the serial link to the Secondary ESP32.
 
@@ -371,7 +384,7 @@ Shows the live health of the serial link to the Secondary ESP32.
 
 ---
 
-### 8. SET RTC TIME
+### 9. SET RTC TIME
 
 Sets the hour and minute on the DS3231 real-time clock.
 
@@ -382,7 +395,7 @@ Sets the hour and minute on the DS3231 real-time clock.
 
 ---
 
-### 9. TRANSFER TEST
+### 10. TRANSFER TEST
 
 Tests the transfer pumps and flow sensors together.
 
@@ -395,18 +408,6 @@ The screen shows two paths — Pre-Heat → Ferm and Ferm → Past — each with
 - LEFT: turns off both pumps and returns to System Check.
 
 > The flow reading depends on calibration. Before first use, run the calibration routine (see Section 11) so the liter display is accurate.
-
----
-
-### 10. QUARTZ HEATER TEST
-
-Tests the fermentation tank quartz heater SSR (SSR_FERM, GPIO 12) at a configurable duty cycle with no temperature feedback.
-
-- UP/DOWN: adjust duty cycle in 5% steps (0%–100%).
-- SELECT: toggle heater ON or OFF. Status tile turns green when running, red when stopped.
-- The ferm tank temperature (from the secondary ESP32) updates every second in the bottom tile.
-- **Monitor the tank temperature closely during this test.** The heater runs until you stop it manually.
-- LEFT: stops the heater and returns to System Check.
 
 ---
 

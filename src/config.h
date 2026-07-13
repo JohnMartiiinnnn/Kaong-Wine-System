@@ -270,6 +270,8 @@ extern bool      flowCalEditing;
 extern bool      quartzTestRunning;
 extern bool      quartzTestNeedsFullRedraw;
 extern int       quartzTestPercent;
+extern int       quartzTestSelection;
+extern bool      quartzTestEditing;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;
