@@ -94,7 +94,8 @@ enum AppState {
   RTC_SET_MENU,
   BREW_SUMMARY_MENU,
   TRANSFER_TEST_MENU,
-  FLOW_CAL_MENU
+  FLOW_CAL_MENU,
+  QUARTZ_TEST_MENU
 };
 
 extern long rawHX711;
@@ -266,6 +267,8 @@ extern float     flowCalKnownVolume;
 extern int       flowCalSelection;
 extern bool      flowCalNeedsFullRedraw;
 extern bool      flowCalEditing;
+extern bool      quartzTestRunning;
+extern bool      quartzTestNeedsFullRedraw;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

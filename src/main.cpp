@@ -162,6 +162,8 @@ float     flowCalKnownVolume = 1.0f;
 int       flowCalSelection   = 0;
 bool      flowCalNeedsFullRedraw = true;
 bool      flowCalEditing         = false;
+bool      quartzTestRunning         = false;
+bool      quartzTestNeedsFullRedraw = true;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -440,6 +442,7 @@ void loop() {
       isFanOn = false;
       isFermFanOn = false;
       pidTestRunning = false;
+      quartzTestRunning = false;
       activeBrewStage = -1;
       currentHeatingPercent = 0;
       digitalWrite(SSR_PREHEAT, LOW);
@@ -602,6 +605,11 @@ void loop() {
         flowCalNeedsFullRedraw = true;
         drawFlowCalMenu();
         break;
+      case QUARTZ_TEST_MENU:
+        quartzTestRunning = false;
+        quartzTestNeedsFullRedraw = true;
+        drawQuartzTestMenu();
+        break;
       case FAN_TEST_PICK:
         fanTestNeedsFullRedraw = true;
         drawFanTestPick();
@@ -719,7 +727,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 10;
+      systemCheckSelection = (systemCheckSelection + 1) % 11;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -842,7 +850,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 9) % 10;
+      systemCheckSelection = (systemCheckSelection + 10) % 11;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -1133,6 +1141,11 @@ void loop() {
         transferTestNeedsFullRedraw = true;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
+      } else if (systemCheckSelection == 10) {
+        quartzTestRunning = false;
+        quartzTestNeedsFullRedraw = true;
+        currentAppState = QUARTZ_TEST_MENU;
+        drawQuartzTestMenu();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -1205,6 +1218,9 @@ void loop() {
         currentAppState = FLOW_CAL_MENU;
         drawFlowCalMenu();
       }
+    } else if (currentAppState == QUARTZ_TEST_MENU) {
+      quartzTestRunning = !quartzTestRunning;
+      drawQuartzTestMenu();
     } else if (currentAppState == FLOW_CAL_MENU) {
       if (flowCalSelection == 0) {
         flowCalEditing = !flowCalEditing;
@@ -1593,6 +1609,12 @@ void loop() {
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
       }
+    } else if (currentAppState == QUARTZ_TEST_MENU) {
+      quartzTestRunning = false;
+      currentHeatingPercent = 0;
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     }
   }
 
@@ -2128,6 +2150,9 @@ void loop() {
         activeHeaterPin = SSR_FERM;
       else
         activeHeaterPin = SSR_PAST;
+    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestRunning) {
+      currentHeatingPercent = 100;
+      activeHeaterPin = SSR_FERM;
     } else if (activeBrewStage == 0) {
       activeHeaterPin = SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
@@ -2192,6 +2217,9 @@ void loop() {
 
     if (currentAppState == FLOW_CAL_MENU)
       drawFlowCalMenu(true);
+
+    if (currentAppState == QUARTZ_TEST_MENU)
+      drawQuartzTestMenu(true);
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
         activeBrewStage >= 0) {

@@ -33,3 +33,4 @@ void drawStageParamMenu();
 void drawBrewSummaryMenu();
 void drawTransferTestMenu(bool valuesOnly = false);
 void drawFlowCalMenu(bool valuesOnly = false);
+void drawQuartzTestMenu(bool valuesOnly = false);

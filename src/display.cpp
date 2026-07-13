@@ -34,7 +34,7 @@ void drawEstopPage() {
 
 void drawCoolingMenu() {
   tft.fillRect(0, 0, 320, 50, 0x03E0);
-  tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
   tft.setTextColor(TFT_WHITE);
   tft.drawString("COOLING CONTROL", 10, 15, 4);
 
@@ -64,7 +64,7 @@ void drawCoolingMenu() {
 void drawNewBrewWizard() {
   if (wizardNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("NEW BREW SETUP", 10, 15, 4);
     tft.setTextColor(TFT_BLACK);
@@ -304,7 +304,7 @@ void updateDashboardTimers() {
 void drawStartMenu() {
   if (menuNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("MAIN MENU", 10, 15, 4);
     menuNeedsFullRedraw = false;
@@ -327,7 +327,7 @@ void drawLoadCellPage(bool valuesOnly) {
     if (loadCellNeedsFullRedraw) {
       // Header
       tft.fillRect(0, 0, 320, 50, 0x0493);
-      tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+      tft.fillRect(0, 50, 320, 430, TFT_WHITE);
       tft.setTextColor(TFT_WHITE);
       tft.drawString("LOAD CELL", 10, 15, 4);
       loadCellNeedsFullRedraw = false;
@@ -403,24 +403,24 @@ void drawSystemCheckMenu() {
     "FAN TEST", "LIGHT INDICATORS", "RELAY TEST",
     "MOTOR TEST", "PID CONTROL",
     "HEATER OUTPUT", "SD CARD VERIFY", "UART MONITOR", "SET RTC TIME",
-    "TRANSFER TEST"
+    "TRANSFER TEST", "QUARTZ HEATER"
   };
 
   auto drawTile = [&](int i, bool sel) {
     uint16_t color    = sel ? 0x3566 : 0xD6BA;
     uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 52 + (i * 38), 300, 34, color);
-    tft.drawRect(10, 52 + (i * 38), 300, 34, TFT_DARKGREY);
+    tft.fillRect(10, 52 + (i * 34), 300, 30, color);
+    tft.drawRect(10, 52 + (i * 34), 300, 30, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 60 + (i * 38), 2);
+    tft.drawCentreString(options[i], CENTER_X, 59 + (i * 34), 2);
   };
 
   if (systemCheckNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SYSTEM CHECK", 10, 15, 4);
-    for (int i = 0; i < 10; i++) drawTile(i, systemCheckSelection == i);
+    for (int i = 0; i < 11; i++) drawTile(i, systemCheckSelection == i);
     tft.fillRect(0, 432, 320, 48, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("UP/DOWN: SELECT   SELECT: ENTER   RETURN: BACK", CENTER_X, 458, 1);
@@ -449,7 +449,7 @@ void drawFanTestPick() {
 
   if (fanTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SELECT FAN GROUP", 10, 15, 4);
     for (int i = 0; i < 2; i++) drawTile(i, fanTestFanChoice == i);
@@ -467,7 +467,7 @@ void drawFanTestPick() {
 void drawFanTestMenu() {
   if (fanTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("FAN CONTROL", 10, 15, 4);
     fanTestNeedsFullRedraw = false;
@@ -501,7 +501,7 @@ void drawFanTestMenu() {
 void drawLightTestMenu() {
   if (lightTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("LIGHT INDICATORS", 10, 15, 4);
     lightTestNeedsFullRedraw = false;
@@ -530,7 +530,7 @@ void drawLightTestMenu() {
 void drawRelayTestMenu() {
   if (relayTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("RELAY TEST", 10, 15, 4);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
@@ -573,7 +573,7 @@ void drawRelayTestMenu() {
 void drawMotorTestMenu() {
   if (motorTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("MOTOR TEST", 10, 15, 4);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
@@ -625,7 +625,7 @@ void drawCalibrationPage(bool valuesOnly) {
   if (!valuesOnly) {
     if (calNeedsFullRedraw) {
       tft.fillRect(0, 0, 320, 50, 0x9000);
-      tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+      tft.fillRect(0, 50, 320, 430, TFT_WHITE);
       tft.setTextColor(TFT_WHITE);
       tft.drawString("SCALE CALIBRATION", 10, 15, 4);
       calNeedsFullRedraw = false;
@@ -655,7 +655,7 @@ void drawSensorMonitorPage(bool valuesOnly) {
   if (!valuesOnly) {
     if (monitorNeedsFullRedraw) {
       tft.fillRect(0, 0, 320, 50, TFT_NAVY);
-      tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+      tft.fillRect(0, 50, 320, 430, TFT_WHITE);
       tft.setTextColor(TFT_WHITE);
       tft.drawString("KEY VALUES", 10, 15, 4);
       tft.setTextColor(TFT_BLACK);
@@ -714,7 +714,7 @@ void drawSensorMonitorPage(bool valuesOnly) {
 
 void drawMixerMenu() {
   tft.fillRect(0, 0, 320, 50, TFT_NAVY);
-  tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
   tft.setTextColor(TFT_WHITE);
   tft.drawString("MIXER CONTROL", 10, 15, 4);
 
@@ -984,7 +984,7 @@ void drawPidTestPick() {
 
   if (pidTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SELECT CHAMBER", 10, 15, 4);
     for (int i = 0; i < 3; i++) drawTile(i, pidTestChoice == i);
@@ -1002,7 +1002,7 @@ void drawPidTestPick() {
 void drawPidTestMenu() {
   if (pidTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("PID CONTROL TEST", 10, 15, 4);
     pidTestNeedsFullRedraw = false;
@@ -1117,7 +1117,7 @@ void drawHeaterTestMenu() {
 
   if (heaterTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("HEATER OUTPUT TEST", 10, 15, 4);
     heaterTestNeedsFullRedraw = false;
@@ -1167,7 +1167,7 @@ void drawHeaterTestMenu() {
   }
 
   // Status bar (START/STOP) — selection 2
-  uint16_t statusBg = (heaterTestRunning || startSel) ? 0xF800 : 0x4208;
+  uint16_t statusBg = heaterTestRunning ? 0x0400 : (startSel ? 0xF800 : 0x4208);
   tft.fillRect(10, 246, 300, 82, statusBg);
   if (startSel) {
     tft.drawRect(10, 246, 300, 82, TFT_WHITE);
@@ -1192,7 +1192,7 @@ void drawHeaterTestMenu() {
   tft.fillRect(20, 396, 278, 18, TFT_WHITE);
   int barW = (heaterTestPercent * 278) / 100;
   if (barW > 0)
-    tft.fillRect(20, 396, barW, 18, heaterTestRunning ? 0xF800 : 0x3566);
+    tft.fillRect(20, 396, barW, 18, heaterTestRunning ? 0x0400 : 0x3566);
   tft.drawRect(20, 396, 278, 18, TFT_DARKGREY);
 
   // Footer
@@ -1214,7 +1214,7 @@ void drawSdVerifyMenu() {
 
   if (sdVerifyNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SD CARD VERIFY", 10, 15, 4);
     sdVerifyNeedsFullRedraw = false;
@@ -1257,7 +1257,7 @@ void drawUartMonitorMenu() {
 
   if (uartMonitorNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("UART MONITOR", 10, 15, 4);
     uartMonitorNeedsFullRedraw = false;
@@ -1322,7 +1322,7 @@ void drawRtcSetMenu() {
 
   if (rtcSetNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SET RTC TIME", 10, 15, 4);
     rtcSetNeedsFullRedraw = false;
@@ -1485,7 +1485,7 @@ void updateDashboardGraph() {
 
 void drawBrewSummaryMenu() {
   tft.fillRect(0, 0, 320, 50, 0x0400);
-  tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
   tft.setTextColor(TFT_WHITE, 0x0400);
   tft.drawString("BREW RESULTS", 10, 15, 4);
 
@@ -1614,7 +1614,7 @@ void drawTransferTestMenu(bool valuesOnly) {
 
   if (transferTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("TRANSFER TEST", 10, 15, 4);
     transferTestNeedsFullRedraw = false;
@@ -1670,7 +1670,7 @@ void drawTransferTestMenu(bool valuesOnly) {
   }
 
   // panel 1 outer border
-  tft.drawRect(10, 58, 300, 185, panel1Active ? TFT_WHITE : TFT_DARKGREY);
+  tft.drawRect(10, 58, 300, 185, TFT_DARKGREY);
 
   // ---- Panel 2: Ferm → Past ----
   uint16_t hdr2Bg  = panel2Active ? 0x03E0 : 0xD6BA;
@@ -1721,7 +1721,7 @@ void drawTransferTestMenu(bool valuesOnly) {
   }
 
   // panel 2 outer border
-  tft.drawRect(10, 251, 300, 185, panel2Active ? TFT_WHITE : TFT_DARKGREY);
+  tft.drawRect(10, 251, 300, 185, TFT_DARKGREY);
 
   // footer
   tft.fillRect(0, 443, 320, 37, TFT_WHITE);
@@ -1737,8 +1737,8 @@ void drawFlowCalMenu(bool valuesOnly) {
                    : 0.0f;
 
   if (valuesOnly) {
-    tft.fillRect(10, 154, 300, 80, 0x1082);
-    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.fillRect(10, 154, 300, 80, 0x2124);
+    tft.setTextColor(TFT_WHITE, 0x2124);
     tft.setTextPadding(290);
     sprintf(buf, "%lu pulses", (unsigned long)pulses);
     tft.drawCentreString(buf, CENTER_X, 162, 2);
@@ -1751,7 +1751,7 @@ void drawFlowCalMenu(bool valuesOnly) {
 
   if (flowCalNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("FLOW CALIBRATION", 10, 15, 4);
     flowCalNeedsFullRedraw = false;
@@ -1765,14 +1765,13 @@ void drawFlowCalMenu(bool valuesOnly) {
   tft.drawCentreString(sName, CENTER_X, 60, 2);
 
   // Row 0: Known Volume
-  uint16_t knownBg = flowCalEditing ? 0x8C20 : (flowCalSelection == 0) ? 0x051D : 0x2124;
+  uint16_t knownBg = (flowCalSelection == 0) ? 0x3566 : 0x2124;
   tft.fillRect(10, 84, 300, 60, knownBg);
-  tft.setTextColor(TFT_DARKGREY, knownBg);
+  tft.setTextColor(TFT_WHITE, knownBg);
   if (flowCalEditing)
     tft.drawCentreString("KNOWN VOLUME  (UP/DOWN TO ADJUST)", CENTER_X, 93, 1);
   else
     tft.drawCentreString("KNOWN VOLUME  (SELECT TO EDIT)", CENTER_X, 93, 1);
-  tft.setTextColor(TFT_WHITE, knownBg);
   sprintf(buf, "%.1f L", flowCalKnownVolume);
   tft.drawCentreString(buf, CENTER_X, 108, 4);
   if (flowCalSelection == 0) {
@@ -1783,8 +1782,8 @@ void drawFlowCalMenu(bool valuesOnly) {
   }
 
   // Live data box (pulse count + calculated liters)
-  tft.fillRect(10, 154, 300, 80, 0x1082);
-  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.fillRect(10, 154, 300, 80, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
   tft.setTextPadding(290);
   sprintf(buf, "%lu pulses", (unsigned long)pulses);
   tft.drawCentreString(buf, CENTER_X, 162, 2);
@@ -1807,7 +1806,7 @@ void drawFlowCalMenu(bool valuesOnly) {
   tft.drawRect(10, 276, 300, 50, (flowCalSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
 
   // Row 2: CAPTURE
-  uint16_t capBg = (flowCalSelection == 2) ? 0x0400 : 0x2104;
+  uint16_t capBg = (flowCalSelection == 2) ? 0x0400 : 0x2124;
   tft.fillRect(10, 334, 300, 84, capBg);
   tft.setTextColor(TFT_WHITE, capBg);
   tft.drawCentreString("CAPTURE K-FACTOR", CENTER_X, 354, 2);
@@ -1825,4 +1824,59 @@ void drawFlowCalMenu(bool valuesOnly) {
     tft.drawCentreString("UP/DOWN: NAVIGATE   SELECT: ACTIVATE", CENTER_X, 446, 1);
     tft.drawCentreString("RETURN: BACK TO TRANSFER TEST", CENTER_X, 462, 1);
   }
+}
+
+void drawQuartzTestMenu(bool valuesOnly) {
+  float fermTemp = incomingData.room2LiquidTemp;
+
+  if (valuesOnly) {
+    tft.fillRect(10, 284, 300, 64, 0x2124);
+    tft.drawRect(10, 284, 300, 64, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.drawString("FERM TANK TEMP", 20, 293, 2);
+    char tbuf[16];
+    if (fermTemp > -100.0f)
+      sprintf(tbuf, "%.1f C", fermTemp);
+    else
+      strcpy(tbuf, "---");
+    tft.setTextPadding(200);
+    tft.drawCentreString(tbuf, CENTER_X, 315, 4);
+    tft.setTextPadding(0);
+    return;
+  }
+
+  if (quartzTestNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("QUARTZ HEATER TEST", 10, 15, 4);
+    quartzTestNeedsFullRedraw = false;
+  }
+
+  // Sub-info bar
+  tft.fillRect(0, 52, 320, 24, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
+  tft.drawCentreString("SSR FERM  |  GPIO 12", CENTER_X, 60, 2);
+
+  // Status tile
+  uint16_t statusBg = quartzTestRunning ? 0x0400 : 0x4208;
+  tft.fillRect(20, 84, 280, 184, statusBg);
+  tft.drawRect(20, 84, 280, 184, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, statusBg);
+  tft.drawCentreString(quartzTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 145, 4);
+  tft.drawCentreString(quartzTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 242, 2);
+
+  // Ferm temp panel (calls valuesOnly path)
+  drawQuartzTestMenu(true);
+
+  // Safety warning
+  tft.fillRect(0, 358, 320, 64, 0xFFE0);
+  tft.setTextColor(TFT_BLACK, 0xFFE0);
+  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 376, 1);
+  tft.drawCentreString("DIRECT SSR FERM CONTROL", CENTER_X, 400, 2);
+
+  // Footer
+  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("SELECT: TOGGLE HEATER   RETURN: BACK", CENTER_X, 458, 1);
 }
