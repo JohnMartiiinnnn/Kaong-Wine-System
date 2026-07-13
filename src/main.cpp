@@ -2253,7 +2253,10 @@ void loop() {
         if (now - quartzAutoCheckMs >= 5000) {
           if (ct - quartzAutoLastTemp < 0.2f) {
             quartzAutoPercent += 5;
-            if (quartzAutoPercent > 60) quartzAutoPercent = 60;
+            if (quartzAutoPercent > 30) quartzAutoPercent = 30;
+          } else {
+            quartzAutoPercent -= 5;
+            if (quartzAutoPercent < 20) quartzAutoPercent = 20;
           }
           quartzAutoLastTemp = ct;
           quartzAutoCheckMs  = now;
