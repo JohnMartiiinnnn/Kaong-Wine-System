@@ -121,7 +121,7 @@ static void formatStageTimer(uint32_t ms, char *out) {
 void drawDashboardLayout() {
   if (dashNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
-    tft.fillRect(0, 50, 320, 384, TFT_WHITE);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("DASHBOARD", 10, 15, 4);
     tft.setTextPadding(0);
@@ -1596,15 +1596,15 @@ void drawTransferTestMenu(bool valuesOnly) {
   bool panel2Active = (transferTestSelection >= 2);
 
   if (valuesOnly) {
-    tft.fillRect(161, 93, 138, 56, 0x1082);
-    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.fillRect(161, 93, 138, 56, 0x2124);
+    tft.setTextColor(TFT_WHITE, 0x2124);
     tft.drawCentreString("FLOW", 230, 102, 2);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters1);
     tft.drawCentreString(buf, 230, 118, 4);
 
-    tft.fillRect(161, 290, 138, 56, 0x1082);
-    tft.setTextColor(TFT_WHITE, 0x1082);
+    tft.fillRect(161, 290, 138, 56, 0x2124);
+    tft.setTextColor(TFT_WHITE, 0x2124);
     tft.drawCentreString("FLOW", 230, 299, 2);
     sprintf(buf, "%.2f L", liters2);
     tft.drawCentreString(buf, 230, 315, 4);
@@ -1621,17 +1621,18 @@ void drawTransferTestMenu(bool valuesOnly) {
   }
 
   // ---- Panel 1: Pre-Heat → Ferm ----
-  uint16_t hdr1Bg  = panel1Active ? 0x0320 : 0x4208;
-  uint16_t body1Bg = panel1Active ? 0x0212 : 0x2104;
+  uint16_t hdr1Bg  = panel1Active ? 0x03E0 : 0xD6BA;
+  uint16_t hdr1Fg  = panel1Active ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, 58, 300, 28, hdr1Bg);
-  tft.setTextColor(TFT_WHITE, hdr1Bg);
+  tft.setTextColor(hdr1Fg, hdr1Bg);
   tft.drawCentreString("PRE-HEAT  ->  FERM", CENTER_X, 67, 2);
-  tft.fillRect(10, 86, 300, 155, body1Bg);
+  tft.fillRect(10, 86, 300, 155, TFT_WHITE);
 
   // pump box
-  uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0x6B4D;
+  uint16_t pump1Bg = pumpPreHeatFermOn ? 0x0400 : 0xD6BA;
+  uint16_t pump1Fg = pumpPreHeatFermOn ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 92, 130, 60, pump1Bg);
-  tft.setTextColor(TFT_WHITE, pump1Bg);
+  tft.setTextColor(pump1Fg, pump1Bg);
   tft.drawCentreString("PUMP", 85, 102, 2);
   tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 120, 4);
   // pump border: thick if selected, thin otherwise
@@ -1644,8 +1645,8 @@ void drawTransferTestMenu(bool valuesOnly) {
   }
 
   // flow box (never selected, always dark border)
-  tft.fillRect(160, 92, 140, 60, 0x1082);
-  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.fillRect(160, 92, 140, 60, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
   tft.drawCentreString("FLOW", 230, 102, 2);
   tft.setTextPadding(130);
   sprintf(buf, "%.2f L", liters1);
@@ -1654,11 +1655,13 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
 
   // calibrate button
-  uint16_t cal1Bg = (transferTestSelection == 1) ? 0x0410 : 0x2124;
+  bool cal1Sel = (transferTestSelection == 1);
+  uint16_t cal1Bg = cal1Sel ? 0x3566 : 0xD6BA;
+  uint16_t cal1Fg = cal1Sel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 158, 280, 52, cal1Bg);
-  tft.setTextColor(TFT_WHITE, cal1Bg);
+  tft.setTextColor(cal1Fg, cal1Bg);
   tft.drawCentreString("CALIBRATE FLOW SENSOR", CENTER_X, 178, 2);
-  if (transferTestSelection == 1) {
+  if (cal1Sel) {
     tft.drawRect(20, 158, 280, 52, TFT_WHITE);
     tft.drawRect(21, 159, 278, 50, TFT_WHITE);
     tft.drawRect(22, 160, 276, 48, TFT_WHITE);
@@ -1670,17 +1673,18 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawRect(10, 58, 300, 185, panel1Active ? TFT_WHITE : TFT_DARKGREY);
 
   // ---- Panel 2: Ferm → Past ----
-  uint16_t hdr2Bg  = panel2Active ? 0x0320 : 0x4208;
-  uint16_t body2Bg = panel2Active ? 0x0110 : 0x2104;
+  uint16_t hdr2Bg  = panel2Active ? 0x03E0 : 0xD6BA;
+  uint16_t hdr2Fg  = panel2Active ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, 251, 300, 28, hdr2Bg);
-  tft.setTextColor(TFT_WHITE, hdr2Bg);
+  tft.setTextColor(hdr2Fg, hdr2Bg);
   tft.drawCentreString("FERM  ->  PAST", CENTER_X, 260, 2);
-  tft.fillRect(10, 279, 300, 155, body2Bg);
+  tft.fillRect(10, 279, 300, 155, TFT_WHITE);
 
   // pump box
-  uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0x6B4D;
+  uint16_t pump2Bg = pumpFermPastOn ? 0x0400 : 0xD6BA;
+  uint16_t pump2Fg = pumpFermPastOn ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 285, 130, 60, pump2Bg);
-  tft.setTextColor(TFT_WHITE, pump2Bg);
+  tft.setTextColor(pump2Fg, pump2Bg);
   tft.drawCentreString("PUMP", 85, 295, 2);
   tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 313, 4);
   if (transferTestSelection == 2) {
@@ -1692,8 +1696,8 @@ void drawTransferTestMenu(bool valuesOnly) {
   }
 
   // flow box
-  tft.fillRect(160, 285, 140, 60, 0x1082);
-  tft.setTextColor(TFT_WHITE, 0x1082);
+  tft.fillRect(160, 285, 140, 60, 0x2124);
+  tft.setTextColor(TFT_WHITE, 0x2124);
   tft.drawCentreString("FLOW", 230, 295, 2);
   tft.setTextPadding(130);
   sprintf(buf, "%.2f L", liters2);
@@ -1702,11 +1706,13 @@ void drawTransferTestMenu(bool valuesOnly) {
   tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
 
   // calibrate button
-  uint16_t cal2Bg = (transferTestSelection == 3) ? 0x0410 : 0x2124;
+  bool cal2Sel = (transferTestSelection == 3);
+  uint16_t cal2Bg = cal2Sel ? 0x3566 : 0xD6BA;
+  uint16_t cal2Fg = cal2Sel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(20, 351, 280, 52, cal2Bg);
-  tft.setTextColor(TFT_WHITE, cal2Bg);
+  tft.setTextColor(cal2Fg, cal2Bg);
   tft.drawCentreString("CALIBRATE FLOW SENSOR", CENTER_X, 371, 2);
-  if (transferTestSelection == 3) {
+  if (cal2Sel) {
     tft.drawRect(20, 351, 280, 52, TFT_WHITE);
     tft.drawRect(21, 352, 278, 50, TFT_WHITE);
     tft.drawRect(22, 353, 276, 48, TFT_WHITE);
