@@ -1134,7 +1134,7 @@ void drawHeaterTestMenu() {
   tft.drawString("STAGE", 20, 66, 2);
   tft.drawCentreString(stageNames[heaterTestStage], CENTER_X, 82, 4);
   tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("UP/DOWN TO CHANGE", CENTER_X, 132, 1);
+  tft.drawCentreString(heaterTestUnlocked ? "UP/DOWN TO CHANGE" : "UNLOCK TO CHANGE", CENTER_X, 132, 1);
 
   // Duty cycle tile
   tft.fillRect(10, 152, 300, 88, 0x3566);
@@ -1144,15 +1144,23 @@ void drawHeaterTestMenu() {
   sprintf(buf, "%d%%", heaterTestPercent);
   tft.drawCentreString(buf, CENTER_X, 176, 4);
   tft.setTextColor(0xD6BA, 0x3566);
-  tft.drawCentreString("L/R TO ADJUST", CENTER_X, 226, 1);
+  tft.drawCentreString(heaterTestUnlocked ? "RIGHT TO ADJUST" : "UNLOCK TO CHANGE", CENTER_X, 226, 1);
 
   // Status bar
-  uint16_t statusBg = heaterTestRunning ? 0xF800 : 0x4208;
-  tft.fillRect(10, 246, 300, 82, statusBg);
-  tft.drawRect(10, 246, 300, 82, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, statusBg);
-  tft.drawCentreString(heaterTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 264, 4);
-  tft.drawCentreString(heaterTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 305, 2);
+  if (!heaterTestUnlocked) {
+    tft.fillRect(10, 246, 300, 82, 0x2124);
+    tft.drawRect(10, 246, 300, 82, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.drawCentreString("CONTROLS LOCKED", CENTER_X, 264, 4);
+    tft.drawCentreString("SELECT TO ACTIVATE", CENTER_X, 305, 2);
+  } else {
+    uint16_t statusBg = heaterTestRunning ? 0xF800 : 0x4208;
+    tft.fillRect(10, 246, 300, 82, statusBg);
+    tft.drawRect(10, 246, 300, 82, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, statusBg);
+    tft.drawCentreString(heaterTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 264, 4);
+    tft.drawCentreString(heaterTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 305, 2);
+  }
 
   // Safety note
   tft.fillRect(0, 334, 320, 28, 0xFFE0);
@@ -1173,8 +1181,12 @@ void drawHeaterTestMenu() {
   // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: CHANGE STAGE   L/R: ADJUST DUTY %", CENTER_X, 447, 1);
-  tft.drawCentreString("SELECT: START/STOP   RETURN: BACK", CENTER_X, 462, 1);
+  if (!heaterTestUnlocked) {
+    tft.drawCentreString("SELECT: ACTIVATE CONTROLS   RETURN: BACK", CENTER_X, 455, 1);
+  } else {
+    tft.drawCentreString("UP/DOWN: CHANGE STAGE   RIGHT: ADJUST DUTY %", CENTER_X, 447, 1);
+    tft.drawCentreString("SELECT: START/STOP   RETURN: BACK", CENTER_X, 462, 1);
+  }
 }
 
 void drawSdVerifyMenu() {

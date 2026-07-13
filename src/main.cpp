@@ -145,6 +145,7 @@ bool heaterTestNeedsFullRedraw = true;
 int heaterTestStage = 0;
 int heaterTestPercent = 0;
 bool heaterTestRunning = false;
+bool heaterTestUnlocked = false;
 uint32_t heaterTestStart = 0;
 bool sdVerifyNeedsFullRedraw = true;
 int sdVerifyResult = -1;
@@ -286,9 +287,9 @@ void setup() {
     mcp.pinMode(FAN_RELAY_PIN, OUTPUT);
     mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
     mcp.pinMode(FERM_FAN_RELAY_PIN, OUTPUT);
-    mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+    mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
     mcp.pinMode(FERM_FAN2_RELAY_PIN, OUTPUT);
-    mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+    mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
     mcp.pinMode(PUMP_PREHEAT_FERM, OUTPUT);
     mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
     mcp.pinMode(PUMP_FERM_PAST, OUTPUT);
@@ -413,8 +414,8 @@ void loop() {
       prePauseSpeed = currentSpeedPercent;
       prePauseFanMode = currentFanMode;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       setFanSpeed(0);
       digitalWrite(SSR_PREHEAT, LOW);
       digitalWrite(SSR_FERM, LOW);
@@ -428,8 +429,8 @@ void loop() {
       for (int i = 0; i < 8; i++)
         mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       setFanSpeed(0);
       setMixerSpeed(0);
       currentMixerMode = MIXER_OFF;
@@ -549,8 +550,8 @@ void loop() {
       isFermFanOn = prePauseFermFanOn;
       currentFanMode = prePauseFanMode;
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_OFF : RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_OFF : RELAY_ON);
       setFanSpeed(prePauseSpeed);
       switch (currentAppState) {
       case START_MENU:
@@ -650,8 +651,8 @@ void loop() {
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       setFanSpeed(0);
       isFermFanOn = false;
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       mcp.digitalWrite(LIGHT_R, RELAY_OFF);
       mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
       mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -763,9 +764,10 @@ void loop() {
         drawStageParamMenu();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (cDown && !ljDown) {
+      if (cDown && !ljDown && heaterTestUnlocked) {
         heaterTestStage = (heaterTestStage + 1) % 3;
         heaterTestRunning = false;
+        heaterTestPercent = 0;
         currentHeatingPercent = 0;
         drawHeaterTestMenu();
       }
@@ -870,10 +872,13 @@ void loop() {
         drawStageParamMenu();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      heaterTestStage = (heaterTestStage + 2) % 3;
-      heaterTestRunning = false;
-      currentHeatingPercent = 0;
-      drawHeaterTestMenu();
+      if (heaterTestUnlocked) {
+        heaterTestStage = (heaterTestStage + 2) % 3;
+        heaterTestRunning = false;
+        heaterTestPercent = 0;
+        currentHeatingPercent = 0;
+        drawHeaterTestMenu();
+      }
     } else if (currentAppState == RTC_SET_MENU) {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
@@ -1079,6 +1084,7 @@ void loop() {
         heaterTestStage = 0;
         heaterTestPercent = 0;
         heaterTestRunning = false;
+        heaterTestUnlocked = false;
         heaterTestNeedsFullRedraw = true;
         currentAppState = HEATER_TEST_MENU;
         drawHeaterTestMenu();
@@ -1137,13 +1143,15 @@ void loop() {
         isFermFanOn = false;
         isFanOn = false;
         mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       }
       pidTestNeedsFullRedraw = true;
       drawPidTestMenu();
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (!heaterTestRunning) {
+      if (!heaterTestUnlocked) {
+        heaterTestUnlocked = true;
+      } else if (!heaterTestRunning) {
         heaterTestRunning = true;
       } else {
         heaterTestRunning = false;
@@ -1242,8 +1250,8 @@ void loop() {
         isFermFanOn = false;
       }
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_OFF : RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_OFF : RELAY_ON);
       drawFanTestMenu();
     } else if (currentAppState == LIGHT_TEST_MENU) {
       if (lightTestSelection == 0) {
@@ -1318,8 +1326,8 @@ void loop() {
           mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
           setFanSpeed(0);
           isFermFanOn = false;
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
           stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
           if (activeBrewStage < 2) {
             stageTransferring = true;
@@ -1397,10 +1405,10 @@ void loop() {
   }
 
   if (cRight && !ljRight && currentAppState == HEATER_TEST_MENU &&
-      !heaterTestRunning) {
+      heaterTestUnlocked && !heaterTestRunning) {
     heaterTestPercent += 5;
     if (heaterTestPercent > 100)
-      heaterTestPercent = 100;
+      heaterTestPercent = 0;
     drawHeaterTestMenu();
   }
   if (cRight && !ljRight && currentAppState == RTC_SET_MENU) {
@@ -1480,8 +1488,8 @@ void loop() {
       isFanOn = false;
       isFermFanOn = false;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       setFanSpeed(0);
       drawFanTestPick();
     } else if (currentAppState == LIGHT_TEST_MENU) {
@@ -1512,8 +1520,8 @@ void loop() {
       isFermFanOn = false;
       isFanOn = false;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
       currentAppState = PID_TEST_PICK;
       pidTestNeedsFullRedraw = true;
       drawPidTestPick();
@@ -1534,18 +1542,12 @@ void loop() {
         drawDashboardLayout();
       }
     } else if (currentAppState == HEATER_TEST_MENU) {
-      if (!heaterTestRunning) {
-        heaterTestPercent -= 5;
-        if (heaterTestPercent < 0)
-          heaterTestPercent = 0;
-        drawHeaterTestMenu();
-      } else {
-        currentAppState = SYSTEM_CHECK_MENU;
-        heaterTestRunning = false;
-        currentHeatingPercent = 0;
-        systemCheckNeedsFullRedraw = true;
-        drawSystemCheckMenu();
-      }
+      heaterTestRunning = false;
+      heaterTestUnlocked = false;
+      currentHeatingPercent = 0;
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == SD_VERIFY_MENU ||
                currentAppState == UART_MONITOR_MENU ||
                currentAppState == RTC_SET_MENU) {
@@ -1939,8 +1941,8 @@ void loop() {
           if (liquidTemp < 27.0f) {
             currentHeatingPercent = 100;
             isFermFanOn = false;
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
           } else if (liquidTemp > 30.0f) {
             currentHeatingPercent = 0;
             isFermFanOn = true;
@@ -2066,8 +2068,8 @@ void loop() {
         mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
         setFanSpeed(0);
         isFermFanOn = false;
-        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
         stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
         if (activeBrewStage < 2) {
           stageTransferring = true;

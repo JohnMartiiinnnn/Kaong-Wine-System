@@ -249,6 +249,7 @@ extern bool     heaterTestNeedsFullRedraw;
 extern int      heaterTestStage;
 extern int      heaterTestPercent;
 extern bool     heaterTestRunning;
+extern bool     heaterTestUnlocked;
 extern uint32_t heaterTestStart;
 extern bool     sdVerifyNeedsFullRedraw;
 extern int      sdVerifyResult;
