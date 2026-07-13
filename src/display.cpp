@@ -1431,12 +1431,12 @@ void updateDashboardGraph() {
   }
 
   // Plot area background
-  tft.fillRect(GX, GPY, GW, GH, TFT_BLACK);
+  tft.fillRect(GX, GPY, GW, GH, TFT_WHITE);
 
-  // Gridlines (dark)
+  // Gridlines
   for (int i = 0; i < 5; i++) {
     int ly = tempToY(tickTemps[i]);
-    tft.drawFastHLine(GX, ly, GW, 0x2104);
+    tft.drawFastHLine(GX, ly, GW, TFT_LIGHTGREY);
   }
 
   // Target dashed lines
