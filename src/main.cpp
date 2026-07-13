@@ -1281,7 +1281,9 @@ void loop() {
         if (!quartzTestRunning) {
           currentHeatingPercent = 0;
           if (quartzTestMode == 1 && isFermFanOn) {
+            setFanSpeed(0);
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
             isFermFanOn = false;
           }
         }
@@ -1689,7 +1691,9 @@ void loop() {
         quartzTestRunning = false;
         currentHeatingPercent = 0;
         if (quartzTestMode == 1 && isFermFanOn) {
+          setFanSpeed(0);
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
           isFermFanOn = false;
         }
         quartzTestNeedsFullRedraw = true;
@@ -2235,15 +2239,30 @@ void loop() {
     } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 1 && quartzTestRunning) {
       float ct = incomingData.room2Temp;
       if (ct > -100.0f && ct < quartzTestTempTarget - 0.5f) {
-        currentHeatingPercent = 100;
+        currentHeatingPercent = 20;
         activeHeaterPin = SSR_FERM;
-        if (isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF); isFermFanOn = false; }
+        if (isFermFanOn) {
+          setFanSpeed(0);
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          isFermFanOn = false;
+        }
       } else if (ct > -100.0f && ct > quartzTestTempTarget + 0.5f) {
         currentHeatingPercent = 0;
-        if (!isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON); isFermFanOn = true; }
+        if (!isFermFanOn) {
+          isFermFanOn = true;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+          setFanSpeed(20);
+        }
       } else {
         currentHeatingPercent = 0;
-        if (isFermFanOn) { mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF); isFermFanOn = false; }
+        if (isFermFanOn) {
+          setFanSpeed(0);
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          isFermFanOn = false;
+        }
       }
     } else if (activeBrewStage == 0) {
       activeHeaterPin = SSR_PREHEAT;
