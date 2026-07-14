@@ -1794,9 +1794,11 @@ void loop() {
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
       static float pidTestIntegral = 0.0f;
       static float pidTestPrevError = 0.0f;
-      const float TEST_KP = 20.0f;
-      const float TEST_KI = 1.0f;
-      const float TEST_KD = 2.0f;
+      static float pidFanPrevTemp   = -999.0f;
+      const float TEST_KP  = 20.0f;
+      const float TEST_KI  = 1.0f;
+      const float TEST_KD  = 2.0f;
+      const float FAN_KD   = 10.0f;
 
       float liquidTemp = -999.0f;
       if (pidTestChoice == 0) {
@@ -1887,11 +1889,16 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
           if (isFermFanOn) {
-            int fanPct = (int)(TEST_KP * (-error));
+            float dTemp = (pidFanPrevTemp > -100.0f) ? (liquidTemp - pidFanPrevTemp) : 0.0f;
+            pidFanPrevTemp = liquidTemp;
+            // P: how far above cool target; D: back off when temp is already falling fast
+            int fanPct = (int)(TEST_KP * (-error) + FAN_KD * dTemp);
             if (fanPct > 100) fanPct = 100;
+            if (fanPct < 0)   fanPct = 0;
             pidFanPercent = fanPct;
           } else {
-            pidFanPercent = 0;
+            pidFanPrevTemp = -999.0f;
+            pidFanPercent  = 0;
           }
           setFanSpeed(pidFanPercent);
         } else {
