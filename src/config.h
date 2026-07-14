@@ -278,6 +278,7 @@ extern float     quartzTestTempTarget;
 extern int       quartzAutoPercent;
 extern float     quartzAutoLastTemp;
 extern uint32_t  quartzAutoCheckMs;
+extern int       quartzFanPercent;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

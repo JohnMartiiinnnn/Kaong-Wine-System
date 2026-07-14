@@ -971,7 +971,7 @@ void drawStageParamMenu() {
 void drawPidTestPick() {
   static int prevSel = -1;
 
-  const char *options[] = {"PRE-HEAT CHAMBER", "FERMENTATION CHAMBER", "PASTEURIZATION CHAMBER"};
+  const char *options[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
 
   auto drawTile = [&](int i, bool sel) {
     uint16_t color    = sel ? 0x3566 : 0xD6BA;
@@ -1884,8 +1884,12 @@ void drawQuartzTestMenu(bool valuesOnly) {
         tft.drawCentreString(hbuf, CENTER_X, 338, 2);
         tft.setTextPadding(0);
       } else if (ft > quartzTestTempTarget + 0.5f) {
+        char cbuf[20];
+        sprintf(cbuf, "COOLING  %d%%", quartzFanPercent);
         tft.setTextColor(0x001F, 0xD6BA);
-        tft.drawCentreString("COOLING  100%", CENTER_X, 338, 2);
+        tft.setTextPadding(260);
+        tft.drawCentreString(cbuf, CENTER_X, 338, 2);
+        tft.setTextPadding(0);
       } else {
         tft.setTextColor(0x0400, 0xD6BA);
         tft.drawCentreString("STABLE", CENTER_X, 338, 2);

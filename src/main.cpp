@@ -172,6 +172,7 @@ float     quartzTestTempTarget      = 35.0f;
 int       quartzAutoPercent         = 20;
 float     quartzAutoLastTemp        = -127.0f;
 uint32_t  quartzAutoCheckMs         = 0;
+int       quartzFanPercent          = 0;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -2272,14 +2273,20 @@ void loop() {
       } else if (ct > -100.0f && ct > quartzTestTempTarget + 0.5f) {
         quartzAutoPercent = 20;
         currentHeatingPercent = 0;
+        // Proportional fan: 20% at target+0.5C, 100% at target+4C
+        int fanPct = (int)((ct - quartzTestTempTarget) * 25.0f);
+        if (fanPct < 20) fanPct = 20;
+        if (fanPct > 100) fanPct = 100;
+        quartzFanPercent = fanPct;
         if (!isFermFanOn) {
           isFermFanOn = true;
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
-          setFanSpeed(100);
         }
+        setFanSpeed(fanPct);
       } else {
         quartzAutoPercent = 20;
+        quartzFanPercent = 0;
         currentHeatingPercent = 0;
         if (isFermFanOn) {
           setFanSpeed(0);
