@@ -1843,20 +1843,23 @@ void drawFlowCalMenu(bool valuesOnly) {
   tft.drawCentreString(buf, CENTER_X, 248, 2);
 
   // Row 1: RESET
-  uint16_t resetBg = (flowCalSelection == 1) ? 0x8000 : 0x4208;
+  bool resetSel = (flowCalSelection == 1);
+  uint16_t resetBg = resetSel ? 0x8000 : 0xD6BA;
+  uint16_t resetFg = resetSel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, 276, 300, 50, resetBg);
-  tft.setTextColor(TFT_WHITE, resetBg);
+  tft.setTextColor(resetFg, resetBg);
   tft.drawCentreString("RESET PULSE COUNT", CENTER_X, 295, 2);
-  tft.drawRect(10, 276, 300, 50, (flowCalSelection == 1) ? TFT_WHITE : TFT_DARKGREY);
+  tft.drawRect(10, 276, 300, 50, resetSel ? TFT_WHITE : TFT_DARKGREY);
 
   // Row 2: CAPTURE
-  uint16_t capBg = (flowCalSelection == 2) ? 0x0400 : 0x2124;
+  bool capSel = (flowCalSelection == 2);
+  uint16_t capBg = capSel ? 0x0400 : 0xD6BA;
+  uint16_t capFg = capSel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, 334, 300, 84, capBg);
-  tft.setTextColor(TFT_WHITE, capBg);
+  tft.setTextColor(capFg, capBg);
   tft.drawCentreString("CAPTURE K-FACTOR", CENTER_X, 354, 2);
-  tft.setTextColor(TFT_DARKGREY, capBg);
   tft.drawCentreString("flow known vol, then SELECT", CENTER_X, 374, 1);
-  tft.drawRect(10, 334, 300, 84, (flowCalSelection == 2) ? TFT_WHITE : TFT_DARKGREY);
+  tft.drawRect(10, 334, 300, 84, capSel ? TFT_WHITE : TFT_DARKGREY);
 
   // Footer
   tft.fillRect(0, 432, 320, 48, TFT_WHITE);
