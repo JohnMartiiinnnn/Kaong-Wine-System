@@ -1020,22 +1020,33 @@ void drawPidTestMenu() {
 
   // Target Heat Setting
   uint16_t heatBg = (!pidTestRunning && pidTestTargetSelection == 0) ? TFT_YELLOW : 0xD6BA;
-  tft.fillRect(20, 100, 135, 70, heatBg);
-  tft.drawRect(20, 100, 135, 70, TFT_DARKGREY);
+  tft.fillRect(20, 100, 135, 62, heatBg);
+  tft.drawRect(20, 100, 135, 62, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, heatBg);
-  tft.drawCentreString("HEAT TARGET", 87, 110, 1);
+  tft.drawCentreString("HEAT TARGET", 87, 108, 1);
   char buf[32];
   sprintf(buf, "%.1f C", pidTestHeatTarget);
-  tft.drawCentreString(buf, 87, 125, 4);
+  tft.drawCentreString(buf, 87, 118, 4);
 
   // Target Cool Setting
   uint16_t coolBg = (!pidTestRunning && pidTestTargetSelection == 1) ? TFT_YELLOW : 0xD6BA;
-  tft.fillRect(165, 100, 135, 70, coolBg);
-  tft.drawRect(165, 100, 135, 70, TFT_DARKGREY);
+  tft.fillRect(165, 100, 135, 62, coolBg);
+  tft.drawRect(165, 100, 135, 62, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, coolBg);
-  tft.drawCentreString("COOL TARGET", 232, 110, 1);
+  tft.drawCentreString("COOL TARGET", 232, 108, 1);
   sprintf(buf, "%.1f C", pidTestCoolTarget);
-  tft.drawCentreString(buf, 232, 125, 4);
+  tft.drawCentreString(buf, 232, 118, 4);
+
+  // Sensor selector (ferm only, y=165-177)
+  if (pidTestChoice == 1) {
+    uint16_t sensBg = (!pidTestRunning && pidTestTargetSelection == 2) ? TFT_YELLOW : 0xD6BA;
+    tft.fillRect(20, 165, 280, 13, sensBg);
+    tft.drawRect(20, 165, 280, 13, TFT_DARKGREY);
+    tft.setTextColor(TFT_BLACK, sensBg);
+    tft.drawCentreString(pidFermSensor == 0 ? "SENSOR: LIQUID (DS18B20)" : "SENSOR: AMBIENT (BME280)", CENTER_X, 167, 1);
+  } else {
+    tft.fillRect(20, 165, 280, 13, TFT_WHITE);
+  }
 
   // Start / Stop Button
   uint16_t btnColor = pidTestRunning ? 0x0400 : 0xF800;

@@ -119,6 +119,7 @@ bool pidTestSuccess = false;
 uint32_t pidTestStableStart = 0;
 uint32_t pidTestStartMs = 0;
 int      pidFanPercent = 0;
+int      pidFermSensor = 1;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -746,10 +747,12 @@ void loop() {
           pidTestHeatTarget -= 1.0f;
           if (pidTestHeatTarget < 0.0f)
             pidTestHeatTarget = 0.0f;
-        } else {
+        } else if (pidTestTargetSelection == 1) {
           pidTestCoolTarget -= 1.0f;
           if (pidTestCoolTarget < 0.0f)
             pidTestCoolTarget = 0.0f;
+        } else {
+          pidFermSensor ^= 1;
         }
         drawPidTestMenu();
       }
@@ -866,10 +869,12 @@ void loop() {
         pidTestHeatTarget += 1.0f;
         if (pidTestHeatTarget > 100.0f)
           pidTestHeatTarget = 100.0f;
-      } else {
+      } else if (pidTestTargetSelection == 1) {
         pidTestCoolTarget += 1.0f;
         if (pidTestCoolTarget > 100.0f)
           pidTestCoolTarget = 100.0f;
+      } else {
+        pidFermSensor ^= 1;
       }
       drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
@@ -1149,6 +1154,7 @@ void loop() {
       } else if (pidTestChoice == 1) {
         pidTestHeatTarget = 27.0f;
         pidTestCoolTarget = 30.0f;
+        pidFermSensor = 1;
       } else {
         pidTestHeatTarget = 35.0f;
         pidTestCoolTarget = 30.0f;
@@ -1411,7 +1417,7 @@ void loop() {
 
   if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
       !pidTestRunning) {
-    pidTestTargetSelection = (pidTestTargetSelection + 1) % 2;
+    pidTestTargetSelection = (pidTestTargetSelection + 1) % (pidTestChoice == 1 ? 3 : 2);
     drawPidTestMenu();
   }
 
@@ -1799,10 +1805,17 @@ void loop() {
         else if (bme1Status)
           liquidTemp = bme1.readTemperature();
       } else if (pidTestChoice == 1) {
-        if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
-          liquidTemp = incomingData.room2LiquidTemp;
-        else if (incomingData.sensor2Status == 1)
-          liquidTemp = incomingData.room2Temp;
+        if (pidFermSensor == 0) {
+          if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+            liquidTemp = incomingData.room2LiquidTemp;
+          else if (incomingData.sensor2Status == 1)
+            liquidTemp = incomingData.room2Temp;
+        } else {
+          if (incomingData.sensor2Status == 1)
+            liquidTemp = incomingData.room2Temp;
+          else if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+            liquidTemp = incomingData.room2LiquidTemp;
+        }
       } else if (pidTestChoice == 2) {
         if (liquid1Status)
           liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
@@ -1848,7 +1861,9 @@ void loop() {
           pidOut = 100.0f;
 
         if (pidOut > 0.0f) {
-          currentHeatingPercent = (int)pidOut;
+          int heat = (int)pidOut;
+          if (pidTestChoice == 1 && heat > 50) heat = 50;
+          currentHeatingPercent = heat;
           isFermFanOn = false;
           isFanOn = false;
         } else if (pidOut < 0.0f) {
