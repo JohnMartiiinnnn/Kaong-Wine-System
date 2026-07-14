@@ -179,6 +179,19 @@ uint32_t transferStartMs = 0;
 bool skipPreheatHeater = false;
 float minVolumeReq = 10.0f;
 bool wizardEditing = false;
+bool calibNeedsFullRedraw = true;
+int calibSelection = 0;
+int calibTarget = 0;
+float calibVolume = 5.0f;
+bool calibRunning = false;
+bool calibCompleted = false;
+uint32_t calibCompleteTime = 0;
+uint32_t calibStartMs = 0;
+bool calibTareDone = false;
+long calibRawTareValue = 0;
+uint32_t calibLedTimer = 0;
+bool calibLedState = false;
+uint32_t calibLastPulseCount = 0;
 int rtcSetField = 0;
 int rtcSetHour = 0;
 int rtcSetMinute = 0;
@@ -232,6 +245,8 @@ void IRAM_ATTR flowISR2() { flowPulse2++; }
 
 // ---- Setup ----
 void setup() {
+  pinMode(2, OUTPUT);
+  digitalWrite(2, LOW);
   pinMode(PWM_PIN, OUTPUT);
   digitalWrite(PWM_PIN, HIGH);
   pinMode(MOTOR_PWM_PIN, OUTPUT);
@@ -362,6 +377,46 @@ void setup() {
 void loop() {
   ArduinoOTA.handle();
   server.handleClient();
+
+  // ---- Calibration Wizard LED UI ----
+  if (currentAppState == CALIB_WIZARD) {
+    if (calibCompleted) {
+      if (millis() - calibCompleteTime < 3000UL) {
+        digitalWrite(2, HIGH);
+      } else {
+        digitalWrite(2, LOW);
+        calibCompleted = false;
+        calibNeedsFullRedraw = true;
+        drawCalibWizard();
+      }
+    } else if (calibRunning) {
+      bool isActive = false;
+      if (calibTarget == 0 || calibTarget == 1) {
+        volatile uint32_t currentPulses = (calibTarget == 0) ? flowPulse1 : flowPulse2;
+        if (currentPulses != calibLastPulseCount) {
+          isActive = true;
+          calibLastPulseCount = currentPulses;
+        }
+      } else {
+        static long lastRaw = 0;
+        if (abs(rawHX711 - lastRaw) > 500) {
+          isActive = true;
+          lastRaw = rawHX711;
+        }
+      }
+      uint32_t interval = isActive ? 100 : 500;
+      if (millis() - calibLedTimer >= interval) {
+        calibLedState = !calibLedState;
+        digitalWrite(2, calibLedState ? HIGH : LOW);
+        calibLedTimer = millis();
+      }
+    } else {
+      digitalWrite(2, LOW);
+    }
+  } else {
+    digitalWrite(2, LOW);
+  }
+
   static uint32_t ld = 0, ll = 0, ls = 0, lw = 0;
   static bool lsd = !sdStatus, les = HIGH;
   char buf[64];
@@ -745,6 +800,11 @@ void loop() {
         loadCellSelection = (loadCellSelection + 1) % 2;
         drawLoadCellPage();
       }
+    } else if (currentAppState == CALIB_WIZARD) {
+      if (cDown && !ljDown && !calibRunning) {
+        calibSelection = (calibSelection + 1) % 3;
+        drawCalibWizard();
+      }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 1) % 10;
       drawSystemCheckMenu();
@@ -875,6 +935,11 @@ void loop() {
         loadCellSelection = (loadCellSelection + 1) % 2;
         drawLoadCellPage();
       }
+    } else if (currentAppState == CALIB_WIZARD) {
+      if (cUp && !ljUp && !calibRunning) {
+        calibSelection = (calibSelection + 2) % 3;
+        drawCalibWizard();
+      }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 9) % 10;
       drawSystemCheckMenu();
@@ -971,47 +1036,15 @@ void loop() {
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
       } else if (menuSelection == 4) {
-        // DEMO RUN: full automated 3-stage simulation (~2.5 min)
-        if (rtcStatus) {
-          DateTime now = rtc.now();
-          sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
-                  now.hour(), now.minute());
-        }
-        originalGravity = 1.060f;
-        ogCapturing = false;
-        ogSampleSum = 0.0f;
-        ogSampleCount = 0;
-        activeBrewStage = 0;
-        stageStartMillis = millis();
-        preHeatSterilized = preHeatCooled = preHeatHolding = false;
-        pastSterilized = pastHolding = false;
-        phAlertActive = false;
-        stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
-        tempHistoryCount = 0;
-        simTempOverride[0] = simTempOverride[1] = simTempOverride[2] = 25.0f;
-        simDynamic[0] = simDynamic[1] = simDynamic[2] = true;
-        simManual[0] = simManual[1] = simManual[2] = false;
-        stageParamEditing = false;
-        incomingData.bleStatus = 1;
-        incomingData.sensor2Status = 1;
-        incomingData.adsStatus = 1;
-        incomingData.ds18Status = 1;
-        incomingData.pillGravity = 1.060f;
-        incomingData.phValue = 4.2f;
-        incomingData.room2LiquidTemp = 25.0f;
-        incomingData.room2Temp = 26.0f;
-        incomingData.room2Pres = 1013.0f;
-        incomingData.pillRSSI = -65;
-        incomingData.pillBattery = 85;
-        remoteStatusReceived = true;
-        simRunActive = true;
-        mcp.digitalWrite(LIGHT_R, RELAY_ON);
-        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-        currentAppState = DASHBOARD_ACTIVE;
-        dashNeedsFullRedraw = true;
-        moduleViewActive = false;
-        drawDashboardLayout();
+        currentAppState = CALIB_WIZARD;
+        calibTarget = 0;
+        calibVolume = 5.0f;
+        calibRunning = false;
+        calibCompleted = false;
+        calibNeedsFullRedraw = true;
+        calibTareDone = false;
+        calibSelection = 0;
+        drawCalibWizard();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (wizardSelection == 0) {
@@ -1371,6 +1404,67 @@ void loop() {
         wizardEditing = !wizardEditing;
         drawLoadCellPage();
       }
+    } else if (currentAppState == CALIB_WIZARD) {
+      if (calibSelection == 0 || calibSelection == 1) {
+        wizardEditing = !wizardEditing;
+        drawCalibWizard();
+      } else if (calibSelection == 2) {
+        // Action Button clicked!
+        if (calibTarget == 0 || calibTarget == 1) {
+          // Flow Sensor
+          if (!calibRunning) {
+            calibRunning = true;
+            if (calibTarget == 0) {
+              flowPulse1 = 0;
+              mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_ON);
+            } else {
+              flowPulse2 = 0;
+              mcp.digitalWrite(PUMP_FERM_PAST, RELAY_ON);
+            }
+            calibStartMs = millis();
+            calibLastPulseCount = 0;
+            calibCompleted = false;
+            drawCalibWizard();
+          } else {
+            calibRunning = false;
+            mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+            mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+            // Calculate new K-factor
+            uint32_t pulses = (calibTarget == 0) ? flowPulse1 : flowPulse2;
+            if (pulses > 0) {
+              flowKFactor[calibTarget] = (float)pulses / calibVolume;
+            }
+            calibCompleted = true;
+            calibCompleteTime = millis();
+            drawCalibWizard();
+          }
+        } else {
+          // Load Cell
+          if (!calibTareDone) {
+            if (hx711Status) {
+              scale.tare();
+              calibRawTareValue = scale.get_value(5);
+              currentWeight = 0.0f;
+              hx711WeightSeeded = false;
+              calibTareDone = true;
+            }
+            drawCalibWizard();
+          } else {
+            if (hx711Status) {
+              long rawVal = scale.get_value(5);
+              float diff = (float)(rawVal - calibRawTareValue);
+              if (abs(diff) > 10.0f) {
+                calibrationFactor = diff / calibVolume;
+                scale.set_scale(calibrationFactor);
+              }
+              calibCompleted = true;
+              calibCompleteTime = millis();
+              calibTareDone = false;
+            }
+            drawCalibWizard();
+          }
+        }
+      }
     } else if (currentAppState == STAGE_PARAM_MENU) {
       int lastRow = (stageParamStage == 1) ? 4 : 2;
       if (stageParamEditing) {
@@ -1448,6 +1542,20 @@ void loop() {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
     drawLoadCellPage();
+  }
+
+  if (cRight && !ljRight && currentAppState == CALIB_WIZARD && !calibRunning) {
+    if (calibSelection == 0 && wizardEditing) {
+      calibTarget = (calibTarget + 1) % 3;
+      calibCompleted = false;
+      calibTareDone = false;
+      drawCalibWizard();
+    } else if (calibSelection == 1 && wizardEditing) {
+      calibVolume += 0.5f;
+      if (calibVolume > 50.0f) calibVolume = 50.0f;
+      calibCompleted = false;
+      drawCalibWizard();
+    }
   }
 
   if (cRight && !ljRight && currentAppState == MOTOR_TEST_MENU) {
@@ -1557,6 +1665,30 @@ void loop() {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
+      }
+    } else if (currentAppState == CALIB_WIZARD) {
+      if (calibSelection == 0 && wizardEditing) {
+        calibTarget = (calibTarget + 2) % 3;
+        calibCompleted = false;
+        calibTareDone = false;
+        drawCalibWizard();
+      } else if (calibSelection == 1 && wizardEditing) {
+        calibVolume -= 0.5f;
+        if (calibVolume < 0.5f) calibVolume = 0.5f;
+        calibCompleted = false;
+        drawCalibWizard();
+      } else {
+        if (calibTareDone) {
+          calibTareDone = false;
+          drawCalibWizard();
+        } else {
+          mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+          mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+          calibRunning = false;
+          currentAppState = START_MENU;
+          menuNeedsFullRedraw = true;
+          drawStartMenu();
+        }
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       currentAppState = START_MENU;
@@ -2318,6 +2450,7 @@ void loop() {
         case MIXER_MENU:        hdrBg = TFT_NAVY; break;
         case LOAD_CELL_PAGE:    hdrBg = 0x0493;   break;
         case CALIBRATION_MODE:  hdrBg = 0x9000;   break;
+        case CALIB_WIZARD:      hdrBg = 0x4810;   break;
         case BREW_SUMMARY_MENU: hdrBg = 0x0400;   break;
         case STAGE_PARAM_MENU: {
           const uint16_t sc[] = {TFT_RED, TFT_ORANGE, 0x03E0};
@@ -2349,6 +2482,9 @@ void loop() {
 
     if (currentAppState == FLOW_CAL_MENU)
       drawFlowCalMenu(true);
+
+    if (currentAppState == CALIB_WIZARD)
+      drawCalibWizard();
 
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&

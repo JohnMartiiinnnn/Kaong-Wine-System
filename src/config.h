@@ -95,7 +95,8 @@ enum AppState {
   BREW_SUMMARY_MENU,
   TRANSFER_TEST_MENU,
   FLOW_CAL_MENU,
-  HEATER_TEST_PICK
+  HEATER_TEST_PICK,
+  CALIB_WIZARD
 };
 
 extern long rawHX711;
@@ -294,3 +295,14 @@ extern uint32_t transferStartMs;
 extern bool     skipPreheatHeater;
 extern float    minVolumeReq;
 extern bool     wizardEditing;
+
+// ---- Calibration Wizard Settings ----
+extern bool     calibNeedsFullRedraw;
+extern int      calibSelection;
+extern int      calibTarget;
+extern float    calibVolume;
+extern bool     calibRunning;
+extern bool     calibCompleted;
+extern uint32_t calibCompleteTime;
+extern bool     calibTareDone;
+extern long     calibRawTareValue;

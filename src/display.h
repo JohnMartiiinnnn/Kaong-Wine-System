@@ -34,3 +34,4 @@ void drawStageParamMenu();
 void drawBrewSummaryMenu();
 void drawTransferTestMenu(bool valuesOnly = false, bool tileOnly = false);
 void drawFlowCalMenu(bool valuesOnly = false);
+void drawCalibWizard();

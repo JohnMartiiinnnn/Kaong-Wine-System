@@ -335,7 +335,7 @@ void drawStartMenu() {
     tft.drawString("MAIN MENU", 10, 15, 4);
     menuNeedsFullRedraw = false;
   }
-  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES", "DEMO RUN"};
+  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES", "CALIBRATE"};
   for (int i = 0; i < 5; i++) {
     uint16_t color    = (menuSelection == i) ? 0x3566 : (i == 4 ? 0x0400 : 0xD6BA);
     uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : (i == 4 ? TFT_WHITE : TFT_BLACK);
@@ -1934,6 +1934,167 @@ void drawFlowCalMenu(bool valuesOnly) {
   } else {
     tft.drawCentreString("UP/DOWN: NAVIGATE   SELECT: ACTIVATE", CENTER_X, 446, 1);
     tft.drawCentreString("RETURN: BACK TO TRANSFER TEST", CENTER_X, 462, 1);
+  }
+}
+
+void drawCalibWizard() {
+  char buf[64];
+  
+  if (calibNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x4810); // Purple/brown header
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("CALIBRATION WIZARD", 10, 15, 4);
+    calibNeedsFullRedraw = false;
+  }
+
+  // Row 0: Target
+  uint16_t row0Bg = (calibSelection == 0) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+  uint16_t row0Fg = (calibSelection == 0) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(15, 60, 290, 45, row0Bg);
+  tft.drawRect(15, 60, 290, 45, TFT_DARKGREY);
+  tft.setTextColor(row0Fg, row0Bg);
+  tft.drawString("TARGET", 25, 75, 2);
+  const char* targetNames[] = {"FLOW SENSOR 1", "FLOW SENSOR 2", "LOAD CELL"};
+  if (calibSelection == 0) {
+    if (wizardEditing) {
+      sprintf(buf, "[ %s ]", targetNames[calibTarget]);
+    } else {
+      sprintf(buf, "< %s >", targetNames[calibTarget]);
+    }
+  } else {
+    sprintf(buf, "%s", targetNames[calibTarget]);
+  }
+  tft.drawRightString(buf, 295, 75, 2);
+
+  // Row 1: Volume
+  uint16_t row1Bg = (calibSelection == 1) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+  uint16_t row1Fg = (calibSelection == 1) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(15, 115, 290, 45, row1Bg);
+  tft.drawRect(15, 115, 290, 45, TFT_DARKGREY);
+  tft.setTextColor(row1Fg, row1Bg);
+  tft.drawString("INPUT LIQUID", 25, 130, 2);
+  if (calibSelection == 1) {
+    if (wizardEditing) {
+      sprintf(buf, "[ %.1f L ]", calibVolume);
+    } else {
+      sprintf(buf, "< %.1f L >", calibVolume);
+    }
+  } else {
+    sprintf(buf, "%.1f L", calibVolume);
+  }
+  tft.drawRightString(buf, 295, 130, 2);
+
+  // Row 2: Action Button
+  uint16_t row2Bg = 0xD6BA;
+  uint16_t row2Fg = TFT_BLACK;
+  const char* actionText = "";
+
+  if (calibTarget == 0 || calibTarget == 1) {
+    // Flow Sensor
+    if (calibRunning) {
+      row2Bg = TFT_ORANGE;
+      row2Fg = TFT_WHITE;
+      actionText = "STOP & SAVE";
+    } else {
+      row2Bg = 0x03E0; // Green
+      row2Fg = TFT_WHITE;
+      actionText = "START PUMP & MEASURE";
+    }
+  } else {
+    // Load Cell
+    if (calibCompleted) {
+      row2Bg = 0x03E0; // Green
+      row2Fg = TFT_WHITE;
+      actionText = "DONE (SUCCESS)";
+    } else if (!calibTareDone) {
+      row2Bg = 0x3566; // Blue
+      row2Fg = TFT_WHITE;
+      actionText = "STEP 1: TARE EMPTY VAT";
+    } else {
+      row2Bg = TFT_ORANGE;
+      row2Fg = TFT_WHITE;
+      actionText = "STEP 2: ADD LIQUID & CALIB";
+    }
+  }
+
+  tft.drawRect(13, 178, 294, 54, (calibSelection == 2) ? TFT_BLACK : TFT_WHITE);
+  tft.fillRect(15, 180, 290, 50, row2Bg);
+  tft.drawRect(15, 180, 290, 50, TFT_DARKGREY);
+  tft.setTextColor(row2Fg, row2Bg);
+  tft.drawCentreString(actionText, CENTER_X, 195, 2);
+
+  // Row 3: Status / Live Reading Display Box
+  tft.fillRect(15, 245, 290, 165, 0xCE79); // Yellow-Green display panel
+  tft.drawRect(15, 245, 290, 165, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xCE79);
+  tft.drawCentreString("LIVE MONITOR", CENTER_X, 252, 2);
+
+  int yLine = 280;
+  if (calibTarget == 0 || calibTarget == 1) {
+    // Flow Sensor Readings
+    uint32_t pulses = (calibTarget == 0) ? flowPulse1 : flowPulse2;
+    float currentK = flowKFactor[calibTarget];
+    float estVol = (float)pulses / currentK;
+
+    sprintf(buf, "PULSES: %lu", pulses);
+    tft.drawString(buf, 30, yLine, 2);
+    
+    sprintf(buf, "EST. VOLUME: %.3f L", estVol);
+    tft.drawString(buf, 30, yLine + 25, 2);
+
+    sprintf(buf, "CURRENT K: %.1f", currentK);
+    tft.drawString(buf, 30, yLine + 50, 2);
+
+    if (calibRunning) {
+      tft.setTextColor(TFT_RED, 0xCE79);
+      tft.drawCentreString("PUMPING & MEASURING...", CENTER_X, yLine + 85, 2);
+    } else if (calibCompleted) {
+      tft.setTextColor(0x03E0, 0xCE79);
+      sprintf(buf, "SAVED NEW K: %.1f", currentK);
+      tft.drawCentreString(buf, CENTER_X, yLine + 85, 2);
+    } else {
+      tft.drawCentreString("READY TO START", CENTER_X, yLine + 85, 2);
+    }
+  } else {
+    // Load Cell Readings
+    float currentFactor = calibrationFactor;
+    float estWt = currentWeight;
+
+    sprintf(buf, "RAW ADC: %ld", rawHX711);
+    tft.drawString(buf, 30, yLine, 2);
+
+    sprintf(buf, "EST. WEIGHT: %.2f L", estWt);
+    tft.drawString(buf, 30, yLine + 25, 2);
+
+    sprintf(buf, "CURRENT FACTOR: %.2f", currentFactor);
+    tft.drawString(buf, 30, yLine + 50, 2);
+
+    if (calibTareDone && !calibCompleted) {
+      tft.setTextColor(TFT_RED, 0xCE79);
+      tft.drawCentreString("TARED. ADD LIQUID & HIT SELECT", CENTER_X, yLine + 85, 2);
+    } else if (calibCompleted) {
+      tft.setTextColor(0x03E0, 0xCE79);
+      sprintf(buf, "SAVED NEW FACTOR: %.1f", currentFactor);
+      tft.drawCentreString(buf, CENTER_X, yLine + 85, 2);
+    } else {
+      tft.drawCentreString("READY (STEP 1: TARE)", CENTER_X, yLine + 85, 2);
+    }
+  }
+
+  // Footer / Key Help Hints
+  tft.fillRect(0, 420, 320, 60, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  if (calibRunning) {
+    tft.drawCentreString("PUMP ACTIVE! LED FLASHING RAPIDLY", CENTER_X, 432, 1);
+    tft.drawCentreString("SELECT: STOP & SAVE CALIBRATION", CENTER_X, 452, 1);
+  } else {
+    tft.drawCentreString("UP/DOWN: NAV   LEFT/RIGHT: ADJUST   SELECT: RUN", CENTER_X, 432, 1);
+    if (calibTareDone) {
+      tft.drawCentreString("LEFT (on Row 2): RESET TARE   RETURN: BACK", CENTER_X, 452, 1);
+    } else {
+      tft.drawCentreString("RETURN (LEFT on Row 0/2): RETURN TO MENU", CENTER_X, 452, 1);
+    }
   }
 }
 
