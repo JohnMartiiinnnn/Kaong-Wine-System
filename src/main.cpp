@@ -1777,14 +1777,26 @@ void loop() {
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
       static float pidTestIntegral = 0.0f;
       static float pidTestPrevError = 0.0f;
+      const float TEST_KP = 20.0f;
+      const float TEST_KI = 1.0f;
+      const float TEST_KD = 2.0f;
 
       float liquidTemp = -999.0f;
-      if (pidTestChoice == 0 && liquid2Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
-      } else if (pidTestChoice == 1 && incomingData.ds18Status == 1) {
-        liquidTemp = incomingData.room2LiquidTemp;
-      } else if (pidTestChoice == 2 && liquid1Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      if (pidTestChoice == 0) {
+        if (liquid2Status)
+          liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+        else if (bme1Status)
+          liquidTemp = bme1.readTemperature();
+      } else if (pidTestChoice == 1) {
+        if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+          liquidTemp = incomingData.room2LiquidTemp;
+        else if (incomingData.sensor2Status == 1)
+          liquidTemp = incomingData.room2Temp;
+      } else if (pidTestChoice == 2) {
+        if (liquid1Status)
+          liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+        else if (bme1Status)
+          liquidTemp = bme1.readTemperature();
       }
 
       if (liquidTemp > -100.0f) {
@@ -1816,8 +1828,8 @@ void loop() {
           pidTestIntegral = 0.0f;
         }
 
-        float pidOut = (PID_KP * error) + (PID_KI * pidTestIntegral) +
-                       (PID_KD * (error - pidTestPrevError));
+        float pidOut = (TEST_KP * error) + (TEST_KI * pidTestIntegral) +
+                       (TEST_KD * (error - pidTestPrevError));
         pidTestPrevError = error;
         if (pidOut < -100.0f)
           pidOut = -100.0f;
@@ -1866,6 +1878,11 @@ void loop() {
           pidTestStableStart = 0;
           pidTestSuccess = false;
         }
+      } else {
+        currentHeatingPercent = 0;
+        isFanOn = false;
+        isFermFanOn = false;
+        pidFanPercent = 0;
       }
       drawPidTestMenu();
     }
