@@ -267,6 +267,7 @@ extern float     flowCalKnownVolume;
 extern int       flowCalSelection;
 extern bool      flowCalNeedsFullRedraw;
 extern bool      flowCalEditing;
+extern int      pidFanPercent;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

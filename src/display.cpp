@@ -1043,7 +1043,6 @@ void drawPidTestMenu() {
 
   // Live Data Dashboard (drawn only if running)
   if (pidTestRunning) {
-    // Current Temp
     float liquidTemp = -999.0f;
     float ambientTemp = -999.0f;
     if (pidTestChoice == 0) {
@@ -1056,54 +1055,76 @@ void drawPidTestMenu() {
       if (liquid1Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
       if (bme1Status) ambientTemp = bme1.readTemperature();
     }
-    
-    // Liquid Temp
-    tft.fillRect(20, 240, 90, 60, 0x3566);
-    tft.drawRect(20, 240, 90, 60, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x3566);
-    tft.drawCentreString("LIQUID", 65, 250, 1);
-    if (liquidTemp > -100.0f) sprintf(buf, "%.1f", liquidTemp);
-    else strcpy(buf, "--");
-    tft.drawCentreString(buf, 65, 270, 2);
 
-    // Ambient Temp
-    tft.fillRect(115, 240, 90, 60, 0x3566);
-    tft.drawRect(115, 240, 90, 60, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x3566);
-    tft.drawCentreString("AMBIENT", 160, 250, 1);
-    if (ambientTemp > -100.0f) sprintf(buf, "%.1f", ambientTemp);
-    else strcpy(buf, "--");
-    tft.drawCentreString(buf, 160, 270, 2);
+    // Row 1: LIQUID TEMP | AMBIENT TEMP (y=240, h=55)
+    tft.fillRect(10, 240, 145, 55, 0x2124);
+    tft.drawRect(10, 240, 145, 55, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.drawCentreString("LIQUID TEMP", 82, 250, 1);
+    if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
+    else strcpy(buf, "---");
+    tft.setTextPadding(130);
+    tft.drawCentreString(buf, 82, 264, 2);
 
-    // Effort %
-    tft.fillRect(210, 240, 90, 60, 0x3566);
-    tft.drawRect(210, 240, 90, 60, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x3566);
-    tft.drawCentreString("EFFORT", 255, 250, 1);
-    if (currentHeatingPercent > 0) {
-      sprintf(buf, "H:%d%%", currentHeatingPercent);
-    } else if (isFanOn || isFermFanOn) {
-      sprintf(buf, "C:%d%%", currentSpeedPercent);
-    } else {
-      strcpy(buf, "0%");
-    }
-    tft.drawCentreString(buf, 255, 270, 2);
+    tft.fillRect(165, 240, 145, 55, 0x2124);
+    tft.drawRect(165, 240, 145, 55, TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.drawCentreString("AMBIENT TEMP", 237, 250, 1);
+    if (ambientTemp > -100.0f) sprintf(buf, "%.1f C", ambientTemp);
+    else strcpy(buf, "---");
+    tft.setTextPadding(130);
+    tft.drawCentreString(buf, 237, 264, 2);
+    tft.setTextPadding(0);
 
-    // Status Banner
-    uint16_t statusBg = pidTestSuccess ? 0x0400 : TFT_ORANGE;
-    tft.fillRect(20, 310, 280, 70, statusBg);
-    tft.drawRect(20, 310, 280, 70, TFT_DARKGREY);
+    // Row 2: HEATER % | FAN % (y=302, h=50)
+    bool heaterOn = currentHeatingPercent > 0;
+    bool fanOn    = isFanOn || isFermFanOn;
+    uint16_t htrBg = heaterOn ? 0x0400 : 0xD6BA;
+    uint16_t htrFg = heaterOn ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 302, 145, 50, htrBg);
+    tft.drawRect(10, 302, 145, 50, TFT_DARKGREY);
+    tft.setTextColor(htrFg, htrBg);
+    tft.drawCentreString("HEATER", 82, 312, 1);
+    if (heaterOn) sprintf(buf, "%d%%", currentHeatingPercent);
+    else strcpy(buf, "OFF");
+    tft.setTextPadding(130);
+    tft.drawCentreString(buf, 82, 322, 2);
+
+    uint16_t fanBg = fanOn ? 0x001F : 0xD6BA;
+    uint16_t fanFg = fanOn ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(165, 302, 145, 50, fanBg);
+    tft.drawRect(165, 302, 145, 50, TFT_DARKGREY);
+    tft.setTextColor(fanFg, fanBg);
+    tft.drawCentreString("FAN", 237, 312, 1);
+    if (fanOn) sprintf(buf, "%d%%", pidFanPercent);
+    else strcpy(buf, "OFF");
+    tft.setTextPadding(130);
+    tft.drawCentreString(buf, 237, 322, 2);
+    tft.setTextPadding(0);
+
+    // Row 3: Status banner (y=360, h=48)
+    uint16_t statusBg;
+    const char *statusText;
+    if (pidTestSuccess)    { statusBg = 0x0400; statusText = "STABLE!"; }
+    else if (heaterOn)     { statusBg = 0xF800; statusText = "HEATING"; }
+    else if (fanOn)        { statusBg = 0x001F; statusText = "COOLING"; }
+    else                   { statusBg = TFT_ORANGE; statusText = "AUTOMATING..."; }
+    tft.fillRect(10, 360, 300, 48, statusBg);
+    tft.drawRect(10, 360, 300, 48, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(pidTestSuccess ? "STABLE!" : "AUTOMATING...", CENTER_X, 325, 4);
+    tft.drawCentreString(statusText, CENTER_X, 376, 4);
 
+    // Elapsed time
     char timeStr[32];
     uint32_t elapsedSecs = (millis() - pidTestStartMs) / 1000;
     sprintf(timeStr, "TIME: %02d:%02d", elapsedSecs / 60, elapsedSecs % 60);
-    tft.drawCentreString(timeStr, CENTER_X, 355, 2);
-  } else {
-    tft.fillRect(20, 240, 280, 140, TFT_WHITE);
+    tft.fillRect(10, 414, 300, 16, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("SELECT START TO BEGIN", CENTER_X, 290, 2);
+    tft.drawCentreString(timeStr, CENTER_X, 416, 1);
+  } else {
+    tft.fillRect(10, 240, 300, 196, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("SELECT START TO BEGIN", CENTER_X, 320, 2);
   }
 
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);

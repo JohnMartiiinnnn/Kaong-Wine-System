@@ -118,6 +118,7 @@ bool pidTestRunning = false;
 bool pidTestSuccess = false;
 uint32_t pidTestStableStart = 0;
 uint32_t pidTestStartMs = 0;
+int      pidFanPercent = 0;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -847,7 +848,7 @@ void loop() {
       systemCheckSelection = (systemCheckSelection + 9) % 10;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
-      pidTestChoice = (pidTestChoice + 1) % 3;
+      pidTestChoice = (pidTestChoice + 2) % 3;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
       if (pidTestTargetSelection == 0) {
@@ -1153,6 +1154,7 @@ void loop() {
       } else {
         pidTestRunning = false;
         currentHeatingPercent = 0;
+        pidFanPercent = 0;
         isFermFanOn = false;
         isFanOn = false;
         mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
@@ -1846,10 +1848,12 @@ void loop() {
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
-          setFanSpeed(isFermFanOn ? (int)(-pidOut) : 0);
+          pidFanPercent = isFermFanOn ? (int)(-pidOut) : 0;
+          setFanSpeed(pidFanPercent);
         } else {
           mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-          setFanSpeed(isFanOn ? 100 : 0);
+          pidFanPercent = isFanOn ? 100 : 0;
+          setFanSpeed(pidFanPercent);
         }
 
         if (abs(error) <= 0.5f) {
