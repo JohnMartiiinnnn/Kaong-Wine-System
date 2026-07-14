@@ -402,7 +402,7 @@ void drawSystemCheckMenu() {
   const char *options[] = {
     "FAN TEST", "LIGHT INDICATORS", "RELAY TEST",
     "MOTOR TEST", "PID CONTROL",
-    "HEATER OUTPUT", "QUARTZ HEATER", "SD CARD VERIFY", "UART MONITOR",
+    "HEATER OUTPUT", "SD CARD VERIFY", "UART MONITOR",
     "SET RTC TIME", "TRANSFER TEST"
   };
 
@@ -420,7 +420,7 @@ void drawSystemCheckMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SYSTEM CHECK", 10, 15, 4);
-    for (int i = 0; i < 11; i++) drawTile(i, systemCheckSelection == i);
+    for (int i = 0; i < 10; i++) drawTile(i, systemCheckSelection == i);
     tft.fillRect(0, 432, 320, 48, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("UP/DOWN: SELECT   SELECT: ENTER   RETURN: BACK", CENTER_X, 458, 1);
@@ -1111,90 +1111,103 @@ void drawPidTestMenu() {
   tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
 }
 
-void drawHeaterTestMenu() {
-  const char *stageNames[] = {"PRE-HEAT", "PASTEURIZATION"};
-  char buf[40];
+void drawHeaterTestPick() {
+  static int prevSel = -1;
+  const char *options[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t color    = sel ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(20, 82 + (i * 105), 280, 88, color);
+    tft.drawRect(20, 82 + (i * 105), 280, 88, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawCentreString(options[i], CENTER_X, 112 + (i * 105), 4);
+  };
 
   if (heaterTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("HEATER OUTPUT TEST", 10, 15, 4);
+    tft.drawCentreString("SELECT CHAMBER", CENTER_X, 15, 4);
+    for (int i = 0; i < 3; i++) drawTile(i, heaterTestStage == i);
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
     heaterTestNeedsFullRedraw = false;
+    prevSel = heaterTestStage;
+  } else if (prevSel != heaterTestStage) {
+    if (prevSel >= 0) drawTile(prevSel, false);
+    drawTile(heaterTestStage, true);
+    prevSel = heaterTestStage;
   }
+}
 
-  bool stageSel = (heaterTestSelection == 0);
-  bool dutySel  = (heaterTestSelection == 1);
-  bool startSel = (heaterTestSelection == 2);
+void drawHeaterTestMenu() {
+  const char *stageNames[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
+  const char *ssrNames[]   = {"SSR PREHEAT", "SSR FERM", "SSR PAST"};
+  char buf[40];
 
-  // Stage tile
-  uint16_t stageBg = stageSel ? 0x3566 : 0xD6BA;
-  uint16_t stageFg = stageSel ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(10, 58, 300, 88, stageBg);
-  if (stageSel && heaterTestEditing) {
-    tft.drawRect(10, 58, 300, 88, TFT_WHITE);
-    tft.drawRect(11, 59, 298, 86, TFT_WHITE);
-  } else {
-    tft.drawRect(10, 58, 300, 88, TFT_DARKGREY);
-  }
-  tft.setTextColor(stageFg, stageBg);
-  tft.drawString("STAGE", 20, 66, 2);
-  tft.drawCentreString(stageNames[heaterTestStage], CENTER_X, 82, 4);
-  tft.fillRect(20, 128, 260, 12, stageBg);
-  if (stageSel) {
-    tft.setTextColor(TFT_WHITE, stageBg);
-    tft.drawCentreString(heaterTestEditing ? "UP/DN TO CHANGE   SELECT: DONE" : "SELECT TO EDIT", CENTER_X, 130, 1);
+  bool dutySel  = (heaterTestSelection == 0);
+  bool startSel = (heaterTestSelection == 1);
+
+  if (heaterTestNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawCentreString("HEATER OUTPUT TEST", CENTER_X, 15, 4);
+    tft.fillRect(0, 52, 320, 28, 0x4208);
+    tft.setTextColor(TFT_WHITE, 0x4208);
+    char sbuf[48];
+    sprintf(sbuf, "%s  (%s)", stageNames[heaterTestStage], ssrNames[heaterTestStage]);
+    tft.drawCentreString(sbuf, CENTER_X, 60, 2);
+    heaterTestNeedsFullRedraw = false;
   }
 
   // Duty cycle tile
   uint16_t dutyBg = dutySel ? 0x3566 : 0xD6BA;
   uint16_t dutyFg = dutySel ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(10, 152, 300, 88, dutyBg);
+  tft.fillRect(10, 86, 300, 106, dutyBg);
   if (dutySel && heaterTestEditing) {
-    tft.drawRect(10, 152, 300, 88, TFT_WHITE);
-    tft.drawRect(11, 153, 298, 86, TFT_WHITE);
+    tft.drawRect(10, 86, 300, 106, TFT_WHITE);
+    tft.drawRect(11, 87, 298, 104, TFT_WHITE);
   } else {
-    tft.drawRect(10, 152, 300, 88, TFT_DARKGREY);
+    tft.drawRect(10, 86, 300, 106, TFT_DARKGREY);
   }
   tft.setTextColor(dutyFg, dutyBg);
-  tft.drawString("DUTY CYCLE", 20, 160, 2);
+  tft.drawString("DUTY CYCLE", 20, 96, 2);
   sprintf(buf, "%d%%", heaterTestPercent);
-  tft.drawCentreString(buf, CENTER_X, 176, 4);
-  tft.fillRect(20, 222, 260, 12, dutyBg);
+  tft.drawCentreString(buf, CENTER_X, 114, 4);
+  tft.fillRect(20, 164, 260, 14, dutyBg);
   if (dutySel) {
     tft.setTextColor(TFT_WHITE, dutyBg);
-    tft.drawCentreString(heaterTestEditing ? "UP/DN TO ADJUST   SELECT: DONE" : "SELECT TO EDIT", CENTER_X, 224, 1);
+    tft.drawCentreString(heaterTestEditing ? "UP/DN TO ADJUST   SELECT: DONE" : "SELECT TO EDIT", CENTER_X, 166, 1);
   }
 
-  // Status bar (START/STOP) — selection 2
+  // START/STOP tile
   uint16_t statusBg = heaterTestRunning ? 0x0400 : (startSel ? 0xF800 : 0x4208);
-  tft.fillRect(10, 246, 300, 82, statusBg);
+  tft.fillRect(10, 198, 300, 106, statusBg);
   if (startSel) {
-    tft.drawRect(10, 246, 300, 82, TFT_WHITE);
-    tft.drawRect(11, 247, 298, 80, TFT_WHITE);
+    tft.drawRect(10, 198, 300, 106, TFT_WHITE);
+    tft.drawRect(11, 199, 298, 104, TFT_WHITE);
   } else {
-    tft.drawRect(10, 246, 300, 82, TFT_DARKGREY);
+    tft.drawRect(10, 198, 300, 106, TFT_DARKGREY);
   }
   tft.setTextColor(TFT_WHITE, statusBg);
-  tft.drawCentreString(heaterTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 264, 4);
-  tft.drawCentreString(heaterTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 305, 2);
+  tft.drawCentreString(heaterTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 222, 4);
+  tft.drawCentreString(heaterTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 268, 2);
 
   // Safety note
-  tft.fillRect(0, 334, 320, 28, 0xFFE0);
+  tft.fillRect(0, 310, 320, 26, 0xFFE0);
   tft.setTextColor(TFT_BLACK, 0xFFE0);
-  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 344, 1);
+  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 320, 1);
 
   // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  if (heaterTestEditing) {
-    if (heaterTestSelection == 0)
-      tft.drawCentreString("UP/DN: CHANGE STAGE   SELECT: DONE", CENTER_X, 447, 1);
-    else
-      tft.drawCentreString("UP/DN: ADJUST DUTY %   SELECT: DONE", CENTER_X, 447, 1);
-  } else {
+  if (heaterTestEditing)
+    tft.drawCentreString("UP/DN: ADJUST DUTY %   SELECT: DONE", CENTER_X, 447, 1);
+  else
     tft.drawCentreString("UP/DN: NAVIGATE   SELECT: EDIT / START", CENTER_X, 447, 1);
-  }
   tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
 }
 
@@ -1808,207 +1821,3 @@ void drawFlowCalMenu(bool valuesOnly) {
   }
 }
 
-void drawQuartzTestPick() {
-  static int prevSel = -1;
-
-  const char *options[] = {"MANUAL", "AUTO TEMP"};
-
-  auto drawTile = [&](int i, bool sel) {
-    uint16_t color    = sel ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 80 + (i * 120), 280, 100, color);
-    tft.drawRect(20, 80 + (i * 120), 280, 100, TFT_DARKGREY);
-    tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 120 + (i * 120), 4);
-    const char *sub[] = {"Set duty cycle manually", "Heater + ferm fan to target temp"};
-    tft.drawCentreString(sub[i], CENTER_X, 148 + (i * 120), 1);
-  };
-
-  if (quartzTestNeedsFullRedraw) {
-    tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawString("QUARTZ HEATER TEST", 10, 15, 4);
-    for (int i = 0; i < 2; i++) drawTile(i, quartzTestMode == i);
-    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK", CENTER_X, 458, 1);
-    quartzTestNeedsFullRedraw = false;
-    prevSel = quartzTestMode;
-  } else if (prevSel != quartzTestMode) {
-    if (prevSel >= 0) drawTile(prevSel, false);
-    drawTile(quartzTestMode, true);
-    prevSel = quartzTestMode;
-  }
-}
-
-void drawQuartzTestMenu(bool valuesOnly) {
-  if (valuesOnly) {
-    if (quartzTestMode == 0) {
-      // Manual: show liquid temp tile at y=292
-      float ft = incomingData.room2LiquidTemp;
-      char tbuf[16];
-      if (ft > -100.0f) sprintf(tbuf, "%.1f C", ft);
-      else strcpy(tbuf, "---");
-      tft.fillRect(10, 292, 300, 70, 0xD6BA);
-      tft.drawRect(10, 292, 300, 70, TFT_DARKGREY);
-      tft.setTextColor(TFT_BLACK, 0xD6BA);
-      tft.drawString("FERM TANK TEMP", 20, 300, 2);
-      tft.setTextPadding(280);
-      tft.drawCentreString(tbuf, CENTER_X, 318, 4);
-      tft.setTextPadding(0);
-    } else {
-      // Auto: live status tile at y=260 using BME280 ambient (room2Temp)
-      float ft = incomingData.room2Temp;
-      char tbuf[16];
-      if (ft > -100.0f) sprintf(tbuf, "%.1f C", ft);
-      else strcpy(tbuf, "---");
-      tft.fillRect(10, 260, 300, 102, 0xD6BA);
-      tft.drawRect(10, 260, 300, 102, TFT_DARKGREY);
-      tft.setTextColor(TFT_BLACK, 0xD6BA);
-      tft.drawString("FERM AMBIENT TEMP", 20, 268, 2);
-      tft.setTextPadding(280);
-      tft.drawCentreString(tbuf, CENTER_X, 286, 4);
-      tft.setTextPadding(0);
-      if (ft <= -100.0f) {
-        tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-        tft.drawCentreString("NO SIGNAL", CENTER_X, 338, 2);
-      } else if (!quartzTestRunning) {
-        tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-        tft.drawCentreString("IDLE", CENTER_X, 338, 2);
-      } else if (ft < quartzTestTempTarget - 0.5f) {
-        char hbuf[20];
-        sprintf(hbuf, "HEATING  %d%%", quartzAutoPercent);
-        tft.setTextColor(TFT_RED, 0xD6BA);
-        tft.setTextPadding(260);
-        tft.drawCentreString(hbuf, CENTER_X, 338, 2);
-        tft.setTextPadding(0);
-      } else if (ft > quartzTestTempTarget + 0.5f) {
-        char cbuf[20];
-        sprintf(cbuf, "COOLING  %d%%", quartzFanPercent);
-        tft.setTextColor(0x001F, 0xD6BA);
-        tft.setTextPadding(260);
-        tft.drawCentreString(cbuf, CENTER_X, 338, 2);
-        tft.setTextPadding(0);
-      } else {
-        tft.setTextColor(0x0400, 0xD6BA);
-        tft.drawCentreString("STABLE", CENTER_X, 338, 2);
-      }
-    }
-    return;
-  }
-
-  if (quartzTestNeedsFullRedraw) {
-    tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawString("QUARTZ HEATER TEST", 10, 15, 4);
-    quartzTestNeedsFullRedraw = false;
-  }
-
-  char buf[16];
-  bool row0Sel  = (quartzTestSelection == 0);
-  bool startSel = (quartzTestSelection == 1);
-
-  if (quartzTestMode == 0) {
-    // ---- MANUAL MODE ----
-    tft.fillRect(0, 52, 320, 28, 0x4208);
-    tft.setTextColor(TFT_WHITE, 0x4208);
-    tft.drawCentreString("MANUAL  (SSR FERM)", CENTER_X, 60, 2);
-
-    // Duty cycle tile (row 0)
-    uint16_t dutyBg = row0Sel ? 0x3566 : 0xD6BA;
-    uint16_t dutyFg = row0Sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 84, 300, 88, dutyBg);
-    if (row0Sel && quartzTestEditing) {
-      tft.drawRect(10, 84, 300, 88, TFT_WHITE);
-      tft.drawRect(11, 85, 298, 86, TFT_WHITE);
-    } else {
-      tft.drawRect(10, 84, 300, 88, TFT_DARKGREY);
-    }
-    tft.setTextColor(dutyFg, dutyBg);
-    tft.drawString("DUTY CYCLE", 20, 92, 2);
-    sprintf(buf, "%d%%", quartzTestPercent);
-    tft.drawCentreString(buf, CENTER_X, 108, 4);
-    tft.fillRect(20, 150, 260, 12, dutyBg);
-    if (row0Sel) {
-      tft.setTextColor(TFT_WHITE, dutyBg);
-      tft.drawCentreString(quartzTestEditing ? "UP/DN TO ADJUST   SELECT: DONE" : "SELECT TO EDIT", CENTER_X, 152, 1);
-    }
-
-    // Status tile (row 1)
-    uint16_t statusBg = quartzTestRunning ? 0x0400 : (startSel ? 0xF800 : 0x4208);
-    tft.fillRect(10, 176, 300, 110, statusBg);
-    if (startSel) {
-      tft.drawRect(10, 176, 300, 110, TFT_WHITE);
-      tft.drawRect(11, 177, 298, 108, TFT_WHITE);
-    } else {
-      tft.drawRect(10, 176, 300, 110, TFT_DARKGREY);
-    }
-    tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(quartzTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 214, 4);
-    tft.drawCentreString(quartzTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 260, 2);
-
-    // Ferm temp tile
-    drawQuartzTestMenu(true);
-
-  } else {
-    // ---- AUTO TEMP MODE ----
-    tft.fillRect(0, 52, 320, 28, 0x4208);
-    tft.setTextColor(TFT_WHITE, 0x4208);
-    tft.drawCentreString("AUTO TEMP  (SSR FERM + FERM FAN)", CENTER_X, 60, 2);
-
-    // Heat target tile (row 0)
-    uint16_t tgtBg = row0Sel ? 0x3566 : 0xD6BA;
-    uint16_t tgtFg = row0Sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 84, 300, 88, tgtBg);
-    if (row0Sel && quartzTestEditing) {
-      tft.drawRect(10, 84, 300, 88, TFT_WHITE);
-      tft.drawRect(11, 85, 298, 86, TFT_WHITE);
-    } else {
-      tft.drawRect(10, 84, 300, 88, TFT_DARKGREY);
-    }
-    tft.setTextColor(tgtFg, tgtBg);
-    tft.drawString("HEAT TARGET", 20, 92, 2);
-    sprintf(buf, "%.0f C", quartzTestTempTarget);
-    tft.drawCentreString(buf, CENTER_X, 108, 4);
-    tft.fillRect(20, 150, 260, 12, tgtBg);
-    if (row0Sel) {
-      tft.setTextColor(TFT_WHITE, tgtBg);
-      tft.drawCentreString(quartzTestEditing ? "UP/DN TO ADJUST   SELECT: DONE" : "SELECT TO EDIT", CENTER_X, 152, 1);
-    }
-
-    // Status tile (row 1)
-    uint16_t statusBg = quartzTestRunning ? 0x0400 : (startSel ? 0xF800 : 0x4208);
-    tft.fillRect(10, 176, 300, 80, statusBg);
-    if (startSel) {
-      tft.drawRect(10, 176, 300, 80, TFT_WHITE);
-      tft.drawRect(11, 177, 298, 78, TFT_WHITE);
-    } else {
-      tft.drawRect(10, 176, 300, 80, TFT_DARKGREY);
-    }
-    tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(quartzTestRunning ? "RUNNING" : "STOPPED", CENTER_X, 200, 4);
-    tft.drawCentreString(quartzTestRunning ? "SELECT TO STOP" : "SELECT TO START", CENTER_X, 236, 2);
-
-    // Live status tile (updated each second)
-    drawQuartzTestMenu(true);
-  }
-
-  // Safety warning
-  tft.fillRect(0, 370, 320, 26, 0xFFE0);
-  tft.setTextColor(TFT_BLACK, 0xFFE0);
-  tft.drawCentreString("! MONITOR TEMPERATURE DURING TEST !", CENTER_X, 381, 1);
-
-  // Footer
-  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  if (quartzTestEditing) {
-    tft.drawCentreString(quartzTestMode == 0 ? "UP/DN: ADJUST DUTY %   SELECT: DONE"
-                                              : "UP/DN: ADJUST TARGET C   SELECT: DONE",
-                         CENTER_X, 447, 1);
-  } else {
-    tft.drawCentreString("UP/DN: NAVIGATE   SELECT: EDIT / START", CENTER_X, 447, 1);
-  }
-  tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
-}

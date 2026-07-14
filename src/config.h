@@ -95,8 +95,7 @@ enum AppState {
   BREW_SUMMARY_MENU,
   TRANSFER_TEST_MENU,
   FLOW_CAL_MENU,
-  QUARTZ_TEST_PICK,
-  QUARTZ_TEST_MENU
+  HEATER_TEST_PICK
 };
 
 extern long rawHX711;
@@ -268,17 +267,6 @@ extern float     flowCalKnownVolume;
 extern int       flowCalSelection;
 extern bool      flowCalNeedsFullRedraw;
 extern bool      flowCalEditing;
-extern bool      quartzTestRunning;
-extern bool      quartzTestNeedsFullRedraw;
-extern int       quartzTestPercent;
-extern int       quartzTestSelection;
-extern bool      quartzTestEditing;
-extern int       quartzTestMode;
-extern float     quartzTestTempTarget;
-extern int       quartzAutoPercent;
-extern float     quartzAutoLastTemp;
-extern uint32_t  quartzAutoCheckMs;
-extern int       quartzFanPercent;
 extern bool     uartMonitorNeedsFullRedraw;
 extern uint32_t uartPacketCount;
 extern uint32_t uartChecksumErrors;

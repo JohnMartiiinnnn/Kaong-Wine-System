@@ -162,17 +162,6 @@ float     flowCalKnownVolume = 1.0f;
 int       flowCalSelection   = 0;
 bool      flowCalNeedsFullRedraw = true;
 bool      flowCalEditing         = false;
-bool      quartzTestRunning         = false;
-bool      quartzTestNeedsFullRedraw = true;
-int       quartzTestPercent         = 50;
-int       quartzTestSelection       = 0;
-bool      quartzTestEditing         = false;
-int       quartzTestMode            = 0;
-float     quartzTestTempTarget      = 35.0f;
-int       quartzAutoPercent         = 20;
-float     quartzAutoLastTemp        = -127.0f;
-uint32_t  quartzAutoCheckMs         = 0;
-int       quartzFanPercent          = 0;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -451,7 +440,6 @@ void loop() {
       isFanOn = false;
       isFermFanOn = false;
       pidTestRunning = false;
-      quartzTestRunning = false;
       activeBrewStage = -1;
       currentHeatingPercent = 0;
       digitalWrite(SSR_PREHEAT, LOW);
@@ -614,15 +602,9 @@ void loop() {
         flowCalNeedsFullRedraw = true;
         drawFlowCalMenu();
         break;
-      case QUARTZ_TEST_PICK:
-        quartzTestNeedsFullRedraw = true;
-        drawQuartzTestPick();
-        break;
-      case QUARTZ_TEST_MENU:
-        quartzTestRunning = false;
-        quartzTestEditing = false;
-        quartzTestNeedsFullRedraw = true;
-        drawQuartzTestMenu();
+      case HEATER_TEST_PICK:
+        heaterTestNeedsFullRedraw = true;
+        drawHeaterTestPick();
         break;
       case FAN_TEST_PICK:
         fanTestNeedsFullRedraw = true;
@@ -741,7 +723,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 11;
+      systemCheckSelection = (systemCheckSelection + 1) % 10;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -787,20 +769,18 @@ void loop() {
         }
         drawStageParamMenu();
       }
+    } else if (currentAppState == HEATER_TEST_PICK) {
+      if (cDown && !ljDown) {
+        heaterTestStage = (heaterTestStage + 1) % 3;
+        drawHeaterTestPick();
+      }
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (cDown && !ljDown) {
         if (heaterTestEditing) {
-          if (heaterTestSelection == 0) {
-            heaterTestStage = (heaterTestStage + 1) % 2;
-            heaterTestRunning = false;
-            heaterTestPercent = 0;
-            currentHeatingPercent = 0;
-          } else if (heaterTestSelection == 1) {
-            if (heaterTestPercent >= 5) heaterTestPercent -= 5;
-            else heaterTestPercent = 100;
-          }
+          if (heaterTestPercent >= 5) heaterTestPercent -= 5;
+          else heaterTestPercent = 100;
         } else {
-          heaterTestSelection = (heaterTestSelection + 1) % 3;
+          heaterTestSelection = (heaterTestSelection + 1) % 2;
         }
         drawHeaterTestMenu();
       }
@@ -808,26 +788,6 @@ void loop() {
       if (cDown && !ljDown) {
         rtcSetField = (rtcSetField + 1) % 2;
         drawRtcSetMenu();
-      }
-    } else if (currentAppState == QUARTZ_TEST_PICK) {
-      if (cDown && !ljDown) {
-        quartzTestMode = (quartzTestMode + 1) % 2;
-        drawQuartzTestPick();
-      }
-    } else if (currentAppState == QUARTZ_TEST_MENU) {
-      if (cDown && !ljDown) {
-        if (quartzTestEditing) {
-          if (quartzTestMode == 0) {
-            if (quartzTestPercent >= 5) quartzTestPercent -= 5;
-            else quartzTestPercent = 100;
-          } else {
-            quartzTestTempTarget -= 1.0f;
-            if (quartzTestTempTarget < 20.0f) quartzTestTempTarget = 20.0f;
-          }
-        } else {
-          quartzTestSelection = (quartzTestSelection + 1) % 2;
-        }
-        drawQuartzTestMenu();
       }
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       if (cDown && !ljDown) {
@@ -884,7 +844,7 @@ void loop() {
       loadCellSelection = (loadCellSelection + 1) % 2;
       drawLoadCellPage();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 10) % 11;
+      systemCheckSelection = (systemCheckSelection + 9) % 10;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -924,40 +884,20 @@ void loop() {
         stageParamSelection = (stageParamSelection + maxRows - 1) % maxRows;
         drawStageParamMenu();
       }
+    } else if (currentAppState == HEATER_TEST_PICK) {
+      heaterTestStage = (heaterTestStage + 2) % 3;
+      drawHeaterTestPick();
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (heaterTestEditing) {
-        if (heaterTestSelection == 0) {
-          heaterTestStage = (heaterTestStage + 1) % 2;
-          heaterTestRunning = false;
-          heaterTestPercent = 0;
-          currentHeatingPercent = 0;
-        } else if (heaterTestSelection == 1) {
-          heaterTestPercent += 5;
-          if (heaterTestPercent > 100) heaterTestPercent = 0;
-        }
+        heaterTestPercent += 5;
+        if (heaterTestPercent > 100) heaterTestPercent = 0;
       } else {
-        heaterTestSelection = (heaterTestSelection + 2) % 3;
+        heaterTestSelection = (heaterTestSelection + 1) % 2;
       }
       drawHeaterTestMenu();
     } else if (currentAppState == RTC_SET_MENU) {
       rtcSetField = (rtcSetField + 1) % 2;
       drawRtcSetMenu();
-    } else if (currentAppState == QUARTZ_TEST_PICK) {
-      quartzTestMode = (quartzTestMode + 1) % 2;
-      drawQuartzTestPick();
-    } else if (currentAppState == QUARTZ_TEST_MENU) {
-      if (quartzTestEditing) {
-        if (quartzTestMode == 0) {
-          quartzTestPercent += 5;
-          if (quartzTestPercent > 100) quartzTestPercent = 0;
-        } else {
-          quartzTestTempTarget += 1.0f;
-          if (quartzTestTempTarget > 80.0f) quartzTestTempTarget = 80.0f;
-        }
-      } else {
-        quartzTestSelection = (quartzTestSelection + 1) % 2;
-      }
-      drawQuartzTestMenu();
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       transferTestSelection = (transferTestSelection + 3) % 4;
       drawTransferTestMenu();
@@ -1158,28 +1098,19 @@ void loop() {
         drawPidTestPick();
       } else if (systemCheckSelection == 5) {
         heaterTestStage = 0;
-        heaterTestPercent = 0;
-        heaterTestRunning = false;
-        heaterTestSelection = 0;
-        heaterTestEditing = false;
         heaterTestNeedsFullRedraw = true;
-        currentAppState = HEATER_TEST_MENU;
-        drawHeaterTestMenu();
+        currentAppState = HEATER_TEST_PICK;
+        drawHeaterTestPick();
       } else if (systemCheckSelection == 6) {
-        quartzTestMode = 0;
-        quartzTestNeedsFullRedraw = true;
-        currentAppState = QUARTZ_TEST_PICK;
-        drawQuartzTestPick();
-      } else if (systemCheckSelection == 7) {
         sdVerifyResult = -1;
         sdVerifyNeedsFullRedraw = true;
         currentAppState = SD_VERIFY_MENU;
         drawSdVerifyMenu();
-      } else if (systemCheckSelection == 8) {
+      } else if (systemCheckSelection == 7) {
         uartMonitorNeedsFullRedraw = true;
         currentAppState = UART_MONITOR_MENU;
         drawUartMonitorMenu();
-      } else if (systemCheckSelection == 9) {
+      } else if (systemCheckSelection == 8) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetHour = now.hour();
@@ -1192,7 +1123,7 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         currentAppState = RTC_SET_MENU;
         drawRtcSetMenu();
-      } else if (systemCheckSelection == 10) {
+      } else if (systemCheckSelection == 9) {
         transferTestNeedsFullRedraw = true;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
@@ -1230,10 +1161,18 @@ void loop() {
       }
       pidTestNeedsFullRedraw = true;
       drawPidTestMenu();
+    } else if (currentAppState == HEATER_TEST_PICK) {
+      heaterTestPercent = 0;
+      heaterTestRunning = false;
+      heaterTestSelection = 0;
+      heaterTestEditing = false;
+      heaterTestNeedsFullRedraw = true;
+      currentAppState = HEATER_TEST_MENU;
+      drawHeaterTestMenu();
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (heaterTestEditing) {
         heaterTestEditing = false;
-      } else if (heaterTestSelection == 2) {
+      } else if (heaterTestSelection == 1) {
         if (!heaterTestRunning) {
           heaterTestRunning = true;
         } else {
@@ -1268,39 +1207,6 @@ void loop() {
         currentAppState = FLOW_CAL_MENU;
         drawFlowCalMenu();
       }
-    } else if (currentAppState == QUARTZ_TEST_PICK) {
-      quartzTestRunning = false;
-      quartzTestPercent = 50;
-      quartzTestTempTarget = 35.0f;
-      quartzTestSelection = 0;
-      quartzTestEditing = false;
-      quartzTestNeedsFullRedraw = true;
-      currentAppState = QUARTZ_TEST_MENU;
-      drawQuartzTestMenu();
-    } else if (currentAppState == QUARTZ_TEST_MENU) {
-      if (quartzTestEditing) {
-        quartzTestEditing = false;
-      } else if (quartzTestSelection == 1) {
-        quartzTestRunning = !quartzTestRunning;
-        if (quartzTestRunning && quartzTestMode == 1) {
-          quartzAutoPercent  = 20;
-          quartzAutoLastTemp = incomingData.room2Temp;
-          quartzAutoCheckMs  = millis();
-        }
-        if (!quartzTestRunning) {
-          currentHeatingPercent = 0;
-          quartzAutoPercent = 20;
-          if (quartzTestMode == 1 && isFermFanOn) {
-            setFanSpeed(0);
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-            isFermFanOn = false;
-          }
-        }
-      } else {
-        quartzTestEditing = true;
-      }
-      drawQuartzTestMenu();
     } else if (currentAppState == FLOW_CAL_MENU) {
       if (flowCalSelection == 0) {
         flowCalEditing = !flowCalEditing;
@@ -1653,6 +1559,10 @@ void loop() {
         dashNeedsFullRedraw = true;
         drawDashboardLayout();
       }
+    } else if (currentAppState == HEATER_TEST_PICK) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (heaterTestEditing) {
         heaterTestEditing = false;
@@ -1661,9 +1571,9 @@ void loop() {
         heaterTestRunning = false;
         heaterTestSelection = 0;
         currentHeatingPercent = 0;
-        currentAppState = SYSTEM_CHECK_MENU;
-        systemCheckNeedsFullRedraw = true;
-        drawSystemCheckMenu();
+        heaterTestNeedsFullRedraw = true;
+        currentAppState = HEATER_TEST_PICK;
+        drawHeaterTestPick();
       }
     } else if (currentAppState == SD_VERIFY_MENU ||
                currentAppState == UART_MONITOR_MENU ||
@@ -1688,27 +1598,6 @@ void loop() {
         transferTestSelection = (flowCalSensor == 0) ? 1 : 3;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
-      }
-    } else if (currentAppState == QUARTZ_TEST_PICK) {
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
-    } else if (currentAppState == QUARTZ_TEST_MENU) {
-      if (quartzTestEditing) {
-        quartzTestEditing = false;
-        drawQuartzTestMenu();
-      } else {
-        quartzTestRunning = false;
-        currentHeatingPercent = 0;
-        if (quartzTestMode == 1 && isFermFanOn) {
-          setFanSpeed(0);
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          isFermFanOn = false;
-        }
-        quartzTestNeedsFullRedraw = true;
-        currentAppState = QUARTZ_TEST_PICK;
-        drawQuartzTestPick();
       }
     }
   }
@@ -2241,60 +2130,10 @@ void loop() {
       currentHeatingPercent = heaterTestPercent;
       if (heaterTestStage == 0)
         activeHeaterPin = SSR_PREHEAT;
+      else if (heaterTestStage == 1)
+        activeHeaterPin = SSR_FERM;
       else
         activeHeaterPin = SSR_PAST;
-    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 0 && quartzTestRunning) {
-      currentHeatingPercent = quartzTestPercent;
-      activeHeaterPin = SSR_FERM;
-    } else if (currentAppState == QUARTZ_TEST_MENU && quartzTestMode == 1 && quartzTestRunning) {
-      float ct = incomingData.room2Temp;
-      if (ct > -100.0f && ct < quartzTestTempTarget - 0.5f) {
-        // Adaptive duty: if temp hasn't risen 0.2C in 5s, ramp up (max 60%)
-        uint32_t now = millis();
-        if (now - quartzAutoCheckMs >= 5000) {
-          if (ct - quartzAutoLastTemp < 0.2f) {
-            quartzAutoPercent += 5;
-            if (quartzAutoPercent > 30) quartzAutoPercent = 30;
-          } else {
-            quartzAutoPercent -= 5;
-            if (quartzAutoPercent < 20) quartzAutoPercent = 20;
-          }
-          quartzAutoLastTemp = ct;
-          quartzAutoCheckMs  = now;
-        }
-        currentHeatingPercent = quartzAutoPercent;
-        activeHeaterPin = SSR_FERM;
-        if (isFermFanOn) {
-          setFanSpeed(0);
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          isFermFanOn = false;
-        }
-      } else if (ct > -100.0f && ct > quartzTestTempTarget + 0.5f) {
-        quartzAutoPercent = 20;
-        currentHeatingPercent = 0;
-        // Proportional fan: 20% at target+0.5C, 100% at target+4C
-        int fanPct = (int)((ct - quartzTestTempTarget) * 25.0f);
-        if (fanPct < 20) fanPct = 20;
-        if (fanPct > 100) fanPct = 100;
-        quartzFanPercent = fanPct;
-        if (!isFermFanOn) {
-          isFermFanOn = true;
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
-        }
-        setFanSpeed(fanPct);
-      } else {
-        quartzAutoPercent = 20;
-        quartzFanPercent = 0;
-        currentHeatingPercent = 0;
-        if (isFermFanOn) {
-          setFanSpeed(0);
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          isFermFanOn = false;
-        }
-      }
     } else if (activeBrewStage == 0) {
       activeHeaterPin = SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
@@ -2360,8 +2199,6 @@ void loop() {
     if (currentAppState == FLOW_CAL_MENU)
       drawFlowCalMenu(true);
 
-    if (currentAppState == QUARTZ_TEST_MENU)
-      drawQuartzTestMenu(true);
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
         activeBrewStage >= 0) {
