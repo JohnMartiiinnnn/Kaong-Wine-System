@@ -255,7 +255,8 @@ void sendMotorCommand(int speed, bool cw) {
 
 // ---- Flow Sensor ISRs ----
 void IRAM_ATTR flowISR1() {
-  if (!sysPump1Active) return;
+  if (!sysPump1Active)
+    return;
   static uint32_t lastPulse1 = 0;
   uint32_t now = millis();
   if (now - lastPulse1 > 5) {
@@ -265,7 +266,8 @@ void IRAM_ATTR flowISR1() {
 }
 
 void IRAM_ATTR flowISR2() {
-  if (!sysPump2Active) return;
+  if (!sysPump2Active)
+    return;
   static uint32_t lastPulse2 = 0;
   uint32_t now = millis();
   if (now - lastPulse2 > 5) {

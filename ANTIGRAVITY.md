@@ -40,10 +40,12 @@ src/
     *   **DS18B20 (x2):** Liquid temperatures (Vat/Pasteurization) on a shared OneWire bus (pin 26).
     *   **HX711:** Load cell for volume/weight measurement (DT=36, SCK=27).
     *   **DS3231 RTC:** Real-time clock for logging timestamps.
+    *   **Flow Sensors:** Flow Sensor 1 (Pin 32, Pre-Heat -> Ferm) and Flow Sensor 2 (Pin 34, Ferm -> Past) with hardware interrupts.
 *   **Actuators:**
     *   **PWM (Pin 25):** 4-wire Fan speed control.
     *   **PWM (TBD):** TB6612FN PWMA — mixing impeller speed (LEDC ch1, 1 kHz, 8-bit). GPIO pin not yet assigned — Primary ESP32 has no free output pins.
-    *   **AC Dimmer:** Pins 12, 13, 14 for heating control; Pin 32 for Zero-Cross detection.
+    *   **SSR Heaters:** Pins 13 (Pre-Heat), 12 (Fermentation), and 14 (Pasteurization) driving solid-state relays (SSRs) via slow time-proportional PWM.
+    *   **Status LED:** GPIO 2 (onboard LED) used for Calibration Wizard signaling.
 *   **Motor Driver (TB6612FN):**
     *   **PWMA → TBD** (GPIO pin pending — no free output pin on Primary ESP32)
     *   **AIN1 → 3.3 V** hardwired — fixed CW direction
@@ -56,12 +58,13 @@ src/
 ### Software Logic
 *   **State Machine:**
     *   `SYSTEM_INIT` → `START_MENU` (after splash)
-    *   `NEW_BREW_WIZARD`: Volume check (min 10 L) before starting brew.
+    *   `NEW_BREW_WIZARD`: Volume check (configurable minimum volume target, e.g., 6 L) and option to bypass/disable the preheat immersion heater.
     *   `DASHBOARD_ACTIVE`: Three sub-views — Pre-Heating, Fermentation, Pasteurization.
     *   `COOLING_MENU`: Manual/Auto fan control.
     *   `MIXER_MENU`: Mixing impeller control — OFF / MANUAL (speed adjust) / AUTO (5 min ON, 355 min OFF).
     *   `SENSOR_MONITOR`: Raw value display for debugging.
     *   `CALIBRATION_MODE`: Live scale tare and calibration factor adjust.
+    *   `CALIB_WIZARD`: Guided Calibration Wizard for Flow Sensor 1, Flow Sensor 2, and the Load Cell (with GPIO 2 LED statuses).
 *   **Data Logging:** Records all sensor data to `/data_log.csv` every 60 seconds.
 *   **Web Dashboard:** Soft-AP `WineBrew_System` (pass: `12345678`), mDNS `winebrew.local`. Live JSON at `/data`, UI at `/`.
 
@@ -134,10 +137,12 @@ Controllers exchange data using a packed C-struct over `Serial2` at 115200 baud.
 | **HX711 SCK** | 27 | Load cell clock |
 | **UART RX** | 16 | Serial2 from Secondary ESP32 |
 | **UART TX** | 17 | Serial2 to Secondary ESP32 |
-| **AC Zero-Cross** | 32 | INPUT_PULLUP, shared by all dimmer channels |
-| **AC Dimmer 1 CH1** | 14 | TRIAC trigger |
-| **AC Dimmer 1 CH2** | 12 | TRIAC trigger |
-| **AC Dimmer 2** | 13 | TRIAC trigger (shared channel) |
+| **Flow Sensor 1** | 32 | Flow Sensor 1 input (interrupt on RISING) |
+| **Flow Sensor 2** | 34 | Flow Sensor 2 input (input-only, interrupt on RISING) |
+| **Heater SSR 1** | 13 | Pre-heat tank heater SSR |
+| **Heater SSR 2** | 12 | Fermentation tank heater SSR |
+| **Heater SSR 3** | 14 | Pasteurization tank heater SSR |
+| **Status LED** | 2 | Onboard LED (GPIO 2) used for Calibration Wizard |
 | **Motor PWM** | 0 | TB6612FN PWMA (LEDC ch1, 1 kHz) — boot pin, disconnect driver during flashing. Currently set to -1 in config.h pending confirmation. |
 
 ### MCP23017 Pin Assignments

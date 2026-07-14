@@ -15,13 +15,14 @@ This document explains how the automated kaong wine brewing system works, from f
 7. [Brewing Stages](#7-brewing-stages)
 8. [Stage Parameters](#8-stage-parameters)
 9. [System Check Tests](#9-system-check-tests)
-10. [Flow Sensor Calibration](#11-flow-sensor-calibration)
-11. [Load Cell Calibration](#12-load-cell-calibration)
-12. [Sensor Monitor](#13-sensor-monitor)
-13. [Web Interface](#14-web-interface)
-14. [Emergency Stop](#15-emergency-stop)
-15. [Status Lights](#16-status-lights)
-16. [Data Logging](#17-data-logging)
+10. [Calibration Wizard](#10-calibration-wizard)
+11. [Flow Sensor Calibration (Manual)](#11-flow-sensor-calibration-manual)
+12. [Load Cell Calibration (Manual)](#12-load-cell-calibration-manual)
+13. [Sensor Monitor](#13-sensor-monitor)
+14. [Web Interface](#14-web-interface)
+15. [Emergency Stop](#15-emergency-stop)
+16. [Status Lights](#16-status-lights)
+17. [Data Logging](#17-data-logging)
 
 
 ---
@@ -120,7 +121,7 @@ Five options, navigated with UP/DOWN and confirmed with SELECT.
 | CONTINUE BREW | Goes to the dashboard (use if returning after a restart mid-brew — note: brew state is not saved to flash, so stage must be re-set manually) |
 | SYSTEM CHECK | Opens the hardware test menu |
 | SENSOR VALUES | Shows a live read of all sensors |
-| DEMO RUN | Runs a full simulated 3-stage brew automatically (no real heat or liquid required) |
+| CALIBRATE | Opens the guided Calibration Wizard (for flow sensors and load cell) |
 
 ---
 
@@ -128,12 +129,15 @@ Five options, navigated with UP/DOWN and confirmed with SELECT.
 
 ### New Brew Wizard
 
-After selecting NEW BREW, the wizard checks the load cell.
+After selecting NEW BREW, you are presented with the New Brew Wizard screen which offers several configuration options:
 
-- If more than 10 liters are on the scale: **PROCEED** is available. SELECT on PROCEED starts the brew from Stage 0 (Pre-Heating).
-- If there is less than 10 liters: only **BYPASS (TEST)** is available. This skips the volume check and starts the brew anyway — use for dry testing.
+- **MIN VOLUME (Row 0):** Adjust the minimum required volume on the scale to proceed (adjustable from 1.0 L to 50.0 L, defaults to 10.0 L). Use LEFT/RIGHT in Edit Mode to modify.
+- **PREHEAT HEATER (Row 1):** Toggle between **ENABLED** and **DISABLED**. Setting this to "DISABLED" skips turning on the preheating side's immersion heater, which is extremely useful for physical runs/testing using water where heating is not desired.
+- **PROCEED (START BREW) (Row 2):** Highlights and becomes selectable once the weight on the load cell meets or exceeds the set **MIN VOLUME**. Pressing SELECT on this row starts the brew.
+- **BYPASS (TEST RUN) (Row 3):** Allows bypassing the volume check entirely and starting the brew anyway — useful for dry or simulation testing.
 
 When a brew starts:
+- If **PREHEAT HEATER** was disabled, the sterilization and cooling phases are bypassed (or considered immediately complete), immediately allowing the transfer pump to Fermentation.
 - The first 5 valid specific gravity readings from the Bluetooth hydrometer are averaged and saved as the **Original Gravity** (OG). This is used later to calculate alcohol content.
 - The Stage 0 pre-heating process begins automatically.
 
@@ -411,7 +415,43 @@ The screen shows two paths — Pre-Heat → Ferm and Ferm → Past — each with
 
 ---
 
-## 11. Flow Sensor Calibration
+## 10. Calibration Wizard
+
+The **Calibration Wizard** provides a guided UI to calibrate flow sensors and the load cell directly from the Main Menu.
+
+### Accessing the Wizard
+Go to the Main Menu, scroll down to the 5th option (**CALIBRATE**), and press `SELECT`.
+
+### Status LED Indicators
+The system uses the onboard ESP32 LED (GPIO 2) to indicate calibration status:
+- **Slow Blink (1 Hz):** Pump active, waiting for flow.
+- **Fast Blink (5 Hz):** Pumping active, measuring flow pulses.
+- **Solid ON (3 seconds):** Calibration success (K-factor or scale factor calculated and saved).
+
+### How to Calibrate Flow Sensors (Sensor 1 & 2)
+1. **Configure Target and Volume:**
+   - **TARGET (Row 0):** Press `SELECT` to edit (green background), use `LEFT`/`RIGHT` to select **FLOW SENSOR 1** or **FLOW SENSOR 2**, then press `SELECT` to confirm.
+   - **INPUT LIQUID (Row 1):** Press `SELECT` to edit, use `LEFT`/`RIGHT` to set the exact volume of liquid you are pouring/pumping for the test (in 0.5 L steps), and press `SELECT` to confirm.
+2. **Start Pumping & Measure:**
+   - Scroll to Row 2 and press `SELECT` on **START PUMP & MEASURE**.
+   - The respective transfer pump turns ON automatically and the onboard LED will blink at 1 Hz. As liquid flows and pulses are registered, the LED blinks at 5 Hz.
+3. **Stop & Save:**
+   - Once all liquid has passed through the sensor, press `SELECT` on **STOP & SAVE**.
+   - The pump turns OFF, the system calculates the K-factor (`pulses / input_volume`), and updates the configuration. The LED stays solid for 3 seconds to indicate success.
+
+### How to Calibrate the Load Cell
+1. **Tare Empty Vat:**
+   - Set **TARGET (Row 0)** to **LOAD CELL**.
+   - With the pre-heat tank empty, scroll to Row 2 and press `SELECT` on **STEP 1: TARE EMPTY VAT**.
+2. **Calibrate Weight:**
+   - Add a known volume of liquid (e.g. 6.0 L) into the pre-heat tank.
+   - Set **INPUT LIQUID (Row 1)** to match the exact volume added.
+   - Scroll to Row 2 and press `SELECT` on **STEP 2: CALIBRATE**.
+   - The system reads raw values, calculates the scale factor, and updates the load cell calibration. The LED stays solid for 3 seconds to indicate success.
+
+---
+
+## 11. Flow Sensor Calibration (Manual)
 
 The flow sensors count electrical pulses from a spinning wheel inside the sensor body. To convert pulses to liters, the system needs a **K-factor** (pulses per liter). The default is 450 pulses/L (typical for a YF-S201 sensor), but the actual value varies with installation and flow rate. Calibration gets it accurate.
 
@@ -443,7 +483,7 @@ Run another known volume through and watch the liter display. It should match cl
 
 ---
 
-## 12. Load Cell Calibration
+## 12. Load Cell Calibration (Manual)
 
 The load cell measures the weight of liquid in the pre-heat tank and converts it to liters (1 kg ≈ 1 L for kaong sap).
 

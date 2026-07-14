@@ -15,7 +15,9 @@ This document outlines all possible scenarios, expected behaviors, and failure s
 | **E-Stop Button** | Emergency override | Press E-Stop while fans and motor are running | ALL relays cut out, Motor stops, UI locks | System ignores button (check `GPA6` connection to MCP) |
 | **HX711 Load Cell** | Tare & Calibrate | Place empty vessel, hit Tare | Display reads `0.0g` exactly | Constant heavy drifting (check shielding/ground loop) |
 | | Scale Response | Add 100g weight | Display rapidly changes to `100.0g` | Reads `FAILED` or `NAN` (check `DT`/`SCK` pins) |
-| **AC Dimmers (TRIAC)** | Zero-Cross Interrupt | Power on AC dimmer board | ESP32 triggers heating pulses successfully | Lights flicker wildly (Zero-cross pin `32` not connected) |
+| **SSR Heaters** | Slow PWM Control | Turn on heater outputs | SSR indicator LED lights up, tank starts heating | No heating (check GPIO 13/12/14 wiring, SSR power) |
+| **Flow Sensors** | Interrupt Pulses | Pump liquid through sensor 1 or 2 | Dashboard/Calib Wizard shows live pulse counts increasing | Pulse count stays at 0 (check GPIO 32/34 wiring, pull-ups) |
+| **Calibration Status LED** | Visual signaling | Run Calibration Wizard | Onboard LED (GPIO 2) blinks (1Hz/5Hz) and lights up solid | LED remains off (check GPIO 2 connection / orientation) |
 
 ---
 

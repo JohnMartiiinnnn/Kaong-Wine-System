@@ -7,9 +7,9 @@
 | 2 | TFT LCD DC | SPI |
 | 4 | TFT LCD RST | SPI |
 | 5 | SD Card CS | SPI |
-| 12 | AC Dimmer 1 CH2 (`DIM1_CH2`) | TRIAC fire pulse |
-| 13 | AC Dimmer 2 Shared (`DIM2_SHARED`) | TRIAC fire pulse |
-| 14 | AC Dimmer 1 CH1 (`DIM1_CH1`) | TRIAC fire pulse |
+| 12 | Heater SSR 2 (`SSR_FERM`) | Fermentation tank heater SSR |
+| 13 | Heater SSR 1 (`SSR_PREHEAT`) | Pre-heat tank heater SSR |
+| 14 | Heater SSR 3 (`SSR_PAST`) | Pasteurization tank heater SSR |
 | 15 | TFT LCD CS | SPI |
 | 16 | UART2 RX | Serial2 — from Secondary ESP32 |
 | 17 | UART2 TX | Serial2 — to Secondary ESP32 |
