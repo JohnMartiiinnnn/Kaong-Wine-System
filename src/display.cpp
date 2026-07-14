@@ -1876,7 +1876,7 @@ void drawFlowCalMenu(bool valuesOnly) {
 
   // Row 2: CAPTURE
   bool capSel = (flowCalSelection == 2);
-  uint16_t capBg = capSel ? 0x07E0 : 0xD6BA;
+  uint16_t capBg = capSel ? 0x3566 : 0xD6BA;
   uint16_t capFg = capSel ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, 334, 300, 84, capBg);
   tft.setTextColor(capFg, capBg);
