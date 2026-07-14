@@ -1886,7 +1886,13 @@ void loop() {
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
-          pidFanPercent = isFermFanOn ? (int)(-pidOut) : 0;
+          if (isFermFanOn) {
+            int fanPct = (int)(TEST_KP * (-error));
+            if (fanPct > 100) fanPct = 100;
+            pidFanPercent = fanPct;
+          } else {
+            pidFanPercent = 0;
+          }
           setFanSpeed(pidFanPercent);
         } else {
           mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
