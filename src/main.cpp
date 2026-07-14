@@ -1796,7 +1796,7 @@ void loop() {
       static float pidTestPrevError = 0.0f;
       static float pidFanPrevTemp   = -999.0f;
       const float TEST_KP  = 20.0f;
-      const float TEST_KI  = 1.0f;
+      const float TEST_KI  = 0.05f;
       const float TEST_KD  = 2.0f;
       const float FAN_KD   = 10.0f;
 
