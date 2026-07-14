@@ -1766,6 +1766,10 @@ void drawTransferTestMenu(bool valuesOnly) {
     drawCal2(transferTestSelection == 3);
     tft.fillRect(10, 403, 300, 40, TFT_WHITE);
 
+    // redraw panel borders last — gap fills at x=10 overwrite them otherwise
+    tft.drawRect(10, 58, 300, 185, TFT_DARKGREY);
+    tft.drawRect(10, 251, 300, 185, TFT_DARKGREY);
+
     tft.fillRect(0, 443, 320, 37, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("UP/DOWN: NAVIGATE   SELECT: ACTIVATE   RETURN: BACK", CENTER_X, 458, 1);
