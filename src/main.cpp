@@ -120,6 +120,7 @@ uint32_t pidTestStableStart = 0;
 uint32_t pidTestStartMs = 0;
 int      pidFanPercent = 0;
 int      pidFermSensor = 1;
+int      pidPreHeatSensor = 0;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -752,7 +753,8 @@ void loop() {
           if (pidTestCoolTarget < 0.0f)
             pidTestCoolTarget = 0.0f;
         } else {
-          pidFermSensor ^= 1;
+          if (pidTestChoice == 0) pidPreHeatSensor ^= 1;
+          else pidFermSensor ^= 1;
         }
         drawPidTestMenu();
       }
@@ -874,7 +876,8 @@ void loop() {
         if (pidTestCoolTarget > 100.0f)
           pidTestCoolTarget = 100.0f;
       } else {
-        pidFermSensor ^= 1;
+        if (pidTestChoice == 0) pidPreHeatSensor ^= 1;
+        else pidFermSensor ^= 1;
       }
       drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
@@ -1151,6 +1154,7 @@ void loop() {
       if (pidTestChoice == 0) {
         pidTestHeatTarget = 35.0f;
         pidTestCoolTarget = 30.0f;
+        pidPreHeatSensor = 0;
       } else if (pidTestChoice == 1) {
         pidTestHeatTarget = 27.0f;
         pidTestCoolTarget = 30.0f;
@@ -1417,7 +1421,7 @@ void loop() {
 
   if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
       !pidTestRunning) {
-    pidTestTargetSelection = (pidTestTargetSelection + 1) % (pidTestChoice == 1 ? 3 : 2);
+    pidTestTargetSelection = (pidTestTargetSelection + 1) % (pidTestChoice <= 1 ? 3 : 2);
     drawPidTestMenu();
   }
 
@@ -1802,10 +1806,13 @@ void loop() {
 
       float liquidTemp = -999.0f;
       if (pidTestChoice == 0) {
-        if (liquid2Status)
-          liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
-        else if (bme1Status)
-          liquidTemp = bme1.readTemperature();
+        if (pidPreHeatSensor == 0) {
+          if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+          else if (bme1Status) liquidTemp = bme1.readTemperature();
+        } else {
+          if (bme1Status) liquidTemp = bme1.readTemperature();
+          else if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+        }
       } else if (pidTestChoice == 1) {
         if (pidFermSensor == 0) {
           if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
@@ -1821,8 +1828,6 @@ void loop() {
       } else if (pidTestChoice == 2) {
         if (liquid1Status)
           liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
-        else if (bme1Status)
-          liquidTemp = bme1.readTemperature();
       }
 
       if (liquidTemp > -100.0f) {

@@ -1037,13 +1037,14 @@ void drawPidTestMenu() {
   sprintf(buf, "%.1f C", pidTestCoolTarget);
   tft.drawCentreString(buf, 232, 118, 4);
 
-  // Sensor selector (ferm only, y=165-177)
-  if (pidTestChoice == 1) {
+  // Sensor selector (pre-heat + ferm only, y=165-177)
+  if (pidTestChoice == 0 || pidTestChoice == 1) {
     uint16_t sensBg = (!pidTestRunning && pidTestTargetSelection == 2) ? TFT_YELLOW : 0xD6BA;
     tft.fillRect(20, 165, 280, 13, sensBg);
     tft.drawRect(20, 165, 280, 13, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, sensBg);
-    tft.drawCentreString(pidFermSensor == 0 ? "SENSOR: LIQUID (DS18B20)" : "SENSOR: AMBIENT (BME280)", CENTER_X, 167, 1);
+    int sel = (pidTestChoice == 0) ? pidPreHeatSensor : pidFermSensor;
+    tft.drawCentreString(sel == 0 ? "SENSOR: LIQUID (DS18B20)" : "SENSOR: AMBIENT (BME280)", CENTER_X, 167, 1);
   } else {
     tft.fillRect(20, 165, 280, 13, TFT_WHITE);
   }
@@ -1067,28 +1068,41 @@ void drawPidTestMenu() {
       if (incomingData.sensor2Status == 1) ambientTemp = incomingData.room2Temp;
     } else if (pidTestChoice == 2) {
       if (liquid1Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
-      if (bme1Status) ambientTemp = bme1.readTemperature();
     }
 
-    // Row 1: LIQUID TEMP | AMBIENT TEMP (y=240, h=55)
-    tft.fillRect(10, 240, 145, 55, 0x2124);
-    tft.drawRect(10, 240, 145, 55, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x2124);
-    tft.drawCentreString("LIQUID TEMP", 82, 250, 1);
-    if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
-    else strcpy(buf, "---");
-    tft.setTextPadding(130);
-    tft.drawCentreString(buf, 82, 264, 2);
+    // Row 1: temp panels (y=240, h=55)
+    if (pidTestChoice == 2) {
+      // Pasteurization: single full-width liquid temp panel
+      tft.fillRect(10, 240, 300, 55, 0x2124);
+      tft.drawRect(10, 240, 300, 55, TFT_DARKGREY);
+      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.drawCentreString("LIQUID TEMP", CENTER_X, 250, 1);
+      if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
+      else strcpy(buf, "---");
+      tft.setTextPadding(280);
+      tft.drawCentreString(buf, CENTER_X, 264, 2);
+      tft.setTextPadding(0);
+    } else {
+      // Pre-heat and ferm: LIQUID TEMP | AMBIENT TEMP
+      tft.fillRect(10, 240, 145, 55, 0x2124);
+      tft.drawRect(10, 240, 145, 55, TFT_DARKGREY);
+      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.drawCentreString("LIQUID TEMP", 82, 250, 1);
+      if (liquidTemp > -100.0f) sprintf(buf, "%.1f C", liquidTemp);
+      else strcpy(buf, "---");
+      tft.setTextPadding(130);
+      tft.drawCentreString(buf, 82, 264, 2);
 
-    tft.fillRect(165, 240, 145, 55, 0x2124);
-    tft.drawRect(165, 240, 145, 55, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, 0x2124);
-    tft.drawCentreString("AMBIENT TEMP", 237, 250, 1);
-    if (ambientTemp > -100.0f) sprintf(buf, "%.1f C", ambientTemp);
-    else strcpy(buf, "---");
-    tft.setTextPadding(130);
-    tft.drawCentreString(buf, 237, 264, 2);
-    tft.setTextPadding(0);
+      tft.fillRect(165, 240, 145, 55, 0x2124);
+      tft.drawRect(165, 240, 145, 55, TFT_DARKGREY);
+      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.drawCentreString("AMBIENT TEMP", 237, 250, 1);
+      if (ambientTemp > -100.0f) sprintf(buf, "%.1f C", ambientTemp);
+      else strcpy(buf, "---");
+      tft.setTextPadding(130);
+      tft.drawCentreString(buf, 237, 264, 2);
+      tft.setTextPadding(0);
+    }
 
     // Row 2: HEATER % | FAN % (y=302, h=50)
     bool heaterOn = currentHeatingPercent > 0;
