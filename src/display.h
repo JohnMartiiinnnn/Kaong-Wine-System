@@ -32,5 +32,5 @@ void drawSensorMonitorPage(bool valuesOnly = false);
 void drawInitTile(int x, int y, const char *label, int status);
 void drawStageParamMenu();
 void drawBrewSummaryMenu();
-void drawTransferTestMenu(bool valuesOnly = false);
+void drawTransferTestMenu(bool valuesOnly = false, bool tileOnly = false);
 void drawFlowCalMenu(bool valuesOnly = false);

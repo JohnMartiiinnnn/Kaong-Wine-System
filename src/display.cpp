@@ -1635,7 +1635,7 @@ void drawBrewSummaryMenu() {
   brewSummaryNeedsFullRedraw = false;
 }
 
-void drawTransferTestMenu(bool valuesOnly) {
+void drawTransferTestMenu(bool valuesOnly, bool tileOnly) {
   static int prevSel = -1;
   char buf[48];
   uint32_t p1 = flowPulse1;
@@ -1662,16 +1662,19 @@ void drawTransferTestMenu(bool valuesOnly) {
 
   // ---- tile draw helpers ----
   auto drawPump1 = [&](bool sel) {
-    uint16_t bg = sel ? 0x3566 : 0xD6BA;
-    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    uint16_t bg = pumpPreHeatFermOn ? 0x0400 : 0xF800;
     tft.fillRect(20, 92, 130, 60, bg);
-    tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
-    tft.setTextColor(fg, bg);
-    tft.drawString("PUMP", 32, 110, 2);
-    tft.fillCircle(135, 107, 10, pumpPreHeatFermOn ? 0x0400 : TFT_DARKGREY);
-    tft.drawCircle(135, 107, 10, TFT_BLACK);
-    tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 135, 128, 2);
+    tft.setTextColor(TFT_WHITE, bg);
+    tft.drawCentreString("PUMP", 85, 97, 1);
+    tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 85, 112, 4);
+    if (sel) {
+      tft.drawRect(20, 92, 130, 60, TFT_WHITE);
+      tft.drawRect(21, 93, 128, 58, TFT_WHITE);
+    } else {
+      tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
+    }
   };
+
   auto drawCal1 = [&](bool sel) {
     uint16_t bg = sel ? 0x3566 : 0xD6BA;
     uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
@@ -1687,15 +1690,17 @@ void drawTransferTestMenu(bool valuesOnly) {
     }
   };
   auto drawPump2 = [&](bool sel) {
-    uint16_t bg = sel ? 0x3566 : 0xD6BA;
-    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    uint16_t bg = pumpFermPastOn ? 0x0400 : 0xF800;
     tft.fillRect(20, 285, 130, 60, bg);
-    tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
-    tft.setTextColor(fg, bg);
-    tft.drawString("PUMP", 32, 303, 2);
-    tft.fillCircle(135, 300, 10, pumpFermPastOn ? 0x0400 : TFT_DARKGREY);
-    tft.drawCircle(135, 300, 10, TFT_BLACK);
-    tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 135, 321, 2);
+    tft.setTextColor(TFT_WHITE, bg);
+    tft.drawCentreString("PUMP", 85, 290, 1);
+    tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 85, 305, 4);
+    if (sel) {
+      tft.drawRect(20, 285, 130, 60, TFT_WHITE);
+      tft.drawRect(21, 286, 128, 58, TFT_WHITE);
+    } else {
+      tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
+    }
   };
   auto drawCal2 = [&](bool sel) {
     uint16_t bg = sel ? 0x3566 : 0xD6BA;
@@ -1727,6 +1732,12 @@ void drawTransferTestMenu(bool valuesOnly) {
     tft.drawCentreString("FERM  ->  PAST", CENTER_X, 260, 2);
     tft.drawRect(10, 251, 300, 185, TFT_DARKGREY);
   };
+
+  if (tileOnly) {
+    if (transferTestSelection == 0) drawPump1(true);
+    else if (transferTestSelection == 2) drawPump2(true);
+    return;
+  }
 
   if (transferTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
