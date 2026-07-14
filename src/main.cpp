@@ -118,9 +118,9 @@ bool pidTestRunning = false;
 bool pidTestSuccess = false;
 uint32_t pidTestStableStart = 0;
 uint32_t pidTestStartMs = 0;
-int      pidFanPercent = 0;
-int      pidFermSensor = 1;
-int      pidPreHeatSensor = 0;
+int pidFanPercent = 0;
+int pidFermSensor = 1;
+int pidPreHeatSensor = 0;
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -154,17 +154,29 @@ uint32_t heaterTestStart = 0;
 bool sdVerifyNeedsFullRedraw = true;
 int sdVerifyResult = -1;
 bool transferTestNeedsFullRedraw = true;
-int  transferTestSelection = 0;
+int transferTestSelection = 0;
 bool pumpPreHeatFermOn = false;
-bool pumpFermPastOn    = false;
+bool pumpFermPastOn = false;
+volatile bool sysPump1Active = false;
+volatile bool sysPump2Active = false;
 volatile uint32_t flowPulse1 = 0;
 volatile uint32_t flowPulse2 = 0;
-float     flowKFactor[2]    = {450.0f, 450.0f};
-int       flowCalSensor      = 0;
-float     flowCalKnownVolume = 1.0f;
-int       flowCalSelection   = 0;
-bool      flowCalNeedsFullRedraw = true;
-bool      flowCalEditing         = false;
+
+void setPump1(bool state) {
+  sysPump1Active = state;
+  mcp.digitalWrite(PUMP_PREHEAT_FERM, state ? RELAY_ON : RELAY_OFF);
+}
+
+void setPump2(bool state) {
+  sysPump2Active = state;
+  mcp.digitalWrite(PUMP_FERM_PAST, state ? RELAY_ON : RELAY_OFF);
+}
+float flowKFactor[2] = {450.0f, 450.0f};
+int flowCalSensor = 0;
+float flowCalKnownVolume = 1.0f;
+int flowCalSelection = 0;
+bool flowCalNeedsFullRedraw = true;
+bool flowCalEditing = false;
 bool uartMonitorNeedsFullRedraw = true;
 uint32_t uartPacketCount = 0;
 uint32_t uartChecksumErrors = 0;
@@ -212,8 +224,10 @@ void setFanSpeed(int percent) {
   if (percent > 100)
     percent = 100;
   currentSpeedPercent = percent;
-  bool isFerm = isFermFanOn || (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1);
-  ledcWrite(pwmChannel, isFerm ? map(percent, 0, 100, 0, 255) : map(percent, 0, 100, 255, 0));
+  bool isFerm = isFermFanOn ||
+                (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1);
+  ledcWrite(pwmChannel, isFerm ? map(percent, 0, 100, 0, 255)
+                               : map(percent, 0, 100, 255, 0));
 }
 
 // ---- Mixer Speed Helper ----
@@ -240,8 +254,25 @@ void sendMotorCommand(int speed, bool cw) {
 }
 
 // ---- Flow Sensor ISRs ----
-void IRAM_ATTR flowISR1() { flowPulse1++; }
-void IRAM_ATTR flowISR2() { flowPulse2++; }
+void IRAM_ATTR flowISR1() {
+  if (!sysPump1Active) return;
+  static uint32_t lastPulse1 = 0;
+  uint32_t now = millis();
+  if (now - lastPulse1 > 5) {
+    flowPulse1++;
+    lastPulse1 = now;
+  }
+}
+
+void IRAM_ATTR flowISR2() {
+  if (!sysPump2Active) return;
+  static uint32_t lastPulse2 = 0;
+  uint32_t now = millis();
+  if (now - lastPulse2 > 5) {
+    flowPulse2++;
+    lastPulse2 = now;
+  }
+}
 
 // ---- Setup ----
 void setup() {
@@ -314,9 +345,9 @@ void setup() {
     mcp.pinMode(FERM_FAN2_RELAY_PIN, OUTPUT);
     mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
     mcp.pinMode(PUMP_PREHEAT_FERM, OUTPUT);
-    mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+    setPump1(false);
     mcp.pinMode(PUMP_FERM_PAST, OUTPUT);
-    mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+    setPump2(false);
     mcp.pinMode(LIGHT_R, OUTPUT);
     mcp.digitalWrite(LIGHT_R, RELAY_OFF);
     mcp.pinMode(LIGHT_Y, OUTPUT);
@@ -392,7 +423,8 @@ void loop() {
     } else if (calibRunning) {
       bool isActive = false;
       if (calibTarget == 0 || calibTarget == 1) {
-        volatile uint32_t currentPulses = (calibTarget == 0) ? flowPulse1 : flowPulse2;
+        volatile uint32_t currentPulses =
+            (calibTarget == 0) ? flowPulse1 : flowPulse2;
         if (currentPulses != calibLastPulseCount) {
           isActive = true;
           calibLastPulseCount = currentPulses;
@@ -822,8 +854,10 @@ void loop() {
           if (pidTestCoolTarget < 0.0f)
             pidTestCoolTarget = 0.0f;
         } else {
-          if (pidTestChoice == 0) pidPreHeatSensor ^= 1;
-          else pidFermSensor ^= 1;
+          if (pidTestChoice == 0)
+            pidPreHeatSensor ^= 1;
+          else
+            pidFermSensor ^= 1;
         }
         drawPidTestMenu();
       }
@@ -863,8 +897,10 @@ void loop() {
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (cDown && !ljDown) {
         if (heaterTestEditing) {
-          if (heaterTestPercent >= 5) heaterTestPercent -= 5;
-          else heaterTestPercent = 100;
+          if (heaterTestPercent >= 5)
+            heaterTestPercent -= 5;
+          else
+            heaterTestPercent = 100;
         } else {
           heaterTestSelection = (heaterTestSelection + 1) % 2;
         }
@@ -884,7 +920,8 @@ void loop() {
       if (cDown && !ljDown) {
         if (flowCalEditing) {
           flowCalKnownVolume -= 0.5f;
-          if (flowCalKnownVolume < 0.5f) flowCalKnownVolume = 0.5f;
+          if (flowCalKnownVolume < 0.5f)
+            flowCalKnownVolume = 0.5f;
         } else {
           flowCalSelection = (flowCalSelection + 1) % 3;
         }
@@ -956,8 +993,10 @@ void loop() {
         if (pidTestCoolTarget > 100.0f)
           pidTestCoolTarget = 100.0f;
       } else {
-        if (pidTestChoice == 0) pidPreHeatSensor ^= 1;
-        else pidFermSensor ^= 1;
+        if (pidTestChoice == 0)
+          pidPreHeatSensor ^= 1;
+        else
+          pidFermSensor ^= 1;
       }
       drawPidTestMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
@@ -990,7 +1029,8 @@ void loop() {
     } else if (currentAppState == HEATER_TEST_MENU) {
       if (heaterTestEditing) {
         heaterTestPercent += 5;
-        if (heaterTestPercent > 100) heaterTestPercent = 0;
+        if (heaterTestPercent > 100)
+          heaterTestPercent = 0;
       } else {
         heaterTestSelection = (heaterTestSelection + 1) % 2;
       }
@@ -1004,7 +1044,8 @@ void loop() {
     } else if (currentAppState == FLOW_CAL_MENU) {
       if (flowCalEditing) {
         flowCalKnownVolume += 0.5f;
-        if (flowCalKnownVolume > 20.0f) flowCalKnownVolume = 20.0f;
+        if (flowCalKnownVolume > 20.0f)
+          flowCalKnownVolume = 20.0f;
       } else {
         flowCalSelection = (flowCalSelection + 2) % 3;
       }
@@ -1264,7 +1305,7 @@ void loop() {
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       if (transferTestSelection == 0) {
         pumpPreHeatFermOn = !pumpPreHeatFermOn;
-        mcp.digitalWrite(PUMP_PREHEAT_FERM, pumpPreHeatFermOn ? RELAY_ON : RELAY_OFF);
+        setPump1(pumpPreHeatFermOn);
         drawTransferTestMenu(false, true);
       } else if (transferTestSelection == 1) {
         flowCalSensor = 0;
@@ -1275,7 +1316,7 @@ void loop() {
         drawFlowCalMenu();
       } else if (transferTestSelection == 2) {
         pumpFermPastOn = !pumpFermPastOn;
-        mcp.digitalWrite(PUMP_FERM_PAST, pumpFermPastOn ? RELAY_ON : RELAY_OFF);
+        setPump2(pumpFermPastOn);
         drawTransferTestMenu(false, true);
       } else {
         flowCalSensor = 1;
@@ -1289,8 +1330,10 @@ void loop() {
       if (flowCalSelection == 0) {
         flowCalEditing = !flowCalEditing;
       } else if (flowCalSelection == 1) {
-        if (flowCalSensor == 0) flowPulse1 = 0;
-        else                    flowPulse2 = 0;
+        if (flowCalSensor == 0)
+          flowPulse1 = 0;
+        else
+          flowPulse2 = 0;
       } else if (flowCalSelection == 2) {
         uint32_t pulses = (flowCalSensor == 0) ? flowPulse1 : flowPulse2;
         if (pulses > 0 && flowCalKnownVolume > 0.0f)
@@ -1416,10 +1459,10 @@ void loop() {
             calibRunning = true;
             if (calibTarget == 0) {
               flowPulse1 = 0;
-              mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_ON);
+              setPump1(true);
             } else {
               flowPulse2 = 0;
-              mcp.digitalWrite(PUMP_FERM_PAST, RELAY_ON);
+              setPump2(true);
             }
             calibStartMs = millis();
             calibLastPulseCount = 0;
@@ -1427,8 +1470,8 @@ void loop() {
             drawCalibWizard();
           } else {
             calibRunning = false;
-            mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
-            mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+            setPump1(false);
+            setPump2(false);
             // Calculate new K-factor
             uint32_t pulses = (calibTarget == 0) ? flowPulse1 : flowPulse2;
             if (pulses > 0) {
@@ -1525,7 +1568,8 @@ void loop() {
   if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD) {
     if (wizardSelection == 0 && wizardEditing) {
       minVolumeReq += 1.0f;
-      if (minVolumeReq > 50.0f) minVolumeReq = 50.0f;
+      if (minVolumeReq > 50.0f)
+        minVolumeReq = 50.0f;
       drawNewBrewWizard();
     }
   }
@@ -1552,7 +1596,8 @@ void loop() {
       drawCalibWizard();
     } else if (calibSelection == 1 && wizardEditing) {
       calibVolume += 0.5f;
-      if (calibVolume > 50.0f) calibVolume = 50.0f;
+      if (calibVolume > 50.0f)
+        calibVolume = 50.0f;
       calibCompleted = false;
       drawCalibWizard();
     }
@@ -1566,7 +1611,8 @@ void loop() {
 
   if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
       !pidTestRunning) {
-    pidTestTargetSelection = (pidTestTargetSelection + 1) % (pidTestChoice <= 1 ? 3 : 2);
+    pidTestTargetSelection =
+        (pidTestTargetSelection + 1) % (pidTestChoice <= 1 ? 3 : 2);
     drawPidTestMenu();
   }
 
@@ -1610,7 +1656,8 @@ void loop() {
     if (currentAppState == NEW_BREW_WIZARD) {
       if (wizardSelection == 0 && wizardEditing) {
         minVolumeReq -= 1.0f;
-        if (minVolumeReq < 1.0f) minVolumeReq = 1.0f;
+        if (minVolumeReq < 1.0f)
+          minVolumeReq = 1.0f;
         drawNewBrewWizard();
       } else {
         currentAppState = START_MENU;
@@ -1674,7 +1721,8 @@ void loop() {
         drawCalibWizard();
       } else if (calibSelection == 1 && wizardEditing) {
         calibVolume -= 0.5f;
-        if (calibVolume < 0.5f) calibVolume = 0.5f;
+        if (calibVolume < 0.5f)
+          calibVolume = 0.5f;
         calibCompleted = false;
         drawCalibWizard();
       } else {
@@ -1682,8 +1730,8 @@ void loop() {
           calibTareDone = false;
           drawCalibWizard();
         } else {
-          mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
-          mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+          setPump1(false);
+          setPump2(false);
           calibRunning = false;
           currentAppState = START_MENU;
           menuNeedsFullRedraw = true;
@@ -1782,8 +1830,8 @@ void loop() {
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       pumpPreHeatFermOn = false;
       pumpFermPastOn = false;
-      mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
-      mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+      setPump1(false);
+      setPump2(false);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -1973,31 +2021,37 @@ void loop() {
     if (currentAppState == PID_TEST_MENU && pidTestRunning) {
       static float pidTestIntegral = 0.0f;
       static float pidTestPrevError = 0.0f;
-      static float pidFanPrevTemp   = -999.0f;
-      const float TEST_KP  = 20.0f;
-      const float TEST_KI  = 0.05f;
-      const float TEST_KD  = 2.0f;
-      const float FAN_KD   = 10.0f;
+      static float pidFanPrevTemp = -999.0f;
+      const float TEST_KP = 20.0f;
+      const float TEST_KI = 0.05f;
+      const float TEST_KD = 2.0f;
+      const float FAN_KD = 10.0f;
 
       float liquidTemp = -999.0f;
       if (pidTestChoice == 0) {
         if (pidPreHeatSensor == 0) {
-          if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
-          else if (bme1Status) liquidTemp = bme1.readTemperature();
+          if (liquid2Status)
+            liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+          else if (bme1Status)
+            liquidTemp = bme1.readTemperature();
         } else {
-          if (bme1Status) liquidTemp = bme1.readTemperature();
-          else if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+          if (bme1Status)
+            liquidTemp = bme1.readTemperature();
+          else if (liquid2Status)
+            liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
         }
       } else if (pidTestChoice == 1) {
         if (pidFermSensor == 0) {
-          if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+          if (incomingData.ds18Status == 1 &&
+              incomingData.room2LiquidTemp > -100.0f)
             liquidTemp = incomingData.room2LiquidTemp;
           else if (incomingData.sensor2Status == 1)
             liquidTemp = incomingData.room2Temp;
         } else {
           if (incomingData.sensor2Status == 1)
             liquidTemp = incomingData.room2Temp;
-          else if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+          else if (incomingData.ds18Status == 1 &&
+                   incomingData.room2LiquidTemp > -100.0f)
             liquidTemp = incomingData.room2LiquidTemp;
         }
       } else if (pidTestChoice == 2) {
@@ -2044,7 +2098,8 @@ void loop() {
 
         if (pidOut > 0.0f) {
           int heat = (int)pidOut;
-          if (pidTestChoice == 1 && heat > 50) heat = 50;
+          if (pidTestChoice == 1 && heat > 50)
+            heat = 50;
           currentHeatingPercent = heat;
           isFermFanOn = false;
           isFanOn = false;
@@ -2069,18 +2124,23 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
                            isFermFanOn ? RELAY_ON : RELAY_OFF);
           if (isFermFanOn) {
-            float dTemp = (pidFanPrevTemp > -100.0f) ? (liquidTemp - pidFanPrevTemp) : 0.0f;
+            float dTemp = (pidFanPrevTemp > -100.0f)
+                              ? (liquidTemp - pidFanPrevTemp)
+                              : 0.0f;
             pidFanPrevTemp = liquidTemp;
-            // P: how far above cool target; D: back off when temp is already falling fast
+            // P: how far above cool target; D: back off when temp is already
+            // falling fast
             float eNeg = -error;
             float baseFan = (eNeg >= 1.0f) ? 100.0f : (30.0f + eNeg * 70.0f);
             int fanPct = (int)(baseFan + FAN_KD * dTemp);
-            if (fanPct > 100) fanPct = 100;
-            if (fanPct < 30)  fanPct = 30;
+            if (fanPct > 100)
+              fanPct = 100;
+            if (fanPct < 30)
+              fanPct = 30;
             pidFanPercent = fanPct;
           } else {
             pidFanPrevTemp = -999.0f;
-            pidFanPercent  = 0;
+            pidFanPercent = 0;
           }
           setFanSpeed(pidFanPercent);
         } else {
@@ -2123,8 +2183,8 @@ void loop() {
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
         mcp.digitalWrite(LIGHT_G, RELAY_ON);
       }
-      mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
-      mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+      setPump1(false);
+      setPump2(false);
       pumpPreHeatFermOn = false;
       pumpFermPastOn = false;
       dashNeedsFullRedraw = true;
@@ -2418,17 +2478,17 @@ void loop() {
     // ---- Stage Transition Pump Control ----
     if (stageTransferring && !simRunActive) {
       if (stageTransferTarget == 1) {
-        mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_ON);
+        setPump1(true);
         pumpPreHeatFermOn = true;
       } else if (stageTransferTarget == 2) {
-        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_ON);
+        setPump2(true);
         pumpFermPastOn = true;
       }
     } else {
       // Turn off pumps if not in manual transfer test menu
       if (currentAppState != TRANSFER_TEST_MENU) {
-        mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
-        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+        setPump1(false);
+        setPump2(false);
         pumpPreHeatFermOn = false;
         pumpFermPastOn = false;
       }
@@ -2444,19 +2504,32 @@ void loop() {
       sprintf(buf, "%02d:%02d", n.hour(), n.minute());
       uint16_t hdrBg;
       switch (currentAppState) {
-        case START_MENU:
-        case NEW_BREW_WIZARD:
-        case DASHBOARD_ACTIVE:
-        case MIXER_MENU:        hdrBg = TFT_NAVY; break;
-        case LOAD_CELL_PAGE:    hdrBg = 0x0493;   break;
-        case CALIBRATION_MODE:  hdrBg = 0x9000;   break;
-        case CALIB_WIZARD:      hdrBg = 0x4810;   break;
-        case BREW_SUMMARY_MENU: hdrBg = 0x0400;   break;
-        case STAGE_PARAM_MENU: {
-          const uint16_t sc[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-          hdrBg = sc[stageParamStage]; break;
-        }
-        default: hdrBg = 0x03E0; break;
+      case START_MENU:
+      case NEW_BREW_WIZARD:
+      case DASHBOARD_ACTIVE:
+      case MIXER_MENU:
+        hdrBg = TFT_NAVY;
+        break;
+      case LOAD_CELL_PAGE:
+        hdrBg = 0x0493;
+        break;
+      case CALIBRATION_MODE:
+        hdrBg = 0x9000;
+        break;
+      case CALIB_WIZARD:
+        hdrBg = 0x4810;
+        break;
+      case BREW_SUMMARY_MENU:
+        hdrBg = 0x0400;
+        break;
+      case STAGE_PARAM_MENU: {
+        const uint16_t sc[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+        hdrBg = sc[stageParamStage];
+        break;
+      }
+      default:
+        hdrBg = 0x03E0;
+        break;
       }
       tft.setTextColor(TFT_YELLOW, hdrBg);
       tft.drawRightString(buf, 310, 15, 4);
@@ -2485,7 +2558,6 @@ void loop() {
 
     if (currentAppState == CALIB_WIZARD)
       drawCalibWizard();
-
 
     if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
         activeBrewStage >= 0) {
