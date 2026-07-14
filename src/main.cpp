@@ -1892,9 +1892,11 @@ void loop() {
             float dTemp = (pidFanPrevTemp > -100.0f) ? (liquidTemp - pidFanPrevTemp) : 0.0f;
             pidFanPrevTemp = liquidTemp;
             // P: how far above cool target; D: back off when temp is already falling fast
-            int fanPct = (int)(TEST_KP * (-error) + FAN_KD * dTemp);
+            float eNeg = -error;
+            float baseFan = (eNeg >= 1.0f) ? 100.0f : (30.0f + eNeg * 70.0f);
+            int fanPct = (int)(baseFan + FAN_KD * dTemp);
             if (fanPct > 100) fanPct = 100;
-            if (fanPct < 0)   fanPct = 0;
+            if (fanPct < 30)  fanPct = 30;
             pidFanPercent = fanPct;
           } else {
             pidFanPrevTemp = -999.0f;
