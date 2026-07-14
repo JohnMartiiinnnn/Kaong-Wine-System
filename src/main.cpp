@@ -1210,6 +1210,7 @@ void loop() {
       if (transferTestSelection == 0) {
         pumpPreHeatFermOn = !pumpPreHeatFermOn;
         mcp.digitalWrite(PUMP_PREHEAT_FERM, pumpPreHeatFermOn ? RELAY_ON : RELAY_OFF);
+        transferTestNeedsFullRedraw = true;
         drawTransferTestMenu();
       } else if (transferTestSelection == 1) {
         flowCalSensor = 0;
@@ -1221,6 +1222,7 @@ void loop() {
       } else if (transferTestSelection == 2) {
         pumpFermPastOn = !pumpFermPastOn;
         mcp.digitalWrite(PUMP_FERM_PAST, pumpFermPastOn ? RELAY_ON : RELAY_OFF);
+        transferTestNeedsFullRedraw = true;
         drawTransferTestMenu();
       } else {
         flowCalSensor = 1;

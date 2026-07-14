@@ -1667,10 +1667,10 @@ void drawTransferTestMenu(bool valuesOnly) {
     tft.fillRect(20, 92, 130, 60, bg);
     tft.drawRect(20, 92, 130, 60, TFT_DARKGREY);
     tft.setTextColor(fg, bg);
-    tft.drawString("PUMP", 32, 100, 2);
+    tft.drawString("PUMP", 32, 110, 2);
     tft.fillCircle(135, 107, 10, pumpPreHeatFermOn ? 0x0400 : TFT_DARKGREY);
     tft.drawCircle(135, 107, 10, TFT_BLACK);
-    tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 70, 130, 2);
+    tft.drawCentreString(pumpPreHeatFermOn ? "ON" : "OFF", 135, 128, 2);
   };
   auto drawCal1 = [&](bool sel) {
     uint16_t bg = sel ? 0x3566 : 0xD6BA;
@@ -1692,10 +1692,10 @@ void drawTransferTestMenu(bool valuesOnly) {
     tft.fillRect(20, 285, 130, 60, bg);
     tft.drawRect(20, 285, 130, 60, TFT_DARKGREY);
     tft.setTextColor(fg, bg);
-    tft.drawString("PUMP", 32, 293, 2);
+    tft.drawString("PUMP", 32, 303, 2);
     tft.fillCircle(135, 300, 10, pumpFermPastOn ? 0x0400 : TFT_DARKGREY);
     tft.drawCircle(135, 300, 10, TFT_BLACK);
-    tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 70, 323, 2);
+    tft.drawCentreString(pumpFermPastOn ? "ON" : "OFF", 135, 321, 2);
   };
   auto drawCal2 = [&](bool sel) {
     uint16_t bg = sel ? 0x3566 : 0xD6BA;
