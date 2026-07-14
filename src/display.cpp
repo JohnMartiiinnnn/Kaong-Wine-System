@@ -533,6 +533,9 @@ void drawRelayTestMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("RELAY TEST", 10, 15, 4);
+    tft.fillRect(0, 52, 320, 28, 0xFFE0);
+    tft.setTextColor(TFT_BLACK, 0xFFE0);
+    tft.drawCentreString("! PUMPS + FANS WILL ENERGIZE !", CENTER_X, 60, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("AUTO-SEQUENCING  500ms/CH", CENTER_X, 420, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
@@ -544,7 +547,7 @@ void drawRelayTestMenu() {
   const int cx[3]    = {55, 160, 265};
   const int rowY[3]  = {120, 230, 340};
   const int r        = 35;
-  const char *labels[9] = {"CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8","FAN"};
+  const char *labels[9] = {"FERM FAN","PUMP 1","PUMP 2","CH4","CH5","LIGHT G","LIGHT Y","LIGHT R","PRE FAN"};
 
   for (int i = 0; i < 9; i++) {
     int row = i / 3;
@@ -1035,7 +1038,7 @@ void drawPidTestMenu() {
   tft.drawCentreString(buf, 232, 125, 4);
 
   // Start / Stop Button
-  uint16_t btnColor = pidTestRunning ? TFT_RED : 0x0400;
+  uint16_t btnColor = pidTestRunning ? 0x0400 : 0xF800;
   tft.fillRect(20, 180, 280, 50, btnColor);
   tft.drawRect(20, 180, 280, 50, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, btnColor);

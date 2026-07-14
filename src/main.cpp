@@ -607,6 +607,16 @@ void loop() {
         heaterTestNeedsFullRedraw = true;
         drawHeaterTestPick();
         break;
+      case HEATER_TEST_MENU:
+        heaterTestRunning = false;
+        heaterTestEditing = false;
+        heaterTestPercent = 0;
+        heaterTestSelection = 0;
+        currentHeatingPercent = 0;
+        heaterTestNeedsFullRedraw = true;
+        currentAppState = HEATER_TEST_PICK;
+        drawHeaterTestPick();
+        break;
       case FAN_TEST_PICK:
         fanTestNeedsFullRedraw = true;
         drawFanTestPick();
@@ -632,6 +642,7 @@ void loop() {
         drawStageParamMenu();
         break;
       default:
+        currentHeatingPercent = 0;
         menuNeedsFullRedraw = true;
         drawStartMenu();
         break;
@@ -2193,7 +2204,22 @@ void loop() {
     if (rtcStatus && currentAppState != SENSOR_MONITOR) {
       DateTime n = rtc.now();
       sprintf(buf, "%02d:%02d", n.hour(), n.minute());
-      tft.setTextColor(TFT_YELLOW, TFT_NAVY);
+      uint16_t hdrBg;
+      switch (currentAppState) {
+        case START_MENU:
+        case NEW_BREW_WIZARD:
+        case DASHBOARD_ACTIVE:
+        case MIXER_MENU:        hdrBg = TFT_NAVY; break;
+        case LOAD_CELL_PAGE:    hdrBg = 0x0493;   break;
+        case CALIBRATION_MODE:  hdrBg = 0x9000;   break;
+        case BREW_SUMMARY_MENU: hdrBg = 0x0400;   break;
+        case STAGE_PARAM_MENU: {
+          const uint16_t sc[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+          hdrBg = sc[stageParamStage]; break;
+        }
+        default: hdrBg = 0x03E0; break;
+      }
+      tft.setTextColor(TFT_YELLOW, hdrBg);
       tft.drawRightString(buf, 310, 15, 4);
     }
 
@@ -2209,8 +2235,6 @@ void loop() {
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();
 
-    if (currentAppState == HEATER_TEST_MENU)
-      drawHeaterTestMenu();
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
 
