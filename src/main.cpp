@@ -176,6 +176,9 @@ int tempHistoryCount = 0;
 bool stageTransferring = false;
 int stageTransferTarget = -1;
 uint32_t transferStartMs = 0;
+bool skipPreheatHeater = false;
+float minVolumeReq = 10.0f;
+bool wizardEditing = false;
 int rtcSetField = 0;
 int rtcSetHour = 0;
 int rtcSetMinute = 0;
@@ -705,8 +708,10 @@ void loop() {
       menuSelection = (menuSelection + 1) % 5;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      wizardSelection = (wizardSelection + 1) % 2;
-      drawNewBrewWizard();
+      if (cDown && !ljDown && !wizardEditing) {
+        wizardSelection = (wizardSelection + 1) % 4;
+        drawNewBrewWizard();
+      }
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
       if (cDown && !ljDown && activeBrewStage >= 0 &&
           simManual[activeBrewStage]) {
@@ -731,11 +736,15 @@ void loop() {
       setMixerSpeed(mixerSpeedPercent);
       drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
-      calSelection = (calSelection + 1) % 3;
-      drawCalibrationPage();
+      if (!wizardEditing) {
+        calSelection = (calSelection + 1) % 3;
+        drawCalibrationPage();
+      }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      loadCellSelection = (loadCellSelection + 1) % 2;
-      drawLoadCellPage();
+      if (!wizardEditing) {
+        loadCellSelection = (loadCellSelection + 1) % 2;
+        drawLoadCellPage();
+      }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 1) % 10;
       drawSystemCheckMenu();
@@ -830,8 +839,10 @@ void loop() {
       menuSelection = (menuSelection + 4) % 5;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      wizardSelection = (wizardSelection + 1) % 2;
-      drawNewBrewWizard();
+      if (!wizardEditing) {
+        wizardSelection = (wizardSelection + 3) % 4;
+        drawNewBrewWizard();
+      }
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
       if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
         simTempOverride[activeBrewStage] += 5.0f;
@@ -855,11 +866,15 @@ void loop() {
       setMixerSpeed(mixerSpeedPercent);
       drawMixerMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
-      calSelection = (calSelection + 2) % 3;
-      drawCalibrationPage();
+      if (!wizardEditing) {
+        calSelection = (calSelection + 2) % 3;
+        drawCalibrationPage();
+      }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      loadCellSelection = (loadCellSelection + 1) % 2;
-      drawLoadCellPage();
+      if (!wizardEditing) {
+        loadCellSelection = (loadCellSelection + 1) % 2;
+        drawLoadCellPage();
+      }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 9) % 10;
       drawSystemCheckMenu();
@@ -939,6 +954,7 @@ void loop() {
         currentAppState = NEW_BREW_WIZARD;
         wizardNeedsFullRedraw = true;
         wizardSelection = 0;
+        wizardEditing = false;
         drawNewBrewWizard();
       } else if (menuSelection == 1) {
         currentAppState = DASHBOARD_ACTIVE;
@@ -998,8 +1014,14 @@ void loop() {
         drawDashboardLayout();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if ((wizardSelection == 0 && currentWeight > 10.0) ||
-          wizardSelection == 1) {
+      if (wizardSelection == 0) {
+        wizardEditing = !wizardEditing;
+        drawNewBrewWizard();
+      } else if (wizardSelection == 1) {
+        skipPreheatHeater = !skipPreheatHeater;
+        drawNewBrewWizard();
+      } else if ((wizardSelection == 2 && currentWeight >= minVolumeReq) ||
+                 wizardSelection == 3) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
@@ -1015,8 +1037,8 @@ void loop() {
         mcp.digitalWrite(LIGHT_R, RELAY_ON);
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
         mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-        preHeatSterilized = false;
-        preHeatCooled = false;
+        preHeatSterilized = skipPreheatHeater;
+        preHeatCooled = skipPreheatHeater;
         preHeatHolding = false;
         pastSterilized = false;
         pastHolding = false;
@@ -1321,6 +1343,7 @@ void loop() {
       currentAppState = LOAD_CELL_PAGE;
       loadCellNeedsFullRedraw = true;
       loadCellSelection = 0;
+      wizardEditing = false;
       drawLoadCellPage();
     } else if (currentAppState == CALIBRATION_MODE) {
       if (calSelection == 0) {
@@ -1329,6 +1352,9 @@ void loop() {
           currentWeight = 0.0f;
           hx711WeightSeeded = false;
         }
+        drawCalibrationPage();
+      } else if (calSelection == 1) {
+        wizardEditing = !wizardEditing;
         drawCalibrationPage();
       } else if (calSelection == 2) {
         currentAppState = SENSOR_MONITOR;
@@ -1340,6 +1366,9 @@ void loop() {
         scale.tare();
         currentWeight = 0.0f;
         hx711WeightSeeded = false;
+        drawLoadCellPage();
+      } else if (loadCellSelection == 1) {
+        wizardEditing = !wizardEditing;
         drawLoadCellPage();
       }
     } else if (currentAppState == STAGE_PARAM_MENU) {
@@ -1399,15 +1428,23 @@ void loop() {
     }
   }
 
+  if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD) {
+    if (wizardSelection == 0 && wizardEditing) {
+      minVolumeReq += 1.0f;
+      if (minVolumeReq > 50.0f) minVolumeReq = 50.0f;
+      drawNewBrewWizard();
+    }
+  }
+
   // Calibration factor adjust via Right/Left while on factor row
   if (cRight && !ljRight && currentAppState == CALIBRATION_MODE &&
-      calSelection == 1) {
+      calSelection == 1 && wizardEditing) {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
     drawCalibrationPage();
   }
   if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE &&
-      loadCellSelection == 1) {
+      loadCellSelection == 1 && wizardEditing) {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
     drawLoadCellPage();
@@ -1463,9 +1500,15 @@ void loop() {
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
-      currentAppState = START_MENU;
-      menuNeedsFullRedraw = true;
-      drawStartMenu();
+      if (wizardSelection == 0 && wizardEditing) {
+        minVolumeReq -= 1.0f;
+        if (minVolumeReq < 1.0f) minVolumeReq = 1.0f;
+        drawNewBrewWizard();
+      } else {
+        currentAppState = START_MENU;
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
+      }
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       if (moduleViewActive) {
         moduleViewActive = false;
@@ -1496,7 +1539,7 @@ void loop() {
       menuNeedsFullRedraw = true;
       drawStartMenu();
     } else if (currentAppState == CALIBRATION_MODE) {
-      if (calSelection == 1) {
+      if (calSelection == 1 && wizardEditing) {
         calibrationFactor -= 10.0;
         scale.set_scale(calibrationFactor);
         drawCalibrationPage();
@@ -1506,7 +1549,7 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      if (loadCellSelection == 1) {
+      if (loadCellSelection == 1 && wizardEditing) {
         calibrationFactor -= 10.0;
         scale.set_scale(calibrationFactor);
         drawLoadCellPage();
@@ -1948,6 +1991,10 @@ void loop() {
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
         mcp.digitalWrite(LIGHT_G, RELAY_ON);
       }
+      mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+      mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+      pumpPreHeatFermOn = false;
+      pumpFermPastOn = false;
       dashNeedsFullRedraw = true;
       if (currentAppState == DASHBOARD_ACTIVE)
         drawDashboardLayout();
@@ -1977,7 +2024,12 @@ void loop() {
 
       if (activeBrewStage == 0) {
         if (!preHeatSterilized) {
-          if (liquidTemp > -100.0f) {
+          if (skipPreheatHeater) {
+            preHeatSterilized = true;
+            preHeatHolding = false;
+            currentHeatingPercent = 0;
+            pidIntegral = 0.0f;
+          } else if (liquidTemp > -100.0f) {
             float error = 80.0f - liquidTemp;
             if (liquidTemp >= PID_THROTTLE_TEMP) {
               pidIntegral += error;
@@ -2017,7 +2069,7 @@ void loop() {
         } else {
           currentHeatingPercent = 0;
           if (liquidTemp > -100.0f && !preHeatCooled) {
-            if (liquidTemp > 30.0f) {
+            if (liquidTemp > 30.0f && !skipPreheatHeater) {
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
               setFanSpeed(100);
@@ -2202,7 +2254,7 @@ void loop() {
       else
         activeHeaterPin = SSR_PAST;
     } else if (activeBrewStage == 0) {
-      activeHeaterPin = SSR_PREHEAT;
+      activeHeaterPin = skipPreheatHeater ? -1 : SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
       activeHeaterPin = SSR_FERM;
     } else if (activeBrewStage == 2) {
@@ -2230,6 +2282,25 @@ void loop() {
     digitalWrite(SSR_PREHEAT, pState);
     digitalWrite(SSR_FERM, fState);
     digitalWrite(SSR_PAST, pastState);
+
+    // ---- Stage Transition Pump Control ----
+    if (stageTransferring && !simRunActive) {
+      if (stageTransferTarget == 1) {
+        mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_ON);
+        pumpPreHeatFermOn = true;
+      } else if (stageTransferTarget == 2) {
+        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_ON);
+        pumpFermPastOn = true;
+      }
+    } else {
+      // Turn off pumps if not in manual transfer test menu
+      if (currentAppState != TRANSFER_TEST_MENU) {
+        mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
+        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+        pumpPreHeatFermOn = false;
+        pumpFermPastOn = false;
+      }
+    }
 
     tft.setTextPadding(0);
 

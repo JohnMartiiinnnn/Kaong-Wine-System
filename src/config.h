@@ -289,3 +289,8 @@ extern int      tempHistoryCount;
 extern bool     stageTransferring;
 extern int      stageTransferTarget;
 extern uint32_t transferStartMs;
+
+// ---- Physical Test Run Settings ----
+extern bool     skipPreheatHeater;
+extern float    minVolumeReq;
+extern bool     wizardEditing;

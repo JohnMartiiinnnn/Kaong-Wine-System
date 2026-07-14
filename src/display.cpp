@@ -67,41 +67,67 @@ void drawNewBrewWizard() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("NEW BREW SETUP", 10, 15, 4);
-    tft.setTextColor(TFT_BLACK);
-    tft.drawCentreString("ADD LIQUID TO VAT", CENTER_X, 70, 2);
-    tft.drawCentreString("MINIMUM 10.0 L REQUIRED", CENTER_X, 90, 2);
-    tft.drawCentreString("RETURN TO CANCEL", CENTER_X, 450, 2);
     wizardNeedsFullRedraw = false;
   }
 
-  tft.fillRect(20, 130, 280, 80, 0xD6BA);
-  tft.drawRect(20, 130, 280, 80, TFT_DARKGREY);
+  // Current weight box
+  tft.fillRect(20, 60, 280, 75, 0xD6BA);
+  tft.drawRect(20, 60, 280, 75, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("CURRENT VOLUME", CENTER_X, 145, 2);
-  char buf[32];
+  tft.drawCentreString("CURRENT WEIGHT", CENTER_X, 70, 2);
+  char buf[64];
   if (hx711Status)
     sprintf(buf, "%.1f L", currentWeight);
   else
     strcpy(buf, "FAILED");
-  tft.drawCentreString(buf, CENTER_X, 175, 4);
+  tft.drawCentreString(buf, CENTER_X, 95, 4);
 
-  bool        canProceed = (currentWeight > 10.0);
-  const char *options[]  = {"PROCEED", "BYPASS (TEST)"};
-  for (int i = 0; i < 2; i++) {
-    int      y        = 250 + (i * 70);
-    uint16_t bgColor  = TFT_DARKGREY;
-    uint16_t txtColor = TFT_WHITE;
-    if (i == 0)
-      bgColor = canProceed ? ((wizardSelection == 0) ? 0x03E0 : 0x0400) : TFT_DARKGREY;
-    else
-      bgColor = (wizardSelection == 1) ? TFT_ORANGE : 0x9000;
-
-    tft.drawRect(18, y - 2, 284, 54, (wizardSelection == i) ? TFT_BLACK : TFT_WHITE);
-    tft.fillRect(20, y, 280, 50, bgColor);
-    tft.drawRect(20, y, 280, 50, TFT_DARKGREY);
-    tft.setTextColor(txtColor, bgColor);
-    tft.drawCentreString(options[i], CENTER_X, y + 15, 2);
+  // Row 0: Min Volume
+  uint16_t row0Bg = (wizardSelection == 0) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xCE79;
+  uint16_t row0Fg = (wizardSelection == 0) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(20, 150, 280, 45, row0Bg);
+  tft.drawRect(20, 150, 280, 45, TFT_DARKGREY);
+  tft.setTextColor(row0Fg, row0Bg);
+  if (wizardSelection == 0 && wizardEditing) {
+    sprintf(buf, "MIN VOLUME: [ %.1f L ]", minVolumeReq);
+  } else {
+    sprintf(buf, "MIN VOLUME: < %.1f L >", minVolumeReq);
   }
+  tft.drawCentreString(buf, CENTER_X, 162, 2);
+
+  // Row 1: Preheat Heater
+  uint16_t row1Bg = (wizardSelection == 1) ? 0x3566 : 0xCE79;
+  uint16_t row1Fg = (wizardSelection == 1) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(20, 205, 280, 45, row1Bg);
+  tft.drawRect(20, 205, 280, 45, TFT_DARKGREY);
+  tft.setTextColor(row1Fg, row1Bg);
+  sprintf(buf, "PREHEAT HEATER: %s", skipPreheatHeater ? "DISABLED" : "ENABLED");
+  tft.drawCentreString(buf, CENTER_X, 217, 2);
+
+  // Row 2: PROCEED
+  bool canProceed = (currentWeight >= minVolumeReq);
+  uint16_t row2Bg = canProceed ? ((wizardSelection == 2) ? 0x03E0 : 0x0400) : TFT_DARKGREY;
+  uint16_t row2Fg = TFT_WHITE;
+  tft.drawRect(18, 268, 284, 49, (wizardSelection == 2) ? TFT_BLACK : TFT_WHITE);
+  tft.fillRect(20, 270, 280, 45, row2Bg);
+  tft.drawRect(20, 270, 280, 45, TFT_DARKGREY);
+  tft.setTextColor(row2Fg, row2Bg);
+  tft.drawCentreString("PROCEED (START BREW)", CENTER_X, 282, 2);
+
+  // Row 3: BYPASS (TEST RUN)
+  uint16_t row3Bg = (wizardSelection == 3) ? TFT_ORANGE : 0x9000;
+  uint16_t row3Fg = TFT_WHITE;
+  tft.drawRect(18, 328, 284, 49, (wizardSelection == 3) ? TFT_BLACK : TFT_WHITE);
+  tft.fillRect(20, 330, 280, 45, row3Bg);
+  tft.drawRect(20, 330, 280, 45, TFT_DARKGREY);
+  tft.setTextColor(row3Fg, row3Bg);
+  tft.drawCentreString("BYPASS (TEST RUN)", CENTER_X, 342, 2);
+
+  // Help Footer
+  tft.fillRect(0, 420, 320, 60, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("UP/DOWN: NAV   LEFT/RIGHT: ADJUST   SELECT: RUN", CENTER_X, 432, 1);
+  tft.drawCentreString("RETURN (LEFT on Row 2/3): CANCEL", CENTER_X, 452, 1);
 }
 
 static void formatStageTimer(uint32_t ms, char *out) {
@@ -349,7 +375,7 @@ void drawLoadCellPage(bool valuesOnly) {
     tft.drawRightString("SELECT TO ZERO", 290, 165, 2);
 
     // CAL FACTOR row
-    uint16_t calBg  = (loadCellSelection == 1) ? 0x3566 : 0xD6BA;
+    uint16_t calBg  = (loadCellSelection == 1) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
     uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 217, 300, 65, calBg);
     tft.drawRect(10, 217, 300, 65, TFT_DARKGREY);
@@ -387,7 +413,7 @@ void drawLoadCellPage(bool valuesOnly) {
 
   // Always refresh cal factor value in case it changed
   if (!valuesOnly) return;
-  uint16_t calBg  = (loadCellSelection == 1) ? 0x3566 : 0xD6BA;
+  uint16_t calBg  = (loadCellSelection == 1) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
   uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
   sprintf(b, "%.2f", calibrationFactor);
   tft.setTextColor(calTxt, calBg);
@@ -614,7 +640,7 @@ void drawValueTile(int x, int y, const char *label, String value, bool isError) 
 }
 
 void drawCalibrationValueTile(int y, const char *label, String value, bool isSelected) {
-  uint16_t bgColor  = isSelected ? 0x3566 : 0xD6BA;
+  uint16_t bgColor  = isSelected ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
   uint16_t txtColor = isSelected ? TFT_WHITE : TFT_BLACK;
   tft.fillRect(10, y, 300, 60, bgColor);
   tft.drawRect(10, y, 300, 60, TFT_DARKGREY);
