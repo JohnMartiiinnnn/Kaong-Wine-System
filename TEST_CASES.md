@@ -42,7 +42,7 @@ This document outlines all possible scenarios, expected behaviors, and failure s
 | Component | Test Scenario | Action | Expected Behavior | Failure Mode |
 | :--- | :--- | :--- | :--- | :--- |
 | **BTS7960 Motor Driver**| Speed & Direction | Navigate to Motor Test Menu, set 50% CW | Motor spins quietly at half speed clockwise; current draw matches load | Whining without movement (Check 12V supply / motor connections) |
-| | Current-to-RPM | Measure current draw voltage on ADS1115 A1 under load | Voltage ranges from 0.012V (no-load, ~50 RPM) to 0.153V (stall, 0 RPM) | Always reads 0V (check IS pins wiring / pull-down resistor) |
+| | Current-to-RPM | Measure current draw voltage on ADS1115 A1 under load | Voltage ranges from 0.035V (no-load, ~66 RPM) to 0.447V (stall, 0 RPM) | Always reads 0V (check IS pins wiring / pull-down resistor) |
 | | E-Stop Cutoff | Hit E-Stop while motor is running | PWM cuts to 0, Motor freewheels to a stop | Motor ignores E-stop (Check `L_EN`/`R_EN` physical wiring) |
 | **Pre-Heat Fan Relay** | Trigger | Navigate to Fan Test Menu, turn Fan 1 ON | Relay clicks, fan spins up | No click (Check MCP `GPA7` wiring to Relay IN) |
 | **Fermentation Fans** | Trigger | Navigate to Fan Test Menu, turn Fan 2 ON | Relays 2 & 3 click simultaneously, dual fans spin | Fans stutter (Insufficient 12V power supply current) |
@@ -50,20 +50,20 @@ This document outlines all possible scenarios, expected behaviors, and failure s
 
 ---
 
-## 4. Mixing Impeller (JGY370) Current Draw vs. Speed Calibration Chart
+## 4. Mixing Impeller (JGB37-545 1260) Current Draw vs. Speed Calibration Chart
 
-The RPM of the 12V JGY370 worm-gear motor can be calculated by measuring the output voltage on the BTS7960's current sense (`IS`) pins. These pins are tied together, connected to **ADS1115 Channel A1** (Secondary ESP32) with a **1kΩ pull-down resistor** to GND.
+The RPM of the 12V JGB37-545 1260 motor (with 90 reduction ratio) can be calculated by measuring the output voltage on the BTS7960's current sense (`IS`) pins. These pins are tied together, connected to **ADS1115 Channel A1** (Secondary ESP32) with a **1kΩ pull-down resistor** to GND.
 
 The motor speed drops linearly as the load and current draw increase:
 
 | Motor Torque Load | Motor Current (A) | Sense Output Voltage (V) | Estimated Speed (RPM) | Operational State |
 | :--- | :--- | :--- | :--- | :--- |
-| **No Load** | 0.10 A | 0.012 V | ~50 RPM | Free-spinning must |
-| **Light Load** | 0.35 A | 0.041 V | ~40 RPM | Continuous rated mixing |
-| **Medium Load** | 0.65 A | 0.076 V | ~28 RPM | Normal fermentation viscosity |
-| **Heavy Load** | 0.95 A | 0.112 V | ~17 RPM | High-density must resistance |
-| **Straining** | 1.20 A | 0.141 V | ~4 RPM | Approaching motor capacity limit |
-| **Stall** | 1.30 A | 0.153 V | 0 RPM | Stalled (Power cutoff required) |
+| **No Load** | 0.30 A | 0.035 V | ~66 RPM | Free-spinning must |
+| **Light Load** | 1.00 A | 0.118 V | ~50 RPM | Rated continuous mixing (rated load) |
+| **Medium Load** | 1.80 A | 0.212 V | ~38 RPM | Normal fermentation viscosity |
+| **Heavy Load** | 2.60 A | 0.306 V | ~23 RPM | High-density must resistance |
+| **Straining** | 3.20 A | 0.376 V | ~11 RPM | Approaching motor capacity limit |
+| **Stall** | 3.80 A | 0.447 V | 0 RPM | Stalled (Power cutoff required) |
 
 > [!IMPORTANT]
-> **Stall Limit Protection:** If the voltage on ADS1115 A1 exceeds **0.140V (1.2A)** for more than 3 consecutive seconds, the primary controller must automatically shut down the motor to prevent the gearbox gears from stripping or the motor winding from burning out.
+> **Stall Limit Protection:** If the voltage on ADS1115 A1 exceeds **0.353V (3.0A)** for more than 3 consecutive seconds, the primary controller must automatically shut down the motor to prevent the gearbox gears from stripping or the motor winding from burning out.
