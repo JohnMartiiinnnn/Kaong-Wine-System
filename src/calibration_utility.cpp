@@ -10,6 +10,8 @@
 #define HX711_SCK 27
 #define FLOW_SENSOR_1 32
 #define FLOW_SENSOR_2 34
+#define RX2_PIN 16
+#define TX2_PIN 17
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -48,15 +50,46 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_1), flowISR1, RISING);
   attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR_2), flowISR2, RISING);
   Serial.println("Flow Sensors Interrupts Attached.");
+
+  // 4. Initialize UART2 for Secondary Communication
+  Serial2.begin(115200, SERIAL_8N1, RX2_PIN, TX2_PIN);
+  Serial.println("UART2 (Secondary Comm) Initialized.");
   
   Serial.println("\n--- Commands ---");
   Serial.println("  't' - Tare the Load Cell (empty scale first)");
   Serial.println("  'c' - Calibrate the Load Cell (place known weight, e.g. 1000g)");
   Serial.println("  'r' - Reset Flow sensor pulse counters");
+  Serial.println("  's' - Switch to Secondary ESP32 Bridge Mode (over UART)");
   Serial.println("  'h' - Print commands guide");
 }
 
 void loop() {
+  static bool bridgeMode = false;
+
+  if (bridgeMode) {
+    // Forward from USB Serial (PC) to UART (Secondary)
+    while (Serial.available() > 0) {
+      char c = Serial.read();
+      if (c == 'p' || c == 'P') {
+        bridgeMode = false;
+        Serial.println("\n[Exited Bridge Mode. Returned to Primary Calibration Mode.]");
+        // Flush remaining Serial input
+        while (Serial.available() > 0) Serial.read();
+        break;
+      } else {
+        Serial2.write(c);
+      }
+    }
+
+    // Forward from UART (Secondary) to USB Serial (PC)
+    while (Serial2.available() > 0) {
+      Serial.write(Serial2.read());
+    }
+
+    delay(10);
+    return; // Skip Primary printing and commands
+  }
+
   static uint32_t lastPrint = 0;
   if (millis() - lastPrint >= 2000) {
     lastPrint = millis();
@@ -134,11 +167,22 @@ void loop() {
       flow2Pulses = 0;
       Serial.println("\n[Flow pulses reset to zero]");
     }
+    else if (cmd == 's' || cmd == 'S') {
+      bridgeMode = true;
+      Serial.println("\n=======================================================");
+      Serial.println("  ENTERING SECONDARY ESP32 BRIDGE MODE");
+      Serial.println("  All serial data will be forwarded to the Secondary.");
+      Serial.println("  Press 'p' to exit and return to Primary Calibration.");
+      Serial.println("=======================================================\n");
+      // Flush UART Serial2 buffer
+      while (Serial2.available() > 0) Serial2.read();
+    }
     else if (cmd == 'h' || cmd == 'H') {
       Serial.println("\n--- Commands Guide ---");
       Serial.println("  't' - Tare the Load Cell (empty scale first)");
       Serial.println("  'c' - Calibrate the Load Cell (place known weight, e.g. 1000g)");
       Serial.println("  'r' - Reset Flow sensor pulse counters");
+      Serial.println("  's' - Switch to Secondary ESP32 Bridge Mode (over UART)");
       Serial.println("  'h' - Print commands guide");
     }
   }

@@ -3,9 +3,12 @@
 #include <Adafruit_ADS1X15.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <stdarg.h>
 
 // Pins based on Secondary Transmitter main.cpp
 #define ONE_WIRE_BUS 13
+#define RXD2 16
+#define TXD2 17
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -15,32 +18,44 @@ Adafruit_ADS1115 ads;
 float phOffsetVoltage = 2.555f; // Voltage at pH 7.0
 float phSlope = 0.171f;         // Volts per pH unit (temperature compensated)
 
+// Helper function to print to both Serial (USB) and Serial2 (UART)
+void printMsg(const char* format, ...) {
+  char buf[256];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buf, sizeof(buf), format, args);
+  va_end(args);
+  Serial.print(buf);
+  Serial2.print(buf);
+}
+
 void setup() {
   Serial.begin(115200);
+  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
   delay(1000);
-  Serial.println("\n=======================================================");
-  Serial.println("  SECONDARY ESP32 SENSOR CALIBRATION UTILITY");
-  Serial.println("=======================================================");
+  printMsg("\n=======================================================\n");
+  printMsg("  SECONDARY ESP32 SENSOR CALIBRATION UTILITY\n");
+  printMsg("=======================================================\n");
 
   // Initialize I2C
   Wire.begin();
 
   // Initialize ADS1115 for pH
   if (ads.begin()) {
-    Serial.println("ADS1115 (pH ADC) Initialized successfully.");
+    printMsg("ADS1115 (pH ADC) Initialized successfully.\n");
   } else {
-    Serial.println("Error: ADS1115 (pH ADC) NOT DETECTED! Check I2C wiring.");
+    printMsg("Error: ADS1115 (pH ADC) NOT DETECTED! Check I2C wiring.\n");
   }
 
   // Initialize DS18B20
   sensors.begin();
   int count = sensors.getDeviceCount();
-  Serial.printf("DS18B20 Probes Found on Pin %d: %d\n", ONE_WIRE_BUS, count);
+  printMsg("DS18B20 Probes Found on Pin %d: %d\n", ONE_WIRE_BUS, count);
 
-  Serial.println("\n--- Commands ---");
-  Serial.println("  '7' - Set pH 7.0 calibration (Calibrate offset voltage)");
-  Serial.println("  '4' - Set pH 4.0 calibration (Calibrate slope)");
-  Serial.println("  'h' - Print commands guide");
+  printMsg("\n--- Commands ---\n");
+  printMsg("  '7' - Set pH 7.0 calibration (Calibrate offset voltage)\n");
+  printMsg("  '4' - Set pH 4.0 calibration (Calibrate slope)\n");
+  printMsg("  'h' - Print commands guide\n");
 }
 
 void loop() {
@@ -48,15 +63,15 @@ void loop() {
   if (millis() - lastPrint >= 2000) {
     lastPrint = millis();
 
-    Serial.println("\n--- Live Data Readings ---");
+    printMsg("\n--- Live Data Readings ---\n");
 
     // 1. Read DS18B20 temperature
     sensors.requestTemperatures();
     float tempC = sensors.getTempCByIndex(0);
     if (tempC != DEVICE_DISCONNECTED_C) {
-      Serial.printf("DS18B20 Fermentation Temp Probe: %.2f C\n", tempC);
+      printMsg("DS18B20 Fermentation Temp Probe: %.2f C\n", tempC);
     } else {
-      Serial.println("DS18B20 Fermentation Temp Probe: [DISCONNECTED]");
+      printMsg("DS18B20 Fermentation Temp Probe: [DISCONNECTED]\n");
       tempC = 25.0f; // Default temp for pH compensation
     }
 
@@ -68,23 +83,29 @@ void loop() {
     float slope_comp = 0.17126f * (tempC + 273.15f) / 298.15f;
     float calculatedPH = 7.0f - (voltage - phOffsetVoltage) / slope_comp;
 
-    Serial.printf("pH Probe (A0) - Raw ADC: %d   Voltage: %.4f V\n", adcVal, voltage);
-    Serial.printf("Calculated pH (Offset V = %.3f, Compensated Slope = %.4f): %.2f pH\n",
+    printMsg("pH Probe (A0) - Raw ADC: %d   Voltage: %.4f V\n", adcVal, voltage);
+    printMsg("Calculated pH (Offset V = %.3f, Compensated Slope = %.4f): %.2f pH\n",
                   phOffsetVoltage, slope_comp, calculatedPH);
   }
 
-  // Handle commands from Serial Monitor
+  // Handle commands from Serial Monitor or UART Serial2
+  char cmd = 0;
   if (Serial.available() > 0) {
-    char cmd = Serial.read();
-    
-    // Flush serial buffer
+    cmd = Serial.read();
+  } else if (Serial2.available() > 0) {
+    cmd = Serial2.read();
+  }
+
+  if (cmd != 0) {
+    // Flush both serial buffers
     while (Serial.available() > 0) Serial.read();
+    while (Serial2.available() > 0) Serial2.read();
 
     if (cmd == '7') {
-      Serial.println("\n[pH 7.0 Calibration]");
-      Serial.println("Place pH probe in pH 7.0 buffer solution. Wait 5s for readings to stabilize...");
+      printMsg("\n[pH 7.0 Calibration]\n");
+      printMsg("Place pH probe in pH 7.0 buffer solution. Wait 5s for readings to stabilize...\n");
       for (int i = 5; i > 0; i--) {
-        Serial.printf("%d...\n", i);
+        printMsg("%d...\n", i);
         delay(1000);
       }
       int16_t adcSum = 0;
@@ -95,15 +116,15 @@ void loop() {
       }
       float avgVoltage = ads.computeVolts(adcSum / samples);
       phOffsetVoltage = avgVoltage;
-      Serial.printf("Calibration Successful!\nNew Offset Voltage (pH 7.0): %.4f V\n", phOffsetVoltage);
-      Serial.println("Update the offset voltage constant (2.555) in Secondary main.cpp with this value.");
+      printMsg("Calibration Successful!\nNew Offset Voltage (pH 7.0): %.4f V\n", phOffsetVoltage);
+      printMsg("Update the offset voltage constant (2.555) in Secondary main.cpp with this value.\n");
     }
     else if (cmd == '4') {
-      Serial.println("\n[pH 4.0 Calibration]");
-      Serial.println("Make sure you calibrated pH 7.0 FIRST.");
-      Serial.println("Place pH probe in pH 4.0 buffer solution. Wait 5s for readings to stabilize...");
+      printMsg("\n[pH 4.0 Calibration]\n");
+      printMsg("Make sure you calibrated pH 7.0 FIRST.\n");
+      printMsg("Place pH probe in pH 4.0 buffer solution. Wait 5s for readings to stabilize...\n");
       for (int i = 5; i > 0; i--) {
-        Serial.printf("%d...\n", i);
+        printMsg("%d...\n", i);
         delay(1000);
       }
       
@@ -120,23 +141,21 @@ void loop() {
       float avgVoltage = ads.computeVolts(adcSum / samples);
       
       // Calculate uncompensated slope at pH 4.0
-      // pH = 7.0 - (V - V_7) / slope  => 4.0 = 7.0 - (V_4 - V_7) / slope => slope = (V_4 - V_7) / 3.0
       float rawSlope = (avgVoltage - phOffsetVoltage) / 3.0f;
       
       // Temperature de-compensate to get base slope at 25C (298.15K)
-      // rawSlope = baseSlope * (tempC + 273.15) / 298.15 => baseSlope = rawSlope * 298.15 / (tempC + 273.15)
       phSlope = rawSlope * 298.15f / (tempC + 273.15f);
 
-      Serial.printf("Calibration Successful!\n");
-      Serial.printf("Measured Voltage at pH 4.0: %.4f V\n", avgVoltage);
-      Serial.printf("Calculated Base Slope at 25C: %.5f V/pH\n", phSlope);
-      Serial.println("Update the pH slope constant (0.17126) in Secondary main.cpp with this value.");
+      printMsg("Calibration Successful!\n");
+      printMsg("Measured Voltage at pH 4.0: %.4f V\n", avgVoltage);
+      printMsg("Calculated Base Slope at 25C: %.5f V/pH\n", phSlope);
+      printMsg("Update the pH slope constant (0.17126) in Secondary main.cpp with this value.\n");
     }
     else if (cmd == 'h' || cmd == 'H') {
-      Serial.println("\n--- Commands Guide ---");
-      Serial.println("  '7' - Set pH 7.0 calibration (Calibrate offset voltage)");
-      Serial.println("  '4' - Set pH 4.0 calibration (Calibrate slope)");
-      Serial.println("  'h' - Print commands guide");
+      printMsg("\n--- Commands Guide ---\n");
+      printMsg("  '7' - Set pH 7.0 calibration (Calibrate offset voltage)\n");
+      printMsg("  '4' - Set pH 4.0 calibration (Calibrate slope)\n");
+      printMsg("  'h' - Print commands guide\n");
     }
   }
 }
