@@ -2508,8 +2508,10 @@ void loop() {
         pumpFermPastOn = true;
       }
     } else {
-      // Turn off pumps if not in manual transfer test menu
-      if (currentAppState != TRANSFER_TEST_MENU) {
+      // Turn off pumps if not in manual transfer test menu, relay test menu, or calibration wizard
+      if (currentAppState != TRANSFER_TEST_MENU &&
+          currentAppState != RELAY_TEST_MENU &&
+          currentAppState != CALIB_WIZARD) {
         setPump1(false);
         setPump2(false);
         pumpPreHeatFermOn = false;
