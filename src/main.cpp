@@ -1204,7 +1204,11 @@ void loop() {
     } else if (currentAppState == RELAY_TEST_MENU) {
       testRelayStates[relayTestChannel] = !testRelayStates[relayTestChannel];
       bool state = testRelayStates[relayTestChannel];
-      if (relayTestChannel < 8) {
+      if (relayTestChannel == 1) {
+        setPump1(state);
+      } else if (relayTestChannel == 2) {
+        setPump2(state);
+      } else if (relayTestChannel < 8) {
         mcp.digitalWrite(RELAY_PINS[relayTestChannel], state ? RELAY_ON : RELAY_OFF);
       } else {
         mcp.digitalWrite(FAN_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
@@ -1226,7 +1230,11 @@ void loop() {
         relayTestNeedsFullRedraw = true;
         for (int i = 0; i < 9; i++) {
           testRelayStates[i] = false;
-          if (i < 8)
+          if (i == 1)
+            setPump1(false);
+          else if (i == 2)
+            setPump2(false);
+          else if (i < 8)
             mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
           else
             mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
@@ -1796,7 +1804,11 @@ void loop() {
     } else if (currentAppState == RELAY_TEST_MENU) {
       for (int i = 0; i < 9; i++) {
         testRelayStates[i] = false;
-        if (i < 8)
+        if (i == 1)
+          setPump1(false);
+        else if (i == 2)
+          setPump2(false);
+        else if (i < 8)
           mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
         else
           mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
