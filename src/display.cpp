@@ -586,7 +586,7 @@ void drawRelayTestMenu() {
     tft.setTextColor(TFT_BLACK, 0xFFE0);
     tft.drawCentreString("! PUMPS + FANS WILL ENERGIZE !", CENTER_X, 60, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: SELECT   SELECT: TOGGLE", CENTER_X, 420, 2);
+    tft.drawCentreString("AUTO-SEQUENCING  1000ms/CH", CENTER_X, 420, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 458, 1);
     relayTestNeedsFullRedraw = false;

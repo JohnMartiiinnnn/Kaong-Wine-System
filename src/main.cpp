@@ -111,7 +111,8 @@ bool lightTestNeedsFullRedraw = true;
 bool relayTestNeedsFullRedraw = true;
 int relayTestChannel = 0;
 uint32_t relayTestTimer = 0;
-bool testRelayStates[9] = {false, false, false, false, false, false, false, false, false};
+bool testRelayStates[9] = {false, false, false, false, false,
+                           false, false, false, false};
 bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
@@ -936,9 +937,6 @@ void loop() {
         }
         drawFlowCalMenu();
       }
-    } else if (currentAppState == RELAY_TEST_MENU) {
-      relayTestChannel = (relayTestChannel + 1) % 9;
-      drawRelayTestMenu();
     }
   }
 
@@ -1062,9 +1060,6 @@ void loop() {
         flowCalSelection = (flowCalSelection + 2) % 3;
       }
       drawFlowCalMenu();
-    } else if (currentAppState == RELAY_TEST_MENU) {
-      relayTestChannel = (relayTestChannel + 8) % 9;
-      drawRelayTestMenu();
     }
   }
 
@@ -1197,19 +1192,6 @@ void loop() {
       }
       mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
       drawCoolingMenu();
-    } else if (currentAppState == RELAY_TEST_MENU) {
-      testRelayStates[relayTestChannel] = !testRelayStates[relayTestChannel];
-      bool state = testRelayStates[relayTestChannel];
-      if (relayTestChannel == 1) {
-        setPump1(state);
-      } else if (relayTestChannel == 2) {
-        setPump2(state);
-      } else if (relayTestChannel < 8) {
-        mcp.digitalWrite(RELAY_PINS[relayTestChannel], state ? RELAY_ON : RELAY_OFF);
-      } else {
-        mcp.digitalWrite(FAN_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
-      }
-      drawRelayTestMenu();
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       if (systemCheckSelection == 0) {
         currentAppState = FAN_TEST_PICK;
@@ -1224,6 +1206,7 @@ void loop() {
       } else if (systemCheckSelection == 2) {
         relayTestChannel = 0;
         relayTestNeedsFullRedraw = true;
+        relayTestTimer = millis();
         for (int i = 0; i < 9; i++) {
           testRelayStates[i] = false;
           if (i == 1)
@@ -1235,6 +1218,8 @@ void loop() {
           else
             mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
         }
+        testRelayStates[0] = true;
+        mcp.digitalWrite(RELAY_PINS[0], RELAY_ON);
         currentAppState = RELAY_TEST_MENU;
         drawRelayTestMenu();
       } else if (systemCheckSelection == 3) {
@@ -1898,7 +1883,36 @@ void loop() {
   ljDown = cDown;
   ljSelect = cSelect;
 
+  // Relay test auto-advance (1000ms per channel)
+  if (currentAppState == RELAY_TEST_MENU && millis() - relayTestTimer > 1000) {
+    testRelayStates[relayTestChannel] = false;
+    if (relayTestChannel == 1) {
+      setPump1(false);
+    } else if (relayTestChannel == 2) {
+      setPump2(false);
+    } else if (relayTestChannel < 8) {
+      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_OFF);
+    } else {
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+    }
 
+    delay(50); // Buffer for electrical stabilization
+
+    relayTestChannel = (relayTestChannel + 1) % 9;
+    testRelayStates[relayTestChannel] = true;
+    if (relayTestChannel == 1) {
+      setPump1(true);
+    } else if (relayTestChannel == 2) {
+      setPump2(true);
+    } else if (relayTestChannel < 8) {
+      mcp.digitalWrite(RELAY_PINS[relayTestChannel], RELAY_ON);
+    } else {
+      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
+    }
+
+    relayTestTimer = millis();
+    drawRelayTestMenu();
+  }
 
   // SD card health check (1s)
   if (millis() - ls > 1000) {
@@ -2516,7 +2530,8 @@ void loop() {
         pumpFermPastOn = true;
       }
     } else {
-      // Turn off pumps if not in manual transfer test menu, relay test menu, or calibration wizard
+      // Turn off pumps if not in manual transfer test menu, relay test menu, or
+      // calibration wizard
       if (currentAppState != TRANSFER_TEST_MENU &&
           currentAppState != RELAY_TEST_MENU &&
           currentAppState != CALIB_WIZARD) {
