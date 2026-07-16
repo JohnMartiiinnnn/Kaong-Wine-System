@@ -563,7 +563,7 @@ void drawRelayTestMenu() {
     tft.setTextColor(TFT_BLACK, 0xFFE0);
     tft.drawCentreString("! PUMPS + FANS WILL ENERGIZE !", CENTER_X, 60, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("AUTO-SEQUENCING  500ms/CH", CENTER_X, 420, 2);
+    tft.drawCentreString("DPAD: SELECT  SELECT: TOGGLE", CENTER_X, 420, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 458, 1);
     relayTestNeedsFullRedraw = false;
@@ -578,22 +578,23 @@ void drawRelayTestMenu() {
   for (int i = 0; i < 9; i++) {
     int row = i / 3;
     int col = i % 3;
-    bool active      = (relayTestChannel == i);
-    uint16_t fill    = active ? TFT_GREEN : 0xC618;
-    uint16_t outline = active ? 0x0300 : TFT_DARKGREY;
+    bool selected    = (relayTestChannel == i);
+    uint16_t fill    = testRelayStates[i] ? TFT_GREEN : 0xC618;
+    uint16_t outline = selected ? TFT_RED : TFT_DARKGREY;
     tft.fillCircle(cx[col], rowY[row], r, fill);
     tft.drawCircle(cx[col], rowY[row], r, outline);
+    if (selected) {
+      tft.drawCircle(cx[col], rowY[row], r - 1, outline);
+      tft.drawCircle(cx[col], rowY[row], r - 2, outline);
+    }
     tft.setTextColor(TFT_BLACK, TFT_WHITE);
     tft.fillRect(cx[col] - 20, rowY[row] + r + 4, 40, 14, TFT_WHITE);
     tft.drawCentreString(labels[i], cx[col], rowY[row] + r + 5, 1);
   }
 
   // Active channel banner
-  char buf[20];
-  if (relayTestChannel < 8)
-    sprintf(buf, "ACTIVE: CH%d", relayTestChannel + 1);
-  else
-    sprintf(buf, "ACTIVE: FAN");
+  char buf[32];
+  sprintf(buf, "%s: %s", labels[relayTestChannel], testRelayStates[relayTestChannel] ? "ON" : "OFF");
   tft.fillRect(0, 55, 320, 28, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.drawCentreString(buf, CENTER_X, 62, 2);

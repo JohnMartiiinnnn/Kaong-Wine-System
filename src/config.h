@@ -212,6 +212,7 @@ extern bool lightTestNeedsFullRedraw;
 extern bool relayTestNeedsFullRedraw;
 extern int  relayTestChannel;
 extern uint32_t relayTestTimer;
+extern bool testRelayStates[9];
 extern bool motorTestNeedsFullRedraw;
 extern int  motorTestSpeed;
 extern bool motorTestCW;
