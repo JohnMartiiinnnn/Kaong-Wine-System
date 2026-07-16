@@ -60,7 +60,7 @@ This standalone project reads local OneWire temp probes on Pin 26 (Pre-heat and 
    ~/.platformio/penv/bin/pio device monitor
    ```
 3. The utility will print temperatures for Index 0 (Pasteurization) and Index 1 (Pre-heat) every 2 seconds.
-4. Verify readings in ice water (~0°C) and boiling water (~100°C).
+4. **Verification**: Since the DS18B20 is a digital sensor and is **factory-calibrated**, it does not require you to calculate or write any calibration factor in code. Simply verify the readings in ice water (~0.0°C) or room temperature against a reference thermometer to ensure the probes are working correctly and not damaged.
 
 ---
 
