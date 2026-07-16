@@ -937,11 +937,7 @@ void loop() {
         drawFlowCalMenu();
       }
     } else if (currentAppState == RELAY_TEST_MENU) {
-      if (cDown && !ljDown) {
-        relayTestChannel = (relayTestChannel + 3) % 9;
-      } else if (cRight && !ljRight) {
-        relayTestChannel = (relayTestChannel + 1) % 9;
-      }
+      relayTestChannel = (relayTestChannel + 1) % 9;
       drawRelayTestMenu();
     }
   }
@@ -1067,7 +1063,7 @@ void loop() {
       }
       drawFlowCalMenu();
     } else if (currentAppState == RELAY_TEST_MENU) {
-      relayTestChannel = (relayTestChannel + 6) % 9;
+      relayTestChannel = (relayTestChannel + 8) % 9;
       drawRelayTestMenu();
     }
   }
