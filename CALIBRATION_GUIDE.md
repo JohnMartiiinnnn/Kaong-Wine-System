@@ -26,7 +26,7 @@ This standalone project tares and calculates the calibration factor for the weig
 
 ## 2. Flow Sensor Calibration
 
-This standalone project measures pulses and calculates K-factors for Flow Sensor 1 and Flow Sensor 2.
+This standalone project measures pulses and calculates K-factors for Flow Sensor 1 and Flow Sensor 2. It provides a visual TFT interface and allows you to toggle the transfer pumps directly using the keypad or Serial Monitor.
 
 ### How to Run
 1. Navigate to the directory:
@@ -38,10 +38,17 @@ This standalone project measures pulses and calculates K-factors for Flow Sensor
    ~/.platformio/penv/bin/pio run -t upload
    ~/.platformio/penv/bin/pio device monitor
    ```
-3. Type `r` and press Enter to reset pulses to 0.
-4. Pour exactly 1.0 Liter of water through the sensor.
-5. Type `c`, press Enter, and input the volume in Liters (`1.0`). The tool will output the calculated K-factor.
-6. **Update code**: Open `src/config.h` in the main codebase and update `FLOW1_KF` and `FLOW2_KF`.
+
+### Calibration Procedure
+1. **Prepare Setup**: Place a container with an exactly measured volume of water (e.g., exactly `1.0 L` or `5.0 L`) at the inlet of the pump/sensor path, and an empty container at the outlet.
+2. **Set Target Volume**: Use the **UP / DOWN** keypad keys to select the **Target Volume** row on the screen. Use the **LEFT / RIGHT** keys to adjust the volume to match your measured water volume.
+3. **Reset Counters**: Navigate to **Reset Counters to 0** and press **SELECT** to clear any old pulses.
+4. **Run Pump**:
+   - Navigate to **Pump 1 (PH->Ferm)** (or **Pump 2 (Ferm->Past)** depending on which sensor you are calibrating).
+   - Press **SELECT** to turn the pump ON.
+   - Let the pump run until all the measured water has passed through the sensor, then press **SELECT** again to turn the pump OFF.
+5. **Calculate K-Factor**: Navigate down to **Calculate K-Factor** and press **SELECT**. The screen (and Serial Monitor) will instantly calculate and display the new K-Factor.
+6. **Update Code**: Open `src/config.h` in the main codebase and update `FLOW1_KF` or `FLOW2_KF` with the computed K-Factor.
 
 ---
 
