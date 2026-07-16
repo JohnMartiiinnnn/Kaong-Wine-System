@@ -1366,16 +1366,86 @@ void loop() {
         }
         drawUnitTestRunPage();
       } else {
-        // Manual confirm test: SELECT = PASS
+        bool trialPassed = false;
+        float trialValue = 0.0f;
+        
         if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
-          unitTestTrialResults[unitTestTrialIndex] = true;
-          unitTestTrialValues[unitTestTrialIndex] = 1.0f;
-          logUnitTestTrial(unitTestTrialIndex, 1.0f, true);
-          unitTestPassedTrials++;
-          unitTestTrialIndex++;
-          unitTestNeedsFullRedraw = true;
-          drawUnitTestRunPage();
+          trialPassed = true;
+          trialValue = 1.0f;
+        } else {
+          switch (unitTestSelection) {
+            case 1: // Load Cells
+              trialValue = currentWeight;
+              trialPassed = (abs(trialValue - 1.0f) <= 0.05f);
+              break;
+            case 2: // DS18B20 Temp
+              {
+                float t = -999.0f;
+                if (ds18ProbeSelection == 0) {
+                  t = sharedLiquidSensors.getTempCByIndex(1);
+                } else if (ds18ProbeSelection == 1) {
+                  t = incomingData.room2LiquidTemp;
+                } else if (ds18ProbeSelection == 2) {
+                  t = sharedLiquidSensors.getTempCByIndex(0);
+                }
+                trialValue = t;
+                trialPassed = (t > 10.0f && t < 110.0f && t != 85.0f && t != -127.0f);
+              }
+              break;
+            case 3: // pH Sensor
+              trialValue = incomingData.phValue;
+              trialPassed = (incomingData.adsStatus == 1 && abs(trialValue - 4.0f) <= 0.2f);
+              break;
+            case 4: // RAPT Pill
+              trialValue = incomingData.pillGravity;
+              trialPassed = (incomingData.bleStatus == 1 && trialValue >= 0.990f && trialValue <= 1.010f);
+              break;
+            case 7: // UART Comm Link
+              trialValue = (float)uartPacketCount;
+              trialPassed = (millis() - lastDataReceivedMillis < 2000);
+              break;
+            case 8: // SD Card Module
+              {
+                if (sdStatus) {
+                  SD.remove("/test_ut.txt");
+                  File f = SD.open("/test_ut.txt", FILE_WRITE);
+                  if (f) {
+                    f.print("UT_OK");
+                    f.close();
+                    f = SD.open("/test_ut.txt", FILE_READ);
+                    if (f) {
+                      String s = f.readString();
+                      trialPassed = (s == "UT_OK");
+                      f.close();
+                    }
+                  }
+                }
+                trialValue = trialPassed ? 1.0f : 0.0f;
+              }
+              break;
+          }
         }
+        
+        unitTestTrialResults[unitTestTrialIndex] = trialPassed;
+        unitTestTrialValues[unitTestTrialIndex] = trialValue;
+        if (trialPassed) unitTestPassedTrials++;
+        
+        logUnitTestTrial(unitTestTrialIndex, trialValue, trialPassed);
+        unitTestTrialIndex++;
+        unitTestNeedsFullRedraw = true;
+        
+        if (unitTestTrialIndex >= 10) {
+          unitTestRunning = false;
+          unitTestFinalResult = (unitTestPassedTrials >= 8) ? 1 : 0;
+          unitTestAllResults[unitTestSelection] = unitTestFinalResult;
+          
+          digitalWrite(SSR_PREHEAT, LOW);
+          for (int i = 0; i < 8; i++) {
+            mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
+          }
+          sendMotorCommand(0, true);
+        }
+        drawUnitTestRunPage();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -2037,71 +2107,7 @@ void loop() {
     bool isManual = (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6);
     
     if (!isManual) {
-      if (millis() - unitTestTimer >= 1000) {
-        unitTestTimer = millis();
-        bool trialPassed = false;
-        float trialValue = 0.0f;
-        
-        switch (unitTestSelection) {
-          case 1: // Load Cells
-            trialValue = currentWeight;
-            trialPassed = (abs(trialValue - 1.0f) <= 0.05f);
-            break;
-          case 2: // DS18B20 Temp
-            {
-              float t = sharedLiquidSensors.getTempCByIndex(ds18ProbeSelection);
-              trialValue = t;
-              trialPassed = (t > 10.0f && t < 110.0f && t != 85.0f && t != -127.0f);
-            }
-            break;
-          case 3: // pH Sensor
-            trialValue = incomingData.phValue;
-            trialPassed = (incomingData.adsStatus == 1 && abs(trialValue - 4.0f) <= 0.2f);
-            break;
-          case 4: // RAPT Pill
-            trialValue = incomingData.pillGravity;
-            trialPassed = (incomingData.bleStatus == 1 && trialValue >= 0.990f && trialValue <= 1.010f);
-            break;
-          case 7: // UART Comm Link
-            trialValue = (float)uartPacketCount;
-            trialPassed = (millis() - lastDataReceivedMillis < 2000);
-            break;
-          case 8: // SD Card Module
-            {
-              if (sdStatus) {
-                SD.remove("/test_ut.txt");
-                File f = SD.open("/test_ut.txt", FILE_WRITE);
-                if (f) {
-                  f.print("UT_OK");
-                  f.close();
-                  f = SD.open("/test_ut.txt", FILE_READ);
-                  if (f) {
-                    String s = f.readString();
-                    trialPassed = (s == "UT_OK");
-                    f.close();
-                  }
-                }
-              }
-              trialValue = trialPassed ? 1.0f : 0.0f;
-            }
-            break;
-        }
-        
-        unitTestTrialResults[unitTestTrialIndex] = trialPassed;
-        unitTestTrialValues[unitTestTrialIndex] = trialValue;
-        if (trialPassed) unitTestPassedTrials++;
-        
-        logUnitTestTrial(unitTestTrialIndex, trialValue, trialPassed);
-        
-        unitTestTrialIndex++;
-        unitTestNeedsFullRedraw = true;
-        
-        if (unitTestTrialIndex >= 10) {
-          unitTestRunning = false;
-          unitTestFinalResult = (unitTestPassedTrials >= 8) ? 1 : 0;
-          unitTestAllResults[unitTestSelection] = unitTestFinalResult;
-        }
-      }
+      // Automated sensor checks are triggered manually via SELECT key handler.
     } else {
       if (unitTestSelection == 0) {
         digitalWrite(SSR_PREHEAT, HIGH);

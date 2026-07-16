@@ -2180,8 +2180,9 @@ void drawUnitTestRunPage() {
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     if (unitTestSelection == 2) {
       char pBuf[64];
+      const char *probeNames[] = {"Pre-heat", "Fermentation", "Pasteurization"};
       sprintf(pBuf, "Immerse Probe %d (%s) in hot/boiling water.",
-              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+              ds18ProbeSelection + 1, probeNames[ds18ProbeSelection]);
       tft.drawString(pBuf, 15, 95, 1);
     } else {
       tft.drawString(procedures[unitTestSelection], 15, 95, 1);
@@ -2231,8 +2232,9 @@ void drawUnitTestRunPage() {
     tft.drawCentreString("TEST STATUS: READY", CENTER_X, 175, 2);
     if (unitTestSelection == 2) {
       char probeSelBuf[48];
+      const char *probeNames[] = {"Pre-heat", "Fermentation", "Pasteurization"};
       sprintf(probeSelBuf, "Testing: Probe %d (%s)", 
-              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+              ds18ProbeSelection + 1, probeNames[ds18ProbeSelection]);
       tft.drawCentreString(probeSelBuf, CENTER_X, 205, 2);
       tft.drawCentreString("Press UP/DOWN to switch probes.", CENTER_X, 230, 1);
       tft.drawCentreString("Press SELECT to begin.", CENTER_X, 255, 2);
@@ -2253,13 +2255,25 @@ void drawUnitTestRunPage() {
       tft.drawCentreString("Target: 1.000 kg +/- 0.050", CENTER_X, 265, 1);
     } else if (unitTestSelection == 2) { // DS18B20
       tft.drawCentreString("Testing DS18B20 Probe:", CENTER_X, 190, 2);
-      float t = sharedLiquidSensors.getTempCByIndex(ds18ProbeSelection);
+      float t = -999.0f;
+      if (ds18ProbeSelection == 0) {
+        t = sharedLiquidSensors.getTempCByIndex(1);
+      } else if (ds18ProbeSelection == 1) {
+        t = incomingData.room2LiquidTemp;
+      } else if (ds18ProbeSelection == 2) {
+        t = sharedLiquidSensors.getTempCByIndex(0);
+      }
       char tempValBuf[32];
-      sprintf(tempValBuf, "%.2f C", t);
+      if (t > -100.0f) {
+        sprintf(tempValBuf, "%.2f C", t);
+      } else {
+        sprintf(tempValBuf, "--");
+      }
       tft.drawCentreString(tempValBuf, CENTER_X, 215, 4);
       char statusBuf[48];
+      const char *probeNames[] = {"Pre-heat", "Fermentation", "Pasteurization"};
       sprintf(statusBuf, "Active: Probe %d (%s)", 
-              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+              ds18ProbeSelection + 1, probeNames[ds18ProbeSelection]);
       tft.drawCentreString(statusBuf, CENTER_X, 255, 2);
     } else if (unitTestSelection == 3) { // pH
       tft.drawCentreString("Live pH Probe:", CENTER_X, 205, 2);
