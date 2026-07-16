@@ -2215,8 +2215,8 @@ void drawUnitTestRunPage() {
   }
 
   // Middle status tile
-  tft.fillRect(15, 160, 290, 180, 0xCE79);
-  tft.drawRect(15, 160, 290, 180, TFT_DARKGREY);
+  tft.fillRect(15, 160, 290, 265, 0xCE79);
+  tft.drawRect(15, 160, 290, 265, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xCE79);
   
   // Display status based on test state
@@ -2289,6 +2289,40 @@ void drawUnitTestRunPage() {
     tft.drawCentreString(resBuf, CENTER_X, 225, 2);
     tft.drawCentreString("Results logged to SD Card.", CENTER_X, 255, 1);
     tft.drawCentreString("Press SELECT to run again.", CENTER_X, 285, 2);
+  }
+
+  // Draw trial values history
+  tft.setTextColor(TFT_NAVY, 0xCE79);
+  tft.drawString("Recorded Trials:", 25, 305, 2);
+  tft.setTextColor(TFT_BLACK, 0xCE79);
+  
+  for (int i = 0; i < 10; i++) {
+    int col = i / 5;
+    int row = i % 5;
+    int x = 25 + col * 145;
+    int y = 330 + row * 16;
+    
+    char valBuf[32];
+    if (i < unitTestTrialIndex) {
+      if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
+        sprintf(valBuf, "T%d: %s", i + 1, unitTestTrialResults[i] ? "PASS" : "FAIL");
+      } else if (unitTestSelection == 1) {
+        sprintf(valBuf, "T%d: %.3f kg", i + 1, unitTestTrialValues[i]);
+      } else if (unitTestSelection == 2) {
+        sprintf(valBuf, "T%d: %.1f C", i + 1, unitTestTrialValues[i]);
+      } else if (unitTestSelection == 3) {
+        sprintf(valBuf, "T%d: %.2f pH", i + 1, unitTestTrialValues[i]);
+      } else if (unitTestSelection == 4) {
+        sprintf(valBuf, "T%d: %.3f SG", i + 1, unitTestTrialValues[i]);
+      } else if (unitTestSelection == 7) {
+        sprintf(valBuf, "T%d: %.0f pkts", i + 1, unitTestTrialValues[i]);
+      } else if (unitTestSelection == 8) {
+        sprintf(valBuf, "T%d: %s", i + 1, unitTestTrialValues[i] > 0.5f ? "OK" : "ERR");
+      }
+    } else {
+      sprintf(valBuf, "T%d: --", i + 1);
+    }
+    tft.drawString(valBuf, x, y, 1);
   }
 
   // Footer
