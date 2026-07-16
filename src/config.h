@@ -83,6 +83,7 @@ enum AppState {
   FAN_TEST_PICK,
   FAN_TEST_MENU,
   LIGHT_TEST_MENU,
+  RELAY_TEST_PICK,
   RELAY_TEST_MENU,
   MOTOR_TEST_MENU,
   STAGE_PARAM_MENU,
@@ -209,6 +210,8 @@ extern int lightTestSelection;
 extern bool systemCheckNeedsFullRedraw;
 extern bool fanTestNeedsFullRedraw;
 extern bool lightTestNeedsFullRedraw;
+extern bool relayTestPickNeedsFullRedraw;
+extern int relayTestPickSelection;
 extern bool relayTestNeedsFullRedraw;
 extern int  relayTestSelection;
 extern bool relayTestAuto;

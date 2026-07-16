@@ -16,6 +16,7 @@ void drawSystemCheckMenu();
 void drawFanTestPick();
 void drawFanTestMenu();
 void drawLightTestMenu();
+void drawRelayTestPick();
 void drawRelayTestMenu();
 void drawMotorTestMenu();
 void drawPidTestPick();
