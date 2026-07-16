@@ -42,7 +42,7 @@ src/
     *   **DS3231 RTC:** Real-time clock for logging timestamps.
     *   **Flow Sensors:** Flow Sensor 1 (Pin 32, Pre-Heat -> Ferm) and Flow Sensor 2 (Pin 34, Ferm -> Past) with hardware interrupts.
 *   **Actuators:**
-    *   **PWM (Pin 25):** 4-wire Fan speed control.
+    *   **PWM (Pin 25):** 4-wire Fan speed control. Both the pre-heating fan and fermentation fan use non-inverted PWM (0% duty cycle = OFF, 100% duty cycle = ON).
     *   **PWM (TBD):** TB6612FN PWMA — mixing impeller speed (LEDC ch1, 1 kHz, 8-bit). GPIO pin not yet assigned — Primary ESP32 has no free output pins.
     *   **SSR Heaters:** Pins 13 (Pre-Heat), 12 (Fermentation), and 14 (Pasteurization) driving solid-state relays (SSRs) via slow time-proportional PWM.
     *   **Status LED:** GPIO 2 (onboard LED) used for Calibration Wizard signaling.

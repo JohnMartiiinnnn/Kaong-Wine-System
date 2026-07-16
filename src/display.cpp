@@ -586,28 +586,51 @@ void drawRelayTestMenu() {
     tft.setTextColor(TFT_BLACK, 0xFFE0);
     tft.drawCentreString("! PUMPS + FANS WILL ENERGIZE !", CENTER_X, 60, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("AUTO-SEQUENCING  1000ms/CH", CENTER_X, 420, 2);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 458, 1);
     relayTestNeedsFullRedraw = false;
+  }
+
+  // Draw footer text dynamically based on mode
+  tft.fillRect(0, 415, 320, 25, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  if (relayTestAuto) {
+    tft.drawCentreString("AUTO-SEQUENCING  1000ms/CH", CENTER_X, 420, 2);
+  } else {
+    tft.drawCentreString("UP/DOWN: NAV   SELECT: TOGGLE", CENTER_X, 420, 2);
   }
 
   const char *labels[9] = {"FERM FAN", "PUMP 1",  "PUMP 2",  "CH4",    "CH5",
                            "LIGHT G",  "LIGHT Y", "LIGHT R", "PRE FAN"};
 
-  for (int i = 0; i < 9; i++) {
-    int y = 85 + (i * 36);
-    bool selected = (relayTestChannel == i);
+  // Draw Mode Selection Row (index 0)
+  {
+    int y = 82;
+    bool selected = (relayTestSelection == 0);
     uint16_t color = selected ? 0x3566 : 0xD6BA;
     uint16_t txtColor = selected ? TFT_WHITE : TFT_BLACK;
-    uint16_t ledColor = testRelayStates[i] ? TFT_GREEN : TFT_DARKGREY;
 
-    tft.fillRect(15, y, 290, 32, color);
-    tft.drawRect(15, y, 290, 32, TFT_DARKGREY);
+    tft.fillRect(15, y, 290, 30, color);
+    tft.drawRect(15, y, 290, 30, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawString(labels[i], 30, y + 8, 2);
-    tft.fillCircle(280, y + 16, 8, ledColor);
-    tft.drawCircle(280, y + 16, 8, TFT_BLACK);
+    char modeBuf[32];
+    sprintf(modeBuf, "TEST MODE: %s", relayTestAuto ? "AUTO" : "MANUAL");
+    tft.drawString(modeBuf, 30, y + 7, 2);
+  }
+
+  // Draw Relays (indices 1 to 9)
+  for (int i = 1; i <= 9; i++) {
+    int y = 82 + (i * 33);
+    bool selected = (relayTestSelection == i);
+    uint16_t color = selected ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = selected ? TFT_WHITE : TFT_BLACK;
+    uint16_t ledColor = testRelayStates[i - 1] ? TFT_GREEN : TFT_DARKGREY;
+
+    tft.fillRect(15, y, 290, 30, color);
+    tft.drawRect(15, y, 290, 30, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawString(labels[i - 1], 30, y + 7, 2);
+    tft.fillCircle(280, y + 15, 7, ledColor);
+    tft.drawCircle(280, y + 15, 7, TFT_BLACK);
   }
 }
 
