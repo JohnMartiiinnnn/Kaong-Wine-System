@@ -335,14 +335,14 @@ void drawStartMenu() {
     tft.drawString("MAIN MENU", 10, 15, 4);
     menuNeedsFullRedraw = false;
   }
-  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES", "CALIBRATE"};
-  for (int i = 0; i < 5; i++) {
-    uint16_t color    = (menuSelection == i) ? 0x3566 : (i == 4 ? 0x0400 : 0xD6BA);
-    uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : (i == 4 ? TFT_WHITE : TFT_BLACK);
-    tft.fillRect(20, 80 + (i * 70), 280, 50, color);
-    tft.drawRect(20, 80 + (i * 70), 280, 50, TFT_DARKGREY);
+  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK", "SENSOR VALUES", "CALIBRATE", "UNIT TESTING"};
+  for (int i = 0; i < 6; i++) {
+    uint16_t color    = (menuSelection == i) ? 0x3566 : ((i == 4 || i == 5) ? 0x0400 : 0xD6BA);
+    uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : ((i == 4 || i == 5) ? TFT_WHITE : TFT_BLACK);
+    tft.fillRect(20, 70 + (i * 62), 280, 48, color);
+    tft.drawRect(20, 70 + (i * 62), 280, 48, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 95 + (i * 70), 2);
+    tft.drawCentreString(options[i], CENTER_X, 82 + (i * 62), 2);
   }
 }
 
@@ -2097,4 +2097,210 @@ void drawCalibWizard() {
     }
   }
 }
+
+void drawUnitTestMenu() {
+  static int prevSel = -1;
+
+  const char *options[] = {
+    "Power Supply (12V)", "Load Cells (Weight)", "DS18B20 Temp Probes",
+    "pH Sensor (A0)", "RAPT Pill (BLE/WiFi)", "Relay Module (8ch)",
+    "Stepper Motor (Yeast)", "UART Comm Link", "SD Card Module"
+  };
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t color    = sel ? 0x3566 : 0xD6BA;
+    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 60 + (i * 38), 300, 34, color);
+    tft.drawRect(10, 60 + (i * 38), 300, 34, TFT_DARKGREY);
+    tft.setTextColor(txtColor, color);
+    tft.drawString(options[i], 20, 69 + (i * 38), 2);
+
+    // Draw status
+    int res = unitTestAllResults[i];
+    if (res == 1) {
+      tft.setTextColor(TFT_GREEN, color);
+      tft.drawRightString("[PASS]", 290, 69 + (i * 38), 2);
+    } else if (res == 0) {
+      tft.setTextColor(TFT_RED, color);
+      tft.drawRightString("[FAIL]", 290, 69 + (i * 38), 2);
+    } else {
+      tft.setTextColor(TFT_DARKGREY, color);
+      tft.drawRightString("[--]", 290, 69 + (i * 38), 2);
+    }
+  };
+
+  if (unitTestNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("UNIT TESTING", 10, 15, 4);
+    for (int i = 0; i < 9; i++) drawTile(i, unitTestSelection == i);
+    tft.fillRect(0, 432, 320, 48, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: SELECT   SELECT: RUN   RETURN: BACK", CENTER_X, 458, 1);
+    unitTestNeedsFullRedraw = false;
+    prevSel = unitTestSelection;
+  } else if (prevSel != unitTestSelection) {
+    if (prevSel >= 0) drawTile(prevSel, false);
+    drawTile(unitTestSelection, true);
+    prevSel = unitTestSelection;
+  }
+}
+
+void drawUnitTestRunPage() {
+  const char *names[] = {
+    "Power Supply (12V)", "Load Cells (Weight)", "DS18B20 Temp Probes",
+    "pH Sensor (A0)", "RAPT Pill (BLE/WiFi)", "Relay Module (8ch)",
+    "Stepper Motor (Yeast)", "UART Comm Link", "SD Card Module"
+  };
+
+  const char *procedures[] = {
+    "Measure voltage output under 1.5kW heater load.",
+    "Place 1.0 kg calibrated weight on platform.",
+    "Immerse liquid temperature probes in hot/boiling water.",
+    "Submerge pH probe in pH 4.0 buffer solution.",
+    "Float RAPT Pill in water and check wireless telemetry.",
+    "Trigger all 8 relays in sequence. Listen for clicks.",
+    "Verify 28BYJ-48 stepper motor CW/CCW rotation.",
+    "Verify checksum packet frequency from Secondary ESP32.",
+    "Perform read/write test block verification."
+  };
+
+  if (unitTestNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("RUNNING UNIT TEST", 10, 15, 4);
+    
+    // Draw Test Name
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawString(names[unitTestSelection], 15, 65, 4);
+    
+    // Draw procedure
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawString(procedures[unitTestSelection], 15, 95, 1);
+    
+    unitTestNeedsFullRedraw = false;
+  }
+
+  // Draw Trial boxes (10 boxes)
+  // X = 15 + i*29, Y = 120
+  for (int i = 0; i < 10; i++) {
+    uint16_t boxColor = TFT_LIGHTGREY;
+    uint16_t borderCol = TFT_DARKGREY;
+    uint16_t txtCol = TFT_BLACK;
+    
+    if (i < unitTestTrialIndex) {
+      if (unitTestTrialResults[i]) {
+        boxColor = TFT_GREEN;
+        borderCol = 0x03E0;
+        txtCol = TFT_WHITE;
+      } else {
+        boxColor = TFT_RED;
+        borderCol = 0xF800;
+        txtCol = TFT_WHITE;
+      }
+    } else if (i == unitTestTrialIndex && unitTestRunning) {
+      boxColor = TFT_YELLOW;
+      borderCol = TFT_ORANGE;
+      txtCol = TFT_BLACK;
+    }
+    
+    tft.fillRect(15 + (i * 29), 120, 26, 26, boxColor);
+    tft.drawRect(15 + (i * 29), 120, 26, 26, borderCol);
+    tft.setTextColor(txtCol, boxColor);
+    char tNum[3];
+    sprintf(tNum, "%d", i + 1);
+    tft.drawCentreString(tNum, 15 + (i * 29) + 13, 126, 1);
+  }
+
+  // Middle status tile
+  tft.fillRect(15, 160, 290, 180, 0xCE79);
+  tft.drawRect(15, 160, 290, 180, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xCE79);
+  
+  // Display status based on test state
+  if (!unitTestRunning && unitTestFinalResult == -1) {
+    tft.drawCentreString("TEST STATUS: READY", CENTER_X, 175, 2);
+    tft.drawCentreString("Press SELECT to begin testing.", CENTER_X, 220, 2);
+  } else if (unitTestRunning) {
+    char pBuf[32];
+    sprintf(pBuf, "RUNNING TRIAL: %d / 10", unitTestTrialIndex + 1);
+    tft.drawCentreString(pBuf, CENTER_X, 170, 2);
+    
+    // Draw live updates
+    tft.setTextColor(TFT_NAVY, 0xCE79);
+    if (unitTestSelection == 1) { // Load Cell
+      tft.drawCentreString("Live Weight:", CENTER_X, 205, 2);
+      String wt = String(currentWeight, 3) + " kg";
+      tft.drawCentreString(wt.c_str(), CENTER_X, 225, 4);
+      tft.drawCentreString("Target: 1.000 kg +/- 0.050", CENTER_X, 265, 1);
+    } else if (unitTestSelection == 2) { // DS18B20
+      tft.drawCentreString("Local Temp Probes:", CENTER_X, 195, 2);
+      float t0 = sharedLiquidSensors.getTempCByIndex(0);
+      float t1 = sharedLiquidSensors.getTempCByIndex(1);
+      char tempBuf[48];
+      sprintf(tempBuf, "P1: %.1f C   P2: %.1f C", t0, t1);
+      tft.drawCentreString(tempBuf, CENTER_X, 220, 2);
+      tft.drawCentreString("Must be valid connected probes", CENTER_X, 255, 1);
+    } else if (unitTestSelection == 3) { // pH
+      tft.drawCentreString("Live pH Probe:", CENTER_X, 205, 2);
+      String ph = String(incomingData.phValue, 2) + " pH";
+      tft.drawCentreString(ph.c_str(), CENTER_X, 225, 4);
+      tft.drawCentreString("Target: 4.0 +/- 0.2 pH (Buffer)", CENTER_X, 265, 1);
+    } else if (unitTestSelection == 4) { // RAPT Pill
+      tft.drawCentreString("RAPT Pill Telemetry:", CENTER_X, 195, 2);
+      char pillBuf[64];
+      sprintf(pillBuf, "SG: %.3f   Temp: %.1f C", incomingData.pillGravity, incomingData.room2LiquidTemp);
+      tft.drawCentreString(pillBuf, CENTER_X, 220, 2);
+      sprintf(pillBuf, "RSSI: %d dBm   Bat: %d%%", incomingData.pillRSSI, incomingData.pillBattery);
+      tft.drawCentreString(pillBuf, CENTER_X, 245, 1);
+      tft.drawCentreString("Target: SG around 1.000", CENTER_X, 275, 1);
+    } else if (unitTestSelection == 7) { // UART
+      tft.drawCentreString("UART Packet Monitor:", CENTER_X, 195, 2);
+      char uartBuf[48];
+      sprintf(uartBuf, "Last RX: %lu ms ago", millis() - unitTestLastTickMs);
+      tft.drawCentreString(uartBuf, CENTER_X, 220, 2);
+      tft.drawCentreString("Expecting packet every 1-2 sec", CENTER_X, 255, 1);
+    } else if (unitTestSelection == 8) { // SD
+      tft.drawCentreString("SPI SD Card verification...", CENTER_X, 205, 2);
+    } else {
+      // Manual prompt
+      tft.drawCentreString("Executing hardware routine...", CENTER_X, 195, 2);
+      tft.drawCentreString("Did the hardware execute correctly?", CENTER_X, 225, 2);
+      tft.setTextColor(TFT_GREEN, 0xCE79);
+      tft.drawCentreString("SELECT: YES (PASS)", CENTER_X, 255, 2);
+      tft.setTextColor(TFT_RED, 0xCE79);
+      tft.drawCentreString("DOWN: NO (FAIL)", CENTER_X, 280, 2);
+    }
+  } else {
+    // Completed
+    if (unitTestFinalResult == 1) {
+      tft.setTextColor(TFT_GREEN, 0xCE79);
+      tft.drawCentreString("TEST RESULT: PASS", CENTER_X, 175, 4);
+    } else {
+      tft.setTextColor(TFT_RED, 0xCE79);
+      tft.drawCentreString("TEST RESULT: FAIL", CENTER_X, 175, 4);
+    }
+    
+    tft.setTextColor(TFT_BLACK, 0xCE79);
+    char resBuf[48];
+    sprintf(resBuf, "Trials passed: %d / 10", unitTestPassedTrials);
+    tft.drawCentreString(resBuf, CENTER_X, 225, 2);
+    tft.drawCentreString("Results logged to SD Card.", CENTER_X, 255, 1);
+    tft.drawCentreString("Press SELECT to run again.", CENTER_X, 285, 2);
+  }
+
+  // Footer
+  tft.fillRect(0, 445, 320, 35, TFT_WHITE);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  if (unitTestRunning && (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6)) {
+    tft.drawCentreString("SELECT: PASS   DOWN: FAIL   RETURN: STOP", CENTER_X, 455, 1);
+  } else if (unitTestRunning) {
+    tft.drawCentreString("RUNNING AUTOMATED TRIALS... RETURN: STOP", CENTER_X, 455, 1);
+  } else {
+    tft.drawCentreString("SELECT: RUN TEST   RETURN: BACK", CENTER_X, 455, 2);
+  }
+}
+
 

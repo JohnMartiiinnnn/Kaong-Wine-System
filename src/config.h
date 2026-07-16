@@ -96,7 +96,9 @@ enum AppState {
   TRANSFER_TEST_MENU,
   FLOW_CAL_MENU,
   HEATER_TEST_PICK,
-  CALIB_WIZARD
+  CALIB_WIZARD,
+  UNIT_TEST_MENU,
+  UNIT_TEST_RUN
 };
 
 extern long rawHX711;
@@ -306,3 +308,18 @@ extern bool     calibCompleted;
 extern uint32_t calibCompleteTime;
 extern bool     calibTareDone;
 extern long     calibRawTareValue;
+
+// ---- Unit Test Settings ----
+extern bool     unitTestNeedsFullRedraw;
+extern int      unitTestSelection;
+extern int      unitTestTrialIndex;
+extern int      unitTestPassedTrials;
+extern bool     unitTestTrialResults[10];
+extern float    unitTestTrialValues[10];
+extern bool     unitTestRunning;
+extern uint32_t unitTestTimer;
+extern int      unitTestFinalResult;
+extern int      unitTestAllResults[9];
+extern bool     unitTestManualSelection;
+extern uint32_t unitTestLastTickMs;
+

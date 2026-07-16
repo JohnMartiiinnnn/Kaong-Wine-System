@@ -208,6 +208,21 @@ int rtcSetField = 0;
 int rtcSetHour = 0;
 int rtcSetMinute = 0;
 
+// ---- Unit Test Variables ----
+bool     unitTestNeedsFullRedraw = true;
+int      unitTestSelection = 0;
+int      unitTestTrialIndex = 0;
+int      unitTestPassedTrials = 0;
+bool     unitTestTrialResults[10] = {};
+float    unitTestTrialValues[10] = {};
+bool     unitTestRunning = false;
+uint32_t unitTestTimer = 0;
+int      unitTestFinalResult = -1;
+int      unitTestAllResults[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+bool     unitTestManualSelection = false;
+uint32_t unitTestLastTickMs = 0;
+
+
 // ---- Button Latch State ----
 bool ljRight = false, ljLeft = false, ljUp = false, ljDown = false,
      ljSelect = false;
@@ -251,6 +266,45 @@ void sendMotorCommand(int speed, bool cw) {
   for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
     cmd.checksum ^= p[i];
   Serial2.write((uint8_t *)&cmd, sizeof(cmd));
+}
+
+void logUnitTestTrial(int trialNum, float value, bool success) {
+  if (!sdStatus) return;
+  File dataFile = SD.open("/unit_test_log.csv", FILE_APPEND);
+  if (!dataFile) return;
+  if (dataFile.size() == 0) {
+    dataFile.println("Date,Time,TestName,TrialNumber,Value,TrialStatus,OverallStatus");
+  }
+  char timeStr[10] = "00:00:00";
+  char dateStr[15] = "2026/01/01";
+  if (rtcStatus) {
+    DateTime now = rtc.now();
+    sprintf(dateStr, "%04d/%02d/%02d", now.year(), now.month(), now.day());
+    sprintf(timeStr, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+  }
+  const char *names[] = {
+    "Power Supply (12V)", "Load Cells (Weight)", "DS18B20 Temp Probes",
+    "pH Sensor (A0)", "RAPT Pill (BLE/WiFi)", "Relay Module (8ch)",
+    "Stepper Motor (Yeast)", "UART Comm Link", "SD Card Module"
+  };
+  dataFile.print(dateStr); dataFile.print(',');
+  dataFile.print(timeStr); dataFile.print(',');
+  dataFile.print(names[unitTestSelection]); dataFile.print(',');
+  dataFile.print(trialNum + 1); dataFile.print(',');
+  dataFile.print(value, 3); dataFile.print(',');
+  dataFile.print(success ? "PASS" : "FAIL"); dataFile.print(',');
+  if (trialNum == 9) {
+    int passed = 0;
+    for (int i = 0; i < 9; i++) {
+      if (unitTestTrialResults[i]) passed++;
+    }
+    if (success) passed++;
+    bool overallPass = (passed >= 8);
+    dataFile.println(overallPass ? "PASS" : "FAIL");
+  } else {
+    dataFile.println("RUNNING");
+  }
+  dataFile.close();
 }
 
 // ---- Flow Sensor ISRs ----
@@ -794,7 +848,7 @@ void loop() {
   // Navigation: Right / Down
   if ((cRight && !ljRight) || (cDown && !ljDown)) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 1) % 5;
+      menuSelection = (menuSelection + 1) % 6;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (cDown && !ljDown && !wizardEditing) {
@@ -842,6 +896,20 @@ void loop() {
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
       systemCheckSelection = (systemCheckSelection + 1) % 10;
       drawSystemCheckMenu();
+    } else if (currentAppState == UNIT_TEST_MENU) {
+      unitTestSelection = (unitTestSelection + 1) % 9;
+      drawUnitTestMenu();
+    } else if (currentAppState == UNIT_TEST_RUN && unitTestRunning) {
+      if (cDown && !ljDown) {
+        if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
+          unitTestTrialResults[unitTestTrialIndex] = false;
+          unitTestTrialValues[unitTestTrialIndex] = 0.0f;
+          logUnitTestTrial(unitTestTrialIndex, 0.0f, false);
+          unitTestTrialIndex++;
+          unitTestNeedsFullRedraw = true;
+          drawUnitTestRunPage();
+        }
+      }
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
       drawPidTestPick();
@@ -935,8 +1003,11 @@ void loop() {
   // Navigation: Up
   if (cUp && !ljUp) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 4) % 5;
+      menuSelection = (menuSelection + 5) % 6;
       drawStartMenu();
+    } else if (currentAppState == UNIT_TEST_MENU) {
+      unitTestSelection = (unitTestSelection + 8) % 9;
+      drawUnitTestMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (!wizardEditing) {
         wizardSelection = (wizardSelection + 3) % 4;
@@ -1088,6 +1159,11 @@ void loop() {
         calibTareDone = false;
         calibSelection = 0;
         drawCalibWizard();
+      } else if (menuSelection == 5) {
+        currentAppState = UNIT_TEST_MENU;
+        unitTestNeedsFullRedraw = true;
+        unitTestSelection = 0;
+        drawUnitTestMenu();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (wizardSelection == 0) {
@@ -1245,6 +1321,46 @@ void loop() {
         transferTestNeedsFullRedraw = true;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
+      }
+    } else if (currentAppState == UNIT_TEST_MENU) {
+      currentAppState = UNIT_TEST_RUN;
+      unitTestNeedsFullRedraw = true;
+      unitTestTrialIndex = 0;
+      unitTestPassedTrials = 0;
+      unitTestRunning = false;
+      unitTestFinalResult = -1;
+      memset(unitTestTrialResults, 0, sizeof(unitTestTrialResults));
+      memset(unitTestTrialValues, 0, sizeof(unitTestTrialValues));
+      drawUnitTestRunPage();
+    } else if (currentAppState == UNIT_TEST_RUN) {
+      if (!unitTestRunning) {
+        unitTestRunning = true;
+        unitTestTrialIndex = 0;
+        unitTestPassedTrials = 0;
+        unitTestFinalResult = -1;
+        memset(unitTestTrialResults, 0, sizeof(unitTestTrialResults));
+        memset(unitTestTrialValues, 0, sizeof(unitTestTrialValues));
+        unitTestTimer = millis();
+        unitTestNeedsFullRedraw = true;
+        
+        // Initial hardware trigger for manual tests
+        if (unitTestSelection == 0) { // Power Supply
+          digitalWrite(SSR_PREHEAT, HIGH); // Preheat SSR ON
+        } else if (unitTestSelection == 6) { // Stepper Motor
+          sendMotorCommand(50, true); // Motor CW
+        }
+        drawUnitTestRunPage();
+      } else {
+        // Manual confirm test: SELECT = PASS
+        if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
+          unitTestTrialResults[unitTestTrialIndex] = true;
+          unitTestTrialValues[unitTestTrialIndex] = 1.0f;
+          logUnitTestTrial(unitTestTrialIndex, 1.0f, true);
+          unitTestPassedTrials++;
+          unitTestTrialIndex++;
+          unitTestNeedsFullRedraw = true;
+          drawUnitTestRunPage();
+        }
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -1744,6 +1860,27 @@ void loop() {
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
       drawStartMenu();
+    } else if (currentAppState == UNIT_TEST_MENU) {
+      currentAppState = START_MENU;
+      menuNeedsFullRedraw = true;
+      drawStartMenu();
+    } else if (currentAppState == UNIT_TEST_RUN) {
+      if (unitTestRunning) {
+        unitTestRunning = false;
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+        digitalWrite(SSR_PREHEAT, LOW);
+        digitalWrite(SSR_FERM, LOW);
+        digitalWrite(SSR_PAST, LOW);
+        sendMotorCommand(0, true);
+        unitTestFinalResult = -1;
+        unitTestNeedsFullRedraw = true;
+        drawUnitTestRunPage();
+      } else {
+        currentAppState = UNIT_TEST_MENU;
+        unitTestNeedsFullRedraw = true;
+        drawUnitTestMenu();
+      }
     } else if (currentAppState == FAN_TEST_PICK) {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
@@ -1871,6 +2008,107 @@ void loop() {
     drawRelayTestMenu();
   }
 
+  // ---- Unit Test Ticks ----
+  if (currentAppState == UNIT_TEST_RUN && unitTestRunning) {
+    bool isManual = (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6);
+    
+    if (!isManual) {
+      if (millis() - unitTestTimer >= 1000) {
+        unitTestTimer = millis();
+        bool trialPassed = false;
+        float trialValue = 0.0f;
+        
+        switch (unitTestSelection) {
+          case 1: // Load Cells
+            trialValue = currentWeight;
+            trialPassed = (abs(trialValue - 1.0f) <= 0.05f);
+            break;
+          case 2: // DS18B20 Temp
+            {
+              float t0 = sharedLiquidSensors.getTempCByIndex(0);
+              float t1 = sharedLiquidSensors.getTempCByIndex(1);
+              trialValue = (t0 > t1) ? t0 : t1;
+              trialPassed = (t0 > 10.0f && t0 < 110.0f && t0 != 85.0f && t0 != -127.0f) &&
+                            (t1 > 10.0f && t1 < 110.0f && t1 != 85.0f && t1 != -127.0f);
+            }
+            break;
+          case 3: // pH Sensor
+            trialValue = incomingData.phValue;
+            trialPassed = (incomingData.adsStatus == 1 && abs(trialValue - 4.0f) <= 0.2f);
+            break;
+          case 4: // RAPT Pill
+            trialValue = incomingData.pillGravity;
+            trialPassed = (incomingData.bleStatus == 1 && trialValue >= 0.990f && trialValue <= 1.010f);
+            break;
+          case 7: // UART Comm Link
+            trialValue = (float)uartPacketCount;
+            trialPassed = (millis() - lastDataReceivedMillis < 2000);
+            break;
+          case 8: // SD Card Module
+            {
+              if (sdStatus) {
+                SD.remove("/test_ut.txt");
+                File f = SD.open("/test_ut.txt", FILE_WRITE);
+                if (f) {
+                  f.print("UT_OK");
+                  f.close();
+                  f = SD.open("/test_ut.txt", FILE_READ);
+                  if (f) {
+                    String s = f.readString();
+                    trialPassed = (s == "UT_OK");
+                    f.close();
+                  }
+                }
+              }
+              trialValue = trialPassed ? 1.0f : 0.0f;
+            }
+            break;
+        }
+        
+        unitTestTrialResults[unitTestTrialIndex] = trialPassed;
+        unitTestTrialValues[unitTestTrialIndex] = trialValue;
+        if (trialPassed) unitTestPassedTrials++;
+        
+        logUnitTestTrial(unitTestTrialIndex, trialValue, trialPassed);
+        
+        unitTestTrialIndex++;
+        unitTestNeedsFullRedraw = true;
+        
+        if (unitTestTrialIndex >= 10) {
+          unitTestRunning = false;
+          unitTestFinalResult = (unitTestPassedTrials >= 8) ? 1 : 0;
+          unitTestAllResults[unitTestSelection] = unitTestFinalResult;
+        }
+      }
+    } else {
+      if (unitTestSelection == 0) {
+        digitalWrite(SSR_PREHEAT, HIGH);
+      } else if (unitTestSelection == 5) {
+        static uint32_t lastRelayCycle = 0;
+        if (millis() - lastRelayCycle >= 500) {
+          lastRelayCycle = millis();
+          int prevCh = (unitTestTrialIndex - 1 + 8) % 8;
+          mcp.digitalWrite(RELAY_PINS[prevCh], RELAY_OFF);
+          int currCh = unitTestTrialIndex % 8;
+          mcp.digitalWrite(RELAY_PINS[currCh], RELAY_ON);
+        }
+      }
+      
+      if (unitTestTrialIndex >= 10) {
+        unitTestRunning = false;
+        unitTestFinalResult = (unitTestPassedTrials >= 8) ? 1 : 0;
+        unitTestAllResults[unitTestSelection] = unitTestFinalResult;
+        
+        digitalWrite(SSR_PREHEAT, LOW);
+        for (int i = 0; i < 8; i++) {
+          mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
+        }
+        sendMotorCommand(0, true);
+        unitTestNeedsFullRedraw = true;
+      }
+    }
+  }
+
   // SD card health check (1s)
   if (millis() - ls > 1000) {
     ls = millis();
@@ -1931,6 +2169,7 @@ void loop() {
     if (t.signature == 0xDEADBEEF && calculateChecksum(t) == t.checksum) {
       incomingData = t;
       uartPacketCount++;
+      unitTestLastTickMs = millis();
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
       if (ogCapturing && incomingData.pillGravity > 0.5f) {
@@ -2551,6 +2790,18 @@ void loop() {
 
     if (currentAppState == UART_MONITOR_MENU)
       drawUartMonitorMenu();
+
+    if (currentAppState == UNIT_TEST_MENU)
+      drawUnitTestMenu();
+
+    if (currentAppState == UNIT_TEST_RUN) {
+      static uint32_t lastUnitTestDraw = 0;
+      if (unitTestNeedsFullRedraw || (millis() - lastUnitTestDraw >= 1000)) {
+        unitTestNeedsFullRedraw = true;
+        drawUnitTestRunPage();
+        lastUnitTestDraw = millis();
+      }
+    }
 
     if (currentAppState == TRANSFER_TEST_MENU)
       drawTransferTestMenu(true);
