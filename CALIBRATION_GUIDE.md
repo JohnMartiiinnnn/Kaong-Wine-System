@@ -56,18 +56,26 @@ The Flow Sensors measure liquid transferred between chambers.
 
 ## 2. Secondary ESP32 Calibration
 
-The Secondary ESP32 transmitter controls the **pH Sensor** and the **Fermentation Liquid Temp Probe**.
+The Secondary ESP32 transmitter controls the **pH Sensor** and the **Fermentation Liquid Temp Probe**. Because it is mounted inside an enclosure, its USB port is inaccessible. You will calibrate it through the Primary ESP32 using the **UART Bridge Mode**.
 
 ### How to Flash
-Navigate to the `Secondary_Transmitter` folder, compile, and upload the calibration target:
+Since the USB port is inaccessible, you must flash the Secondary ESP32 over-the-air (OTA) or use a pre-flashed calibration image.
 ```bash
-cd Secondary_Transmitter
-~/.platformio/penv/bin/pio run -e calibration -t upload
+cd /Users/gian/Coding/Kaong-Wine-System/Secondary_Transmitter
+~/.platformio/penv/bin/pio run -e calibration -t upload --upload-port <IP_ADDRESS_OF_SECONDARY>
 ```
-Open the Serial Monitor at **115200** baud:
-```bash
-~/.platformio/penv/bin/pio device monitor
-```
+*(If OTA is not yet configured or the enclosure is open, you may plug it in directly to flash once.)*
+
+### Entering UART Bridge Mode
+1. Ensure the **Primary ESP32** is flashed with the calibration utility and plugged into your PC via USB.
+2. Open the Primary ESP32's Serial Monitor at **115200** baud:
+   ```bash
+   cd /Users/gian/Coding/Kaong-Wine-System
+   ~/.platformio/penv/bin/pio device monitor
+   ```
+3. Type `s` and press Enter. The monitor will display:
+   `ENTERING SECONDARY ESP32 BRIDGE MODE`
+   *You are now communicating directly with the enclosed Secondary ESP32 via UART.*
 
 ### 2.1 pH Sensor (ADS1115 + PH4502C) Calibration
 pH calibration uses a standard 2-point buffer method (pH 7.0 neutral buffer and pH 4.0 acid buffer) with temperature compensation.
@@ -91,8 +99,11 @@ pH calibration uses a standard 2-point buffer method (pH 7.0 neutral buffer and 
         ```
 
 ### 2.2 Fermentation Liquid Temp Probe
-*   The utility automatically reads and prints the fermentation probe temperature every 2 seconds.
+*   While in Bridge Mode, the utility automatically reads and prints the fermentation probe temperature every 2 seconds.
 *   Verify accuracy in ice water (~0°C) and warm water.
+
+### Exiting Bridge Mode
+Type `p` and press Enter to return to Primary ESP32 Calibration Mode.
 
 ---
 
@@ -100,13 +111,13 @@ pH calibration uses a standard 2-point buffer method (pH 7.0 neutral buffer and 
 
 After updating all calibration coefficients, flash the main firmware back to both boards:
 
-*   **Primary Controller**:
+*   **Primary Controller** (via USB):
     ```bash
     cd /Users/gian/Coding/Kaong-Wine-System
     ~/.platformio/penv/bin/pio run -e esp32dev -t upload
     ```
-*   **Secondary Controller**:
+*   **Secondary Controller** (via OTA):
     ```bash
     cd /Users/gian/Coding/Kaong-Wine-System/Secondary_Transmitter
-    ~/.platformio/penv/bin/pio run -e esp32dev -t upload
+    ~/.platformio/penv/bin/pio run -e esp32dev -t upload --upload-port <IP_ADDRESS_OF_SECONDARY>
     ```
