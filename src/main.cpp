@@ -221,6 +221,7 @@ int      unitTestFinalResult = -1;
 int      unitTestAllResults[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 bool     unitTestManualSelection = false;
 uint32_t unitTestLastTickMs = 0;
+int      ds18ProbeSelection = 0;
 
 
 // ---- Button Latch State ----
@@ -899,15 +900,23 @@ void loop() {
     } else if (currentAppState == UNIT_TEST_MENU) {
       unitTestSelection = (unitTestSelection + 1) % 9;
       drawUnitTestMenu();
-    } else if (currentAppState == UNIT_TEST_RUN && unitTestRunning) {
+    } else if (currentAppState == UNIT_TEST_RUN) {
       if (cDown && !ljDown) {
-        if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
-          unitTestTrialResults[unitTestTrialIndex] = false;
-          unitTestTrialValues[unitTestTrialIndex] = 0.0f;
-          logUnitTestTrial(unitTestTrialIndex, 0.0f, false);
-          unitTestTrialIndex++;
-          unitTestNeedsFullRedraw = true;
-          drawUnitTestRunPage();
+        if (unitTestRunning) {
+          if (unitTestSelection == 0 || unitTestSelection == 5 || unitTestSelection == 6) {
+            unitTestTrialResults[unitTestTrialIndex] = false;
+            unitTestTrialValues[unitTestTrialIndex] = 0.0f;
+            logUnitTestTrial(unitTestTrialIndex, 0.0f, false);
+            unitTestTrialIndex++;
+            unitTestNeedsFullRedraw = true;
+            drawUnitTestRunPage();
+          }
+        } else {
+          if (unitTestSelection == 2) {
+            ds18ProbeSelection = (ds18ProbeSelection + 1) % 2;
+            unitTestNeedsFullRedraw = true;
+            drawUnitTestRunPage();
+          }
         }
       }
     } else if (currentAppState == PID_TEST_PICK) {
@@ -1008,6 +1017,12 @@ void loop() {
     } else if (currentAppState == UNIT_TEST_MENU) {
       unitTestSelection = (unitTestSelection + 8) % 9;
       drawUnitTestMenu();
+    } else if (currentAppState == UNIT_TEST_RUN && !unitTestRunning) {
+      if (unitTestSelection == 2) {
+        ds18ProbeSelection = (ds18ProbeSelection + 1) % 2;
+        unitTestNeedsFullRedraw = true;
+        drawUnitTestRunPage();
+      }
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (!wizardEditing) {
         wizardSelection = (wizardSelection + 3) % 4;
@@ -1734,14 +1749,23 @@ void loop() {
     drawPidTestMenu();
   }
 
-  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE &&
-      moduleViewActive) {
-    stageParamStage = dashSelection;
-    stageParamSelection = 0;
-    stageParamEditing = false;
-    stageParamNeedsFullRedraw = true;
-    currentAppState = STAGE_PARAM_MENU;
-    drawStageParamMenu();
+  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE) {
+    if (moduleViewActive) {
+      stageParamStage = dashSelection;
+      stageParamSelection = 0;
+      stageParamEditing = false;
+      stageParamNeedsFullRedraw = true;
+      currentAppState = STAGE_PARAM_MENU;
+      drawStageParamMenu();
+    } else {
+      logDataToSD();
+      // Redraw the Log time on the dashboard immediately
+      tft.setTextPadding(0);
+      tft.setTextColor(TFT_BLACK, TFT_WHITE);
+      char logBuf[16];
+      sprintf(logBuf, " %s ", lastLogTime);
+      tft.drawString(logBuf, 230, 80, 2);
+    }
   }
 
   if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
@@ -2025,11 +2049,9 @@ void loop() {
             break;
           case 2: // DS18B20 Temp
             {
-              float t0 = sharedLiquidSensors.getTempCByIndex(0);
-              float t1 = sharedLiquidSensors.getTempCByIndex(1);
-              trialValue = (t0 > t1) ? t0 : t1;
-              trialPassed = (t0 > 10.0f && t0 < 110.0f && t0 != 85.0f && t0 != -127.0f) &&
-                            (t1 > 10.0f && t1 < 110.0f && t1 != 85.0f && t1 != -127.0f);
+              float t = sharedLiquidSensors.getTempCByIndex(ds18ProbeSelection);
+              trialValue = t;
+              trialPassed = (t > 10.0f && t < 110.0f && t != 85.0f && t != -127.0f);
             }
             break;
           case 3: // pH Sensor
@@ -2150,11 +2172,7 @@ void loop() {
     }
   }
 
-  // Log every 60s
-  if (millis() - ll > 60000) {
-    ll = millis();
-    logDataToSD();
-  }
+
 
   // UART receive from Secondary
   while (Serial2.available() > 0) {

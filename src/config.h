@@ -322,4 +322,5 @@ extern int      unitTestFinalResult;
 extern int      unitTestAllResults[9];
 extern bool     unitTestManualSelection;
 extern uint32_t unitTestLastTickMs;
+extern int      ds18ProbeSelection;
 

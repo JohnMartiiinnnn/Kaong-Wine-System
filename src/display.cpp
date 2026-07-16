@@ -2178,7 +2178,14 @@ void drawUnitTestRunPage() {
     
     // Draw procedure
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawString(procedures[unitTestSelection], 15, 95, 1);
+    if (unitTestSelection == 2) {
+      char pBuf[64];
+      sprintf(pBuf, "Immerse Probe %d (%s) in hot/boiling water.",
+              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+      tft.drawString(pBuf, 15, 95, 1);
+    } else {
+      tft.drawString(procedures[unitTestSelection], 15, 95, 1);
+    }
     
     unitTestNeedsFullRedraw = false;
   }
@@ -2222,7 +2229,16 @@ void drawUnitTestRunPage() {
   // Display status based on test state
   if (!unitTestRunning && unitTestFinalResult == -1) {
     tft.drawCentreString("TEST STATUS: READY", CENTER_X, 175, 2);
-    tft.drawCentreString("Press SELECT to begin testing.", CENTER_X, 220, 2);
+    if (unitTestSelection == 2) {
+      char probeSelBuf[48];
+      sprintf(probeSelBuf, "Testing: Probe %d (%s)", 
+              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+      tft.drawCentreString(probeSelBuf, CENTER_X, 205, 2);
+      tft.drawCentreString("Press UP/DOWN to switch probes.", CENTER_X, 230, 1);
+      tft.drawCentreString("Press SELECT to begin.", CENTER_X, 255, 2);
+    } else {
+      tft.drawCentreString("Press SELECT to begin testing.", CENTER_X, 220, 2);
+    }
   } else if (unitTestRunning) {
     char pBuf[32];
     sprintf(pBuf, "RUNNING TRIAL: %d / 10", unitTestTrialIndex + 1);
@@ -2236,13 +2252,15 @@ void drawUnitTestRunPage() {
       tft.drawCentreString(wt.c_str(), CENTER_X, 225, 4);
       tft.drawCentreString("Target: 1.000 kg +/- 0.050", CENTER_X, 265, 1);
     } else if (unitTestSelection == 2) { // DS18B20
-      tft.drawCentreString("Local Temp Probes:", CENTER_X, 195, 2);
-      float t0 = sharedLiquidSensors.getTempCByIndex(0);
-      float t1 = sharedLiquidSensors.getTempCByIndex(1);
-      char tempBuf[48];
-      sprintf(tempBuf, "P1: %.1f C   P2: %.1f C", t0, t1);
-      tft.drawCentreString(tempBuf, CENTER_X, 220, 2);
-      tft.drawCentreString("Must be valid connected probes", CENTER_X, 255, 1);
+      tft.drawCentreString("Testing DS18B20 Probe:", CENTER_X, 190, 2);
+      float t = sharedLiquidSensors.getTempCByIndex(ds18ProbeSelection);
+      char tempValBuf[32];
+      sprintf(tempValBuf, "%.2f C", t);
+      tft.drawCentreString(tempValBuf, CENTER_X, 215, 4);
+      char statusBuf[48];
+      sprintf(statusBuf, "Active: Probe %d (%s)", 
+              ds18ProbeSelection + 1, ds18ProbeSelection == 0 ? "Pre-heat" : "Ferm");
+      tft.drawCentreString(statusBuf, CENTER_X, 255, 2);
     } else if (unitTestSelection == 3) { // pH
       tft.drawCentreString("Live pH Probe:", CENTER_X, 205, 2);
       String ph = String(incomingData.phValue, 2) + " pH";
@@ -2333,7 +2351,11 @@ void drawUnitTestRunPage() {
   } else if (unitTestRunning) {
     tft.drawCentreString("RUNNING AUTOMATED TRIALS... RETURN: STOP", CENTER_X, 455, 1);
   } else {
-    tft.drawCentreString("SELECT: RUN TEST   RETURN: BACK", CENTER_X, 455, 2);
+    if (unitTestSelection == 2) {
+      tft.drawCentreString("UP/DOWN: SELECT PROBE   SELECT: RUN   RETURN: BACK", CENTER_X, 455, 1);
+    } else {
+      tft.drawCentreString("SELECT: RUN TEST   RETURN: BACK", CENTER_X, 455, 2);
+    }
   }
 }
 
