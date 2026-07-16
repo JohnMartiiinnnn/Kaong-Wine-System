@@ -154,6 +154,9 @@ extern struct_message incomingData;
 extern uint32_t lastDataReceivedMillis;
 extern float currentWeight;
 extern float calibrationFactor;
+extern float preheatTempOffset;
+extern float pastTempOffset;
+extern float fermTempOffset;
 extern float originalGravity;
 extern bool ogCapturing;
 extern int ogSampleCount;
@@ -306,3 +309,9 @@ extern bool     calibCompleted;
 extern uint32_t calibCompleteTime;
 extern bool     calibTareDone;
 extern long     calibRawTareValue;
+
+// ---- Temperature Calibration Helpers ----
+float getPreheatTemp();
+float getPastTemp();
+float getFermTemp();
+

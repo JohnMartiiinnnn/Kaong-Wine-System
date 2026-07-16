@@ -696,13 +696,13 @@ void drawSensorMonitorPage(bool valuesOnly) {
     char b[32];
     if (bme1Status) { sprintf(b, "%.1f C", bme1.readTemperature());                    drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)",   b,        false); }
     else              drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)",   "FAILED", true);
-    if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    b,        false); }
+    if (liquid2Status) { sprintf(b, "%.1f C", getPreheatTemp()); drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    b,        false); }
     else                drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)",    "FAILED", true);
     if (incomingData.sensor2Status > 0) { sprintf(b, "%.1f C", incomingData.room2Temp);      drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", b,        false); }
     else                                  drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", "FAILED", true);
-    if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", incomingData.room2LiquidTemp); drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)",  b,        false); }
+    if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", getFermTemp()); drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)",  b,        false); }
     else                                drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)",  "FAILED", true);
-    if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   b,        false); }
+    if (liquid1Status) { sprintf(b, "%.1f C", getPastTemp()); drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   b,        false); }
     else                drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)",   "FAILED", true);
     if (incomingData.pillGravity > 0.1) { sprintf(b, "%.4f SG", incomingData.pillGravity); drawValueTile(5, yStart + yGap * 5, "S. GRAVITY",     b,        false); }
     else                                  drawValueTile(5, yStart + yGap * 5, "S. GRAVITY",     "FAILED", true);
@@ -728,10 +728,10 @@ void drawSensorMonitorPage(bool valuesOnly) {
   };
 
   if (bme1Status) { sprintf(b, "%.1f C", bme1.readTemperature());                    rv(0, b, false); } else rv(0, "FAILED", true);
-  if (liquid2Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(1)); rv(1, b, false); } else rv(1, "FAILED", true);
+  if (liquid2Status) { sprintf(b, "%.1f C", getPreheatTemp()); rv(1, b, false); } else rv(1, "FAILED", true);
   if (incomingData.sensor2Status > 0) { sprintf(b, "%.1f C", incomingData.room2Temp);      rv(2, b, false); } else rv(2, "FAILED", true);
-  if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", incomingData.room2LiquidTemp); rv(3, b, false); } else rv(3, "FAILED", true);
-  if (liquid1Status) { sprintf(b, "%.1f C", sharedLiquidSensors.getTempCByIndex(0)); rv(4, b, false); } else rv(4, "FAILED", true);
+  if (incomingData.ds18Status == 1) { sprintf(b, "%.1f C", getFermTemp()); rv(3, b, false); } else rv(3, "FAILED", true);
+  if (liquid1Status) { sprintf(b, "%.1f C", getPastTemp()); rv(4, b, false); } else rv(4, "FAILED", true);
   if (incomingData.pillGravity > 0.1) { sprintf(b, "%.4f SG", incomingData.pillGravity); rv(5, b, false); } else rv(5, "FAILED", true);
   if (incomingData.adsStatus == 1) { sprintf(b, "%.2f pH", incomingData.phValue); rv(6, b, false); } else rv(6, "FAILED", true);
   if (hx711Status) { sprintf(b, "%.1f L", currentWeight); rv(7, b, false); } else rv(7, "FAILED", true);
@@ -904,7 +904,7 @@ void drawStageParamMenu() {
   if (stageParamStage == 0) {
     float ambT = bme1Status ? bme1.readTemperature() : -999.0f;
     float liqT = simActive ? simTempOverride[0]
-               : (liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : -999.0f);
+               : (liquid2Status ? getPreheatTemp() : -999.0f);
 
     uint16_t ambBg = (ambT > -999 && ambT >= stageTargetTemp[0]) ? 0x0400 : 0xF800;
     tft.fillRect(10, statusY + 20, 300, 40, ambBg);
@@ -926,7 +926,7 @@ void drawStageParamMenu() {
 
   } else if (stageParamStage == 1) {
     float ctrlT = simActive ? simTempOverride[1]
-                : ((incomingData.ds18Status == 1) ? incomingData.room2LiquidTemp : -999.0f);
+                : ((incomingData.ds18Status == 1) ? getFermTemp() : -999.0f);
     float ph    = (incomingData.adsStatus == 1) ? incomingData.phValue : -999.0f;
     float grav  = (incomingData.pillGravity > 0.1f && incomingData.pillGravity < 10.0f)
                     ? incomingData.pillGravity : -999.0f;
@@ -960,7 +960,7 @@ void drawStageParamMenu() {
 
   } else {
     float pastT = simActive ? simTempOverride[2]
-                : (liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : -999.0f);
+                : (liquid1Status ? getPastTemp() : -999.0f);
     uint16_t pBg = (pastT > -999 && pastT >= stageTargetTemp[2]) ? 0x0400 : 0xF800;
     tft.fillRect(10, statusY + 20, 300, 40, pBg);
     tft.drawRect(10, statusY + 20, 300, 40, TFT_DARKGREY);
@@ -1087,13 +1087,13 @@ void drawPidTestMenu() {
     float liquidTemp = -999.0f;
     float ambientTemp = -999.0f;
     if (pidTestChoice == 0) {
-      if (liquid2Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+      if (liquid2Status) liquidTemp = getPreheatTemp();
       if (bme1Status) ambientTemp = bme1.readTemperature();
     } else if (pidTestChoice == 1) {
-      if (incomingData.ds18Status == 1) liquidTemp = incomingData.room2LiquidTemp;
+      if (incomingData.ds18Status == 1) liquidTemp = getFermTemp();
       if (incomingData.sensor2Status == 1) ambientTemp = incomingData.room2Temp;
     } else if (pidTestChoice == 2) {
-      if (liquid1Status) liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+      if (liquid1Status) liquidTemp = getPastTemp();
     }
 
     // Row 1: temp panels (y=240, h=55)

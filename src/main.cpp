@@ -49,6 +49,9 @@ struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
+float preheatTempOffset = 0.0f;     // Calibration offset for Pre-heat probe (Index 1)
+float pastTempOffset = 0.0f;        // Calibration offset for Pasteurization probe (Index 0)
+float fermTempOffset = 0.0f;        // Calibration offset for Fermentation probe (remote via UART)
 float originalGravity = 0.0;
 bool ogCapturing = false;
 int ogSampleCount = 0;
@@ -2033,20 +2036,20 @@ void loop() {
       if (pidTestChoice == 0) {
         if (pidPreHeatSensor == 0) {
           if (liquid2Status)
-            liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+            liquidTemp = getPreheatTemp();
           else if (bme1Status)
             liquidTemp = bme1.readTemperature();
         } else {
           if (bme1Status)
             liquidTemp = bme1.readTemperature();
           else if (liquid2Status)
-            liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+            liquidTemp = getPreheatTemp();
         }
       } else if (pidTestChoice == 1) {
         if (pidFermSensor == 0) {
           if (incomingData.ds18Status == 1 &&
               incomingData.room2LiquidTemp > -100.0f)
-            liquidTemp = incomingData.room2LiquidTemp;
+            liquidTemp = getFermTemp();
           else if (incomingData.sensor2Status == 1)
             liquidTemp = incomingData.room2Temp;
         } else {
@@ -2054,11 +2057,11 @@ void loop() {
             liquidTemp = incomingData.room2Temp;
           else if (incomingData.ds18Status == 1 &&
                    incomingData.room2LiquidTemp > -100.0f)
-            liquidTemp = incomingData.room2LiquidTemp;
+            liquidTemp = getFermTemp();
         }
       } else if (pidTestChoice == 2) {
         if (liquid1Status)
-          liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+          liquidTemp = getPastTemp();
       }
 
       if (liquidTemp > -100.0f) {
@@ -2209,11 +2212,11 @@ void loop() {
       if (simTempOverride[activeBrewStage] > 0.0f) {
         liquidTemp = simTempOverride[activeBrewStage];
       } else if (activeBrewStage == 0 && liquid2Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(1);
+        liquidTemp = getPreheatTemp();
       } else if (activeBrewStage == 1 && incomingData.ds18Status == 1) {
-        liquidTemp = incomingData.room2LiquidTemp;
+        liquidTemp = getFermTemp();
       } else if (activeBrewStage == 2 && liquid1Status) {
-        liquidTemp = sharedLiquidSensors.getTempCByIndex(0);
+        liquidTemp = getPastTemp();
       }
 
       if (activeBrewStage == 0) {
@@ -2569,11 +2572,11 @@ void loop() {
         if (simTempOverride[activeBrewStage] > 0.0f)
           gTemp = simTempOverride[activeBrewStage];
         else if (activeBrewStage == 0 && liquid2Status)
-          gTemp = sharedLiquidSensors.getTempCByIndex(1);
+          gTemp = getPreheatTemp();
         else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
-          gTemp = incomingData.room2LiquidTemp;
+          gTemp = getFermTemp();
         else if (activeBrewStage == 2 && liquid1Status)
-          gTemp = sharedLiquidSensors.getTempCByIndex(0);
+          gTemp = getPastTemp();
         if (gTemp > -100.0f) {
           if (tempHistoryCount < TEMP_GRAPH_W) {
             tempHistory[tempHistoryCount++] = gTemp;
@@ -2599,7 +2602,7 @@ void loop() {
             (simTempOverride[0] > 0.0f)
                 ? String(simTempOverride[0], 1)
                 : (liquid2Status
-                       ? String(sharedLiquidSensors.getTempCByIndex(1), 1)
+                       ? String(getPreheatTemp(), 1)
                        : "--");
         tft.drawCentreString(pa + "C", 80, y + 80, 4);
         tft.drawCentreString(pl + "C", 240, y + 80, 4);
@@ -2620,7 +2623,7 @@ void loop() {
         String fl = (simTempOverride[1] > 0.0f)
                         ? String(simTempOverride[1], 1)
                         : (incomingData.ds18Status == 1
-                               ? String(incomingData.room2LiquidTemp, 1)
+                               ? String(getFermTemp(), 1)
                                : "--");
         tft.drawCentreString(fa + "C", 80, y + 85, 4);
         tft.drawCentreString(fl + "C", 240, y + 85, 4);
@@ -2668,7 +2671,7 @@ void loop() {
             (simTempOverride[2] > 0.0f)
                 ? String(simTempOverride[2], 1)
                 : (liquid1Status
-                       ? String(sharedLiquidSensors.getTempCByIndex(0), 1)
+                       ? String(getPastTemp(), 1)
                        : "--");
         tft.drawCentreString(pt + "C", CENTER_X, y + 85, 4);
         tft.drawCentreString("READY", CENTER_X, y + 155, 4);
@@ -2676,3 +2679,22 @@ void loop() {
     }
   }
 }
+
+float getPreheatTemp() {
+  float t = sharedLiquidSensors.getTempCByIndex(1);
+  if (t == DEVICE_DISCONNECTED_C) return t;
+  return t + preheatTempOffset;
+}
+
+float getPastTemp() {
+  float t = sharedLiquidSensors.getTempCByIndex(0);
+  if (t == DEVICE_DISCONNECTED_C) return t;
+  return t + pastTempOffset;
+}
+
+float getFermTemp() {
+  float t = incomingData.room2LiquidTemp;
+  if (t < -100.0f) return t;
+  return t + fermTempOffset;
+}
+
