@@ -287,15 +287,15 @@ The firmware prints `raw=` and `ema=` weight values over `Serial` at 115200 baud
 Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible. Sensor calibration is handled over the board's inter-controller UART connection (`Serial2` at 115200 baud) using a bridge mode on the Primary.
 
 ### 7.1 Operation Workflow
-1. Flash both boards with their respective `calibration` targets:
-   - Primary: `~/.platformio/penv/bin/pio run -e calibration -t upload`
-   - Secondary: `cd Secondary_Transmitter && ~/.platformio/penv/bin/pio run -e calibration -t upload` (via OTA/wireless).
-2. Connect PC USB directly to the **Primary ESP32**.
-3. Open the Serial Monitor at **115200** baud.
-4. By default, you are in **Primary Calibration Mode** (prints local sensors).
-5. Type **`s`** (or `S`) to enter **Secondary ESP32 Bridge Mode**. Local sensor printing will mute, and all terminal inputs will be routed directly to the Secondary ESP32.
-6. Calibrate Secondary sensors using:
+1. Ensure the Secondary ESP32 is running its calibration utility (flashed via OTA).
+2. Flash the Primary ESP32 with the standalone bridge utility:
+   - Command: `cd pHSensor_Calibration && ~/.platformio/penv/bin/pio run -t upload`
+3. Open the Serial Monitor on the Primary ESP32:
+   - Command: `~/.platformio/penv/bin/pio device monitor`
+4. The monitor will immediately stream pH and fermentation temperature readouts from the Secondary ESP32.
+5. Calibrate the Secondary pH probe using:
    - **`7`**: pH 7.0 neutral offset calibration.
    - **`4`**: pH 4.0 acid slope calibration.
-7. Type **`p`** (or `P`) to return to **Primary Calibration Mode**.
+6. Once calibration is done, flash the main production code back to the Primary ESP32.
+
 
