@@ -27,7 +27,7 @@ typedef struct __attribute__((packed)) {
   float room2Temp;
   float room2Pres;
   float phValue;
-  float room2LiquidTemp; // Fermentation Liquid Temp from Secondary
+  float room2LiquidTemp;
   uint8_t sensor2Status;
   uint8_t adsStatus;
   uint8_t ds18Status;
@@ -49,9 +49,9 @@ enum ProbeSelection {
 
 ProbeSelection selectedProbe = PROBE_PASTEURIZATION;
 
-bool lastUpState = true;
-bool lastDownState = true;
 uint32_t lastDisplayUpdate = 0;
+uint32_t lastPress = 0;
+float currentTemp = -127.0f;
 
 const char* getProbeName(ProbeSelection p) {
   switch (p) {
@@ -71,14 +71,14 @@ uint8_t calculateChecksum(const struct_message &msg) {
   return checksum;
 }
 
-void drawUI(float currentTemp) {
+void drawUI(float temp) {
   // Header
   tft.fillRect(0, 0, 320, 60, 0x18C3); // dark blue header
   tft.setTextColor(TFT_WHITE);
   tft.drawCentreString("DS18B20 TEMP PROBES", 160, 10, 4);
   tft.drawCentreString("Select Probe to Monitor", 160, 38, 2);
 
-  // Draw Probe List (y starts from 80)
+  // Draw Probe List
   int yStart = 80;
   int yGap = 45;
 
@@ -86,7 +86,6 @@ void drawUI(float currentTemp) {
     int y = yStart + i * yGap;
     bool isSelected = ((int)selectedProbe == i);
     
-    // Background highlight for selection
     uint16_t bg = isSelected ? 0x2A6B : 0x0841; // Light blue vs dark gray-blue
     uint16_t border = isSelected ? TFT_CYAN : TFT_DARKGREY;
     
@@ -96,25 +95,22 @@ void drawUI(float currentTemp) {
     tft.setTextColor(isSelected ? TFT_WHITE : TFT_LIGHTGREY);
     tft.drawString(getProbeName((ProbeSelection)i), 20, y + 10, 2);
 
-    // Mini indicator dot
     if (isSelected) {
       tft.fillCircle(290, y + 18, 5, TFT_CYAN);
     }
   }
 
-  // Giant value display area (y from 230 to 420)
+  // Giant value display area
   tft.fillRect(10, 230, 300, 200, 0x0821); // deep dark blue-black card
   tft.drawRect(10, 230, 300, 200, TFT_DARKGREY);
   
   tft.setTextColor(TFT_LIGHTGREY);
   tft.drawCentreString("CURRENT TEMPERATURE", 160, 245, 2);
 
-  if (currentTemp > -100.0f) {
+  if (temp > -100.0f) {
     char buf[16];
-    dtostrf(currentTemp, 5, 2, buf);
+    dtostrf(temp, 5, 2, buf);
     tft.setTextColor(TFT_GREEN);
-    
-    // Draw big value
     tft.drawCentreString(buf, 140, 290, 7); // Giant font
     tft.drawString("C", 240, 290, 4);      // Celsius unit
   } else {
@@ -123,7 +119,6 @@ void drawUI(float currentTemp) {
     tft.drawCentreString("Check probe connection / wiring", 160, 350, 1);
   }
 
-  // Navigation hint
   tft.setTextColor(TFT_LIGHTGREY);
   tft.drawCentreString("Press UP/DOWN on Keypad to switch", 160, 445, 1);
 }
@@ -136,11 +131,13 @@ void setup() {
 
   // Initialize TFT Screen
   tft.init();
-  tft.setRotation(0); // Portrait mode: 320x480
+  tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
 
-  // Initialize Sensors
+  // Initialize Sensors (Non-blocking)
   sensors.begin();
+  sensors.setWaitForConversion(false);
+  sensors.requestTemperatures(); // Prime first read
   int count = sensors.getDeviceCount();
   Serial.printf("Local DS18B20 Probes Found on Pin %d: %d\n", ONE_WIRE_BUS, count);
 
@@ -154,12 +151,11 @@ void setup() {
     Serial.println("[ERR] MCP23017 not detected at 0x20!");
   }
 
-  // Draw initial static interface
   drawUI(-127.0f);
 }
 
 void loop() {
-  // 1. Read UART packets from Secondary (to get Fermentation temp)
+  // 1. Read UART packets from Secondary
   while (Serial2.available() > 0) {
     if (Serial2.peek() != 0xEF) {
       Serial2.read();
@@ -181,9 +177,7 @@ void loop() {
     secondaryActive = false;
   }
 
-  // 2. Read local and remote temperature values
-  sensors.requestTemperatures();
-  float currentTemp = -127.0f;
+  // 2. Read temperature values (Non-blocking: reads previous request, starts next one)
   if (selectedProbe == PROBE_PASTEURIZATION) {
     currentTemp = sensors.getTempCByIndex(0);
   } else if (selectedProbe == PROBE_PREHEAT) {
@@ -191,43 +185,32 @@ void loop() {
   } else if (selectedProbe == PROBE_FERMENTATION) {
     currentTemp = (secondaryActive && rxData.ds18Status == 1) ? rxData.room2LiquidTemp : -127.0f;
   }
+  sensors.requestTemperatures(); // Start conversion for next loop
 
   // 3. Update the TFT Screen and Serial Monitor (every 1 second)
   if (millis() - lastDisplayUpdate >= 1000) {
     lastDisplayUpdate = millis();
-    
-    // Draw UI with new values
     drawUI(currentTemp);
-
-    // Print to Serial Monitor for backup
     Serial.printf("[DISPLAY] Selected Probe: %s | Temp: %.2f C\n", getProbeName(selectedProbe), currentTemp);
   }
 
-  // 4. Handle Keypad Up/Down Navigation
-  bool upVal = mcp.digitalRead(BTN_UP);
-  bool downVal = mcp.digitalRead(BTN_DOWN);
+  // 4. Handle Keypad Up/Down Navigation (Lockout-based debounce)
+  if (millis() - lastPress > 250) {
+    bool upPressed = (mcp.digitalRead(BTN_UP) == LOW);
+    bool downPressed = (mcp.digitalRead(BTN_DOWN) == LOW);
 
-  // Switch Selection UP
-  if (upVal == LOW && lastUpState == HIGH) {
-    delay(50); // debounce
-    if (mcp.digitalRead(BTN_UP) == LOW) {
+    if (upPressed) {
       selectedProbe = (ProbeSelection)(((int)selectedProbe + 1) % 3);
+      lastPress = millis();
       drawUI(currentTemp);
       Serial.printf("[KEY] Selection changed to: %s\n", getProbeName(selectedProbe));
-    }
-  }
-
-  // Switch Selection DOWN
-  if (downVal == LOW && lastDownState == HIGH) {
-    delay(50); // debounce
-    if (mcp.digitalRead(BTN_DOWN) == LOW) {
+    } else if (downPressed) {
       selectedProbe = (ProbeSelection)(((int)selectedProbe + 2) % 3); // -1 modulo 3
+      lastPress = millis();
       drawUI(currentTemp);
       Serial.printf("[KEY] Selection changed to: %s\n", getProbeName(selectedProbe));
     }
   }
 
-  lastUpState = upVal;
-  lastDownState = downVal;
   delay(10);
 }
