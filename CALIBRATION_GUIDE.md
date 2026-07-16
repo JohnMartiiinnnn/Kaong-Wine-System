@@ -54,20 +54,22 @@ This standalone project measures pulses and calculates K-factors for Flow Sensor
 
 ## 3. DS18B20 Temperature Probes Verification
 
-This standalone project reads local OneWire temp probes on Pin 26 (Pre-heat and Pasteurization).
+This standalone project provides a visual TFT interface to read local OneWire temp probes on Pin 26 (Pre-heat and Pasteurization) as well as the remote fermentation probe via UART.
 
 ### How to Run
 1. Navigate to the directory:
    ```bash
    cd /Users/gian/Coding/Kaong-Wine-System/DS18B20_Calibration
    ```
-2. Flash and open the monitor:
+2. Flash the firmware:
    ```bash
    ~/.platformio/penv/bin/pio run -t upload
-   ~/.platformio/penv/bin/pio device monitor
    ```
-3. The utility will print temperatures for Index 0 (Pasteurization) and Index 1 (Pre-heat) every 2 seconds.
-4. **Verification**: Since the DS18B20 is a digital sensor and is **factory-calibrated**, it does not require you to calculate or write any calibration factor in code. Simply verify the readings in ice water (~0.0°C) or room temperature against a reference thermometer to ensure the probes are working correctly and not damaged.
+3. Use the keypad **UP / DOWN** arrows to select which probe you want to view on the screen:
+   * **Pasteurization (Index 0)**
+   * **Pre-heat (Index 1)**
+   * **Fermentation (Remote UART)**
+4. **Verification**: Verify the readings in ice water (~0.0°C) or room temperature against a reference thermometer. If the readings are offset, you can add software offsets to `preheatTempOffset`, `pastTempOffset`, and `fermTempOffset` in the main `src/config.h` file.
 
 ---
 
@@ -75,8 +77,17 @@ This standalone project reads local OneWire temp probes on Pin 26 (Pre-heat and 
 
 Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible. The `pHSensor_Calibration` project runs a serial bridge on the Primary ESP32 to route command/response data bi-directionally over UART (`Serial2` pins 16 & 17) to the Secondary.
 
+### Flashing the Secondary MCU
+Before using the bridge, the Secondary ESP32 must be running its calibration utility. Since it's enclosed, use OTA or ensure the correct environment is uploaded if connected via USB:
+1. Navigate to the transmitter directory: `cd /Users/gian/Coding/Kaong-Wine-System/Secondary_Transmitter`
+2. Flash **only** the calibration environment:
+   ```bash
+   ~/.platformio/penv/bin/pio run -e calibration -t upload
+   ```
+   *(Note: when done with pH calibration, run `~/.platformio/penv/bin/pio run -e esp32dev -t upload` to restore production firmware).*
+
 ### How to Run
-1. Ensure the Secondary ESP32 has its calibration code running (flashed via OTA previously).
+1. Ensure the Secondary ESP32 has its calibration code running (see above).
 2. Navigate to the bridge directory:
    ```bash
    cd /Users/gian/Coding/Kaong-Wine-System/pHSensor_Calibration
