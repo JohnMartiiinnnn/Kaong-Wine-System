@@ -81,7 +81,8 @@ Secondary_Transmitter/src/
 *   **Sensors:**
     *   **BME280/BMP280:** Fermentation ambient temp and pressure (I2C).
     *   **DS18B20:** Fermentation liquid temp (OneWire, non-blocking).
-    *   **ADS1115 + PH4502C:** High-precision pH monitoring.
+    *   **ADS1115 + PH4502C:** High-precision pH monitoring (ADS1115 A0).
+    *   **BTS7960 Motor Current Sense:** `L_IS` & `R_IS` tied together to ADS1115 A1 (1kΩ pull-down to GND).
 *   **Wireless:**
     *   **BLE (NimBLE):** Scans for RAPT Pill beacons — SG and internal temperature.
 
@@ -278,3 +279,23 @@ The firmware prints `raw=` and `ema=` weight values over `Serial` at 115200 baud
 - **GPIO0 is the boot pin.** Do not hold GPIO0 LOW externally during power-on or the ESP32 will enter bootloader mode instead of running firmware.
 - **No brake mode.** When speed is set to 0 % (PWMA = LOW with AIN1 HIGH, AIN2 LOW), the TB6612FN enters coast mode, not active brake. The worm gear's self-locking mechanism prevents the impeller from back-driving, so this is acceptable.
 - **Single-channel only.** Only the A channel of the TB6612FN is used (1.2 A continuous). The B channel is unused. If higher torque is needed in the future, bridge both channels in parallel for 2.4 A continuous.
+
+---
+
+## 7. UART Calibration Bridge (for Enclosed Secondary ESP32)
+
+Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible. Sensor calibration is handled over the board's inter-controller UART connection (`Serial2` at 115200 baud) using a bridge mode on the Primary.
+
+### 7.1 Operation Workflow
+1. Flash both boards with their respective `calibration` targets:
+   - Primary: `~/.platformio/penv/bin/pio run -e calibration -t upload`
+   - Secondary: `cd Secondary_Transmitter && ~/.platformio/penv/bin/pio run -e calibration -t upload` (via OTA/wireless).
+2. Connect PC USB directly to the **Primary ESP32**.
+3. Open the Serial Monitor at **115200** baud.
+4. By default, you are in **Primary Calibration Mode** (prints local sensors).
+5. Type **`s`** (or `S`) to enter **Secondary ESP32 Bridge Mode**. Local sensor printing will mute, and all terminal inputs will be routed directly to the Secondary ESP32.
+6. Calibrate Secondary sensors using:
+   - **`7`**: pH 7.0 neutral offset calibration.
+   - **`4`**: pH 4.0 acid slope calibration.
+7. Type **`p`** (or `P`) to return to **Primary Calibration Mode**.
+
