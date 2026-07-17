@@ -49,8 +49,8 @@ struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
-float chamberEmptyWeight = 0.0f;    // Measured chamber offset weight
-long chamberEmptyRaw = 0;           // Raw chamber offset value
+float chamberEmptyWeight = 2.5f;    // Measured chamber offset weight
+long chamberEmptyRaw = 57531;       // Raw chamber offset value (2.5 * 23012.45)
 float preheatTempOffset =
     0.0f; // Calibration offset for Pre-heat probe (Index 1)
 float pastTempOffset =
