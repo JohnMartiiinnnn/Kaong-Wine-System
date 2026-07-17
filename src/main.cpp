@@ -49,8 +49,9 @@ struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
-float chamberEmptyWeight = 2.5f;    // Measured chamber offset weight
-long chamberEmptyRaw = 57531;       // Raw chamber offset value (2.5 * 23012.45)
+RaptLog raptLogs[10] = {};
+int raptLogCount = 0;
+bool raptTestNeedsFullRedraw = true;
 float preheatTempOffset =
     0.0f; // Calibration offset for Pre-heat probe (Index 1)
 float pastTempOffset =
@@ -114,7 +115,6 @@ bool relayTestPickNeedsFullRedraw = true;
 int relayTestPickSelection = 0; // 0=Auto, 1=Manual
 bool relayTestNeedsFullRedraw = true;
 int relayTestSelection = 0; // 1..9=Relays (no mode row needed now)
-int calibWeightIndex = 0;   // 0 = 1.10 kg, 1 = 2.25 kg, 2 = 3.35 kg (combined)
 bool relayTestAuto = true;  // defaults to auto-sequencing
 uint32_t relayTestTimer = 0;
 bool testRelayStates[9] = {false, false, false, false, false,
@@ -240,8 +240,8 @@ void setFanSpeed(int percent) {
   currentSpeedPercent = percent;
   bool isFerm = isFermFanOn ||
                 (currentAppState == FAN_TEST_MENU && fanTestFanChoice == 1);
-  ledcWrite(pwmChannel, isFerm ? map(percent, 0, 100, 255, 0)
-                               : map(percent, 0, 100, 0, 255));
+  ledcWrite(pwmChannel, isFerm ? map(percent, 0, 100, 0, 255)
+                               : map(percent, 0, 100, 255, 0));
 }
 
 // ---- Mixer Speed Helper ----
@@ -808,7 +808,7 @@ void loop() {
   // Navigation: Right / Down
   if ((cRight && !ljRight) || (cDown && !ljDown)) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 1) % 5;
+      menuSelection = (menuSelection + 1) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (cDown && !ljDown && !wizardEditing) {
@@ -845,7 +845,7 @@ void loop() {
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
       if (!wizardEditing) {
-        loadCellSelection = (loadCellSelection + 1) % 5;
+        loadCellSelection = (loadCellSelection + 1) % 2;
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -854,7 +854,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 10;
+      systemCheckSelection = (systemCheckSelection + 1) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -957,7 +957,7 @@ void loop() {
   // Navigation: Up
   if (cUp && !ljUp) {
     if (currentAppState == START_MENU) {
-      menuSelection = (menuSelection + 4) % 5;
+      menuSelection = (menuSelection + 3) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (!wizardEditing) {
@@ -993,7 +993,7 @@ void loop() {
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
       if (!wizardEditing) {
-        loadCellSelection = (loadCellSelection + 4) % 5;
+        loadCellSelection = (loadCellSelection + 1) % 2;
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1002,7 +1002,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 9) % 10;
+      systemCheckSelection = (systemCheckSelection + 11) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 2) % 3;
@@ -1108,16 +1108,6 @@ void loop() {
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
-      } else if (menuSelection == 4) {
-        currentAppState = CALIB_WIZARD;
-        calibTarget = 0;
-        calibVolume = 5.0f;
-        calibRunning = false;
-        calibCompleted = false;
-        calibNeedsFullRedraw = true;
-        calibTareDone = false;
-        calibSelection = 0;
-        drawCalibWizard();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (wizardSelection == 0) {
@@ -1311,6 +1301,18 @@ void loop() {
         transferTestNeedsFullRedraw = true;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
+      } else if (systemCheckSelection == 10) {
+        currentAppState = LOAD_CELL_PAGE;
+        loadCellNeedsFullRedraw = true;
+        loadCellSelection = 0;
+        wizardEditing = false;
+        drawLoadCellPage();
+      } else if (systemCheckSelection == 11) {
+        currentAppState = RAPT_TEST_MENU;
+        raptTestNeedsFullRedraw = true;
+        raptLogCount = 0;
+        memset(raptLogs, 0, sizeof(raptLogs));
+        drawRaptTestPage();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -1484,11 +1486,8 @@ void loop() {
       sendMotorCommand(0, motorTestCW);
       drawMotorTestMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
-      currentAppState = LOAD_CELL_PAGE;
-      loadCellNeedsFullRedraw = true;
-      loadCellSelection = 0;
-      wizardEditing = false;
-      drawLoadCellPage();
+      // Removed LOAD_CELL_PAGE trigger from SENSOR_MONITOR select key
+      // Pressing SELECT inside SENSOR_MONITOR now does nothing.
     } else if (currentAppState == CALIBRATION_MODE) {
       if (calSelection == 0) {
         if (hx711Status) {
@@ -1506,38 +1505,10 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      if (loadCellSelection == 0 && hx711Status) {
+      if (hx711Status) {
         scale.tare();
-        chamberEmptyWeight = 0.0f;
-        chamberEmptyRaw = 0;
         currentWeight = 0.0f;
         hx711WeightSeeded = false;
-        drawLoadCellPage();
-      } else if (loadCellSelection == 1 && hx711Status) {
-        chamberEmptyRaw = scale.get_value(5);
-        chamberEmptyWeight = (float)chamberEmptyRaw / calibrationFactor;
-        currentWeight = 0.0f;
-        hx711WeightSeeded = false;
-        drawLoadCellPage();
-      } else if (loadCellSelection == 2) {
-        wizardEditing = !wizardEditing;
-        drawLoadCellPage();
-      } else if (loadCellSelection == 3 && hx711Status) {
-        float knownW = 1.10f;
-        if (calibWeightIndex == 1) knownW = 2.25f;
-        else if (calibWeightIndex == 2) knownW = 3.35f;
-        long rawVal = scale.get_value(5);
-        float diff = (float)(rawVal - chamberEmptyRaw);
-        if (abs(diff) > 10.0f) {
-          calibrationFactor = diff / knownW;
-          scale.set_scale(calibrationFactor);
-          chamberEmptyWeight = (float)chamberEmptyRaw / calibrationFactor;
-          currentWeight = knownW;
-          hx711WeightSeeded = false;
-        }
-        drawLoadCellPage();
-      } else if (loadCellSelection == 4) {
-        wizardEditing = !wizardEditing;
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1674,18 +1645,7 @@ void loop() {
     scale.set_scale(calibrationFactor);
     drawCalibrationPage();
   }
-  if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE &&
-      loadCellSelection == 4 && wizardEditing) {
-    calibrationFactor += 10.0;
-    scale.set_scale(calibrationFactor);
-    chamberEmptyWeight = (float)chamberEmptyRaw / calibrationFactor;
-    drawLoadCellPage();
-  }
-  if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE &&
-      loadCellSelection == 2 && wizardEditing) {
-    calibWeightIndex = (calibWeightIndex + 1) % 3;
-    drawLoadCellPage();
-  }
+  // Removed LOAD_CELL_PAGE manual cal adjust from right key
 
   if (cRight && !ljRight && currentAppState == CALIB_WIZARD && !calibRunning) {
     if (calibSelection == 0 && wizardEditing) {
@@ -1803,19 +1763,13 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      if (loadCellSelection == 4 && wizardEditing) {
-        calibrationFactor -= 10.0;
-        scale.set_scale(calibrationFactor);
-        chamberEmptyWeight = (float)chamberEmptyRaw / calibrationFactor;
-        drawLoadCellPage();
-      } else if (loadCellSelection == 2 && wizardEditing) {
-        calibWeightIndex = (calibWeightIndex + 2) % 3;
-        drawLoadCellPage();
-      } else {
-        currentAppState = SENSOR_MONITOR;
-        monitorNeedsFullRedraw = true;
-        drawSensorMonitorPage();
-      }
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == RAPT_TEST_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == CALIB_WIZARD) {
       if (calibSelection == 0 && wizardEditing) {
         calibTarget = (calibTarget + 2) % 3;
@@ -2068,6 +2022,44 @@ void loop() {
       uartPacketCount++;
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
+
+      // Check for new RAPT Pill telemetry update
+      if (incomingData.pillGravity > 0.1f) {
+        static float lastPillTemp = -999.0f;
+        static float lastPillGravity = -999.0f;
+        static int16_t lastPillRSSI = -999;
+
+        if (incomingData.pillTemp != lastPillTemp ||
+            incomingData.pillGravity != lastPillGravity ||
+            incomingData.pillRSSI != lastPillRSSI) {
+
+          lastPillTemp = incomingData.pillTemp;
+          lastPillGravity = incomingData.pillGravity;
+          lastPillRSSI = incomingData.pillRSSI;
+
+          if (currentAppState == RAPT_TEST_MENU && raptLogCount < 10) {
+            static uint32_t lastLogTimeMs = 0;
+            if (raptLogCount == 0 || (millis() - lastLogTimeMs > 15000UL)) {
+              lastLogTimeMs = millis();
+              raptLogs[raptLogCount].gravity = incomingData.pillGravity;
+              if (rtcStatus) {
+                DateTime now = rtc.now();
+                sprintf(raptLogs[raptLogCount].timeStr, "%02d:%02d:%02d",
+                        now.hour(), now.minute(), now.second());
+              } else {
+                uint32_t sec = millis() / 1000;
+                uint32_t min = sec / 60;
+                sec = sec % 60;
+                sprintf(raptLogs[raptLogCount].timeStr, "%02d:%02d", min, sec);
+              }
+              raptLogCount++;
+
+              raptTestNeedsFullRedraw = true;
+            }
+          }
+        }
+      }
+
       if (ogCapturing && incomingData.pillGravity > 0.5f) {
         ogSampleSum += incomingData.pillGravity;
         ogSampleCount++;
@@ -2096,8 +2088,8 @@ void loop() {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } else {
       // 2. Allow negative drift/values through for debugging inverted load
-      // cells
-      float inputW = rawW - chamberEmptyWeight;
+      float inputW = rawW;
+
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
         hx711WeightSeeded = true;
@@ -2682,6 +2674,9 @@ void loop() {
 
     if (currentAppState == LOAD_CELL_PAGE)
       drawLoadCellPage(true);
+
+    if (currentAppState == RAPT_TEST_MENU)
+      drawRaptTestPage(true);
 
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();

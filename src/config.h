@@ -97,7 +97,8 @@ enum AppState {
   TRANSFER_TEST_MENU,
   FLOW_CAL_MENU,
   HEATER_TEST_PICK,
-  CALIB_WIZARD
+  CALIB_WIZARD,
+  RAPT_TEST_MENU
 };
 
 extern long rawHX711;
@@ -131,6 +132,15 @@ typedef struct __attribute__((packed)) {
   uint8_t checksum;
 } struct_message;
 
+struct RaptLog {
+  float gravity;
+  char timeStr[12];
+};
+
+extern RaptLog raptLogs[10];
+extern int raptLogCount;
+extern bool raptTestNeedsFullRedraw;
+
 // ---- Hardware Objects (defined in main.cpp) ----
 extern Adafruit_MCP23X17 mcp;
 extern RTC_DS3231 rtc;
@@ -155,8 +165,6 @@ extern struct_message incomingData;
 extern uint32_t lastDataReceivedMillis;
 extern float currentWeight;
 extern float calibrationFactor;
-extern float chamberEmptyWeight;
-extern long chamberEmptyRaw;
 extern float preheatTempOffset;
 extern float pastTempOffset;
 extern float fermTempOffset;
@@ -216,7 +224,6 @@ extern bool relayTestPickNeedsFullRedraw;
 extern int relayTestPickSelection;
 extern bool relayTestNeedsFullRedraw;
 extern int  relayTestSelection;
-extern int calibWeightIndex;
 extern bool relayTestAuto;
 extern uint32_t relayTestTimer;
 extern bool testRelayStates[9];
