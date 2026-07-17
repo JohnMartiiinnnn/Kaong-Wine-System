@@ -76,9 +76,6 @@ bool isLight1On = false;
 bool isLight2On = false;
 bool isLight3On = false;
 FanMode currentFanMode = FAN_OFF;
-bool isSystemHalted = false;
-int estopState = 0;
-uint32_t estopTimer = 0;
 int returnConfirmState = 0;
 uint32_t returnConfirmTimer = 0;
 int mixerSpeedPercent = 0;
@@ -371,7 +368,6 @@ void setup() {
     mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
     mcp.pinMode(LIGHT_G, OUTPUT);
     mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-    mcp.pinMode(ESTOP_BUTTON_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_RIGHT_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_LEFT_PIN, INPUT_PULLUP);
     mcp.pinMode(BTN_UP_PIN, INPUT_PULLUP);
@@ -465,105 +461,9 @@ void loop() {
   } else {
     digitalWrite(2, LOW);
   }
-
   static uint32_t ld = 0, ll = 0, ls = 0, lw = 0;
-  static bool lsd = !sdStatus, les = HIGH;
+  static bool lsd = !sdStatus;
   char buf[64];
-
-  // Emergency stop
-  static uint32_t haltHoldStart = 0;
-  static bool haltHoldActive = false;
-  static uint8_t lastHoldPct = 255;
-  static bool prePauseFanOn = false;
-  static bool prePauseFermFanOn = false;
-  static int prePauseSpeed = 0;
-  static FanMode prePauseFanMode = FAN_OFF;
-  bool ces = mcp.digitalRead(ESTOP_BUTTON_PIN);
-
-  if (isSystemHalted) {
-    // Long-press e-stop for 3s to reset
-    if (ces == LOW) {
-      if (!haltHoldActive) {
-        haltHoldActive = true;
-        haltHoldStart = millis();
-        lastHoldPct = 255;
-      }
-      uint32_t held = millis() - haltHoldStart;
-      uint8_t pct = (uint8_t)min(held * 100 / 3000UL, 100UL);
-      if (pct != lastHoldPct) {
-        lastHoldPct = pct;
-        tft.fillRect(40, 300, 240, 20, TFT_DARKGREY);
-        tft.fillRect(40, 300, (int)(240 * pct / 100), 20, TFT_WHITE);
-        tft.drawRect(40, 300, 240, 20, TFT_WHITE);
-      }
-      if (held >= 3000) {
-        isSystemHalted = false;
-        haltHoldActive = false;
-        pidTestRunning = false;
-        activeBrewStage = -1;
-        currentHeatingPercent = 0;
-        currentAppState = START_MENU;
-        menuNeedsFullRedraw = true;
-        drawStartMenu();
-      }
-    } else {
-      if (haltHoldActive) {
-        haltHoldActive = false;
-        // Reset progress bar
-        tft.fillRect(40, 300, 240, 20, TFT_RED);
-        tft.drawRect(40, 300, 240, 20, TFT_WHITE);
-      }
-    }
-    les = ces;
-    return;
-  }
-
-  // Detect ESTOP Button
-  if (ces == LOW && les == HIGH) {
-    if (estopState == 0) {
-      prePauseFanOn = isFanOn;
-      prePauseFermFanOn = isFermFanOn;
-      prePauseSpeed = currentSpeedPercent;
-      prePauseFanMode = currentFanMode;
-      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-      setFanSpeed(0);
-      digitalWrite(SSR_PREHEAT, LOW);
-      digitalWrite(SSR_FERM, LOW);
-      digitalWrite(SSR_PAST, LOW);
-      estopState = 1;
-      drawEstopPage();
-    } else if (estopState == 1) {
-      isSystemHalted = true;
-      estopState = 0;
-      haltHoldActive = false;
-      for (int i = 0; i < 8; i++)
-        mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
-      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-      setFanSpeed(0);
-      setMixerSpeed(0);
-      currentMixerMode = MIXER_OFF;
-      mixerRunning = false;
-      isFanOn = false;
-      isFermFanOn = false;
-      pidTestRunning = false;
-      activeBrewStage = -1;
-      currentHeatingPercent = 0;
-      digitalWrite(SSR_PREHEAT, LOW);
-      digitalWrite(SSR_FERM, LOW);
-      digitalWrite(SSR_PAST, LOW);
-      tft.fillScreen(TFT_RED);
-      tft.setTextColor(TFT_WHITE);
-      tft.drawCentreString("SYSTEM HALTED", 160, 80, 4);
-      tft.drawCentreString("HOLD ESTOP 3s TO RESET", 160, 200, 2);
-      tft.fillRect(40, 300, 240, 20, TFT_RED);
-      tft.drawRect(40, 300, 240, 20, TFT_WHITE);
-    }
-  }
-  les = ces;
 
   // Button reads
   bool rawRight = (mcp.digitalRead(BTN_RIGHT_PIN) == LOW);

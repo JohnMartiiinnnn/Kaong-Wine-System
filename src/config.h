@@ -41,7 +41,7 @@ const int BTN_LEFT_PIN = 1;      // GPA1
 const int BTN_UP_PIN = 2;        // GPA2
 const int BTN_DOWN_PIN = 3;      // GPA3
 const int BTN_SELECT_PIN = 4;    // GPA4
-const int ESTOP_BUTTON_PIN = 6;  // GPA6
+
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
@@ -186,9 +186,6 @@ extern bool isLight1On;
 extern bool isLight2On;
 extern bool isLight3On;
 extern FanMode currentFanMode;
-extern bool isSystemHalted;
-extern int estopState;
-extern uint32_t estopTimer;
 extern int returnConfirmState;
 extern uint32_t returnConfirmTimer;
 extern int mixerSpeedPercent;
