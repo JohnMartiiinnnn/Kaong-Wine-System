@@ -44,6 +44,7 @@ typedef struct __attribute__((packed)) {
   float room2Pres;
   float phValue;
   float room2LiquidTemp;
+  float motorSenseVolts; // Volts on BTS7960 current sense
   uint8_t sensor2Status; // 0: Not Found, 1: BME280, 2: BMP280
   uint8_t adsStatus;     // 0: Not Found, 1: Connected
   uint8_t ds18Status;    // 0: Not Found, 1: Connected
@@ -286,7 +287,7 @@ void loop() {
     txData.room2LiquidTemp = -127.0;
   }
 
-  // 4. Update pH data
+  // 4. Update pH data and Motor Current Sense
   if (txData.adsStatus == 1) {
     int16_t results = ads.readADC_SingleEnded(0);
     float voltage = ads.computeVolts(results);
@@ -295,6 +296,12 @@ void loop() {
     float tempC = (txData.ds18Status == 1) ? txData.room2LiquidTemp : 25.0;
     float slope_V_pH = 0.17126 * (tempC + 273.15) / 298.15;
     txData.phValue = 7.0 - (voltage - 2.555) / slope_V_pH;
+
+    // Read channel A1 for BTS7960 current sense
+    int16_t results_motor = ads.readADC_SingleEnded(1);
+    txData.motorSenseVolts = ads.computeVolts(results_motor);
+  } else {
+    txData.motorSenseVolts = 0.0f;
   }
 
   // 5. UART Transmission — copy under lock so BLE callback can't tear a field

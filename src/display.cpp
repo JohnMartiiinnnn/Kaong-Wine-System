@@ -649,6 +649,16 @@ void drawMotorTestMenu() {
   sprintf(buf, "%d%%", motorTestSpeed);
   tft.drawCentreString(buf, CENTER_X, 115, 7);
 
+  char telemetryBuf[64];
+  float rpmVal = 0.0f;
+  if (motorTestSpeed > 0 && incomingData.motorSenseVolts > 0.01f) {
+    rpmVal = 66.0f - 160.19f * (incomingData.motorSenseVolts - 0.035f);
+    if (rpmVal < 0.0f) rpmVal = 0.0f;
+    if (rpmVal > 66.0f) rpmVal = 66.0f;
+  }
+  sprintf(telemetryBuf, "V: %.3fV  RPM: %.1f", incomingData.motorSenseVolts, rpmVal);
+  tft.drawCentreString(telemetryBuf, CENTER_X, 168, 2);
+
   // Direction tile
   uint16_t dirColor = motorTestCW ? 0x001F : 0xF800;
   tft.fillRect(20, 220, 280, 130, dirColor);
@@ -853,10 +863,21 @@ void drawMixerMenu() {
   char buf[32];
   sprintf(buf, "%d%%", mixerSpeedPercent);
   tft.drawCentreString(buf, CENTER_X, 262, 4);
+
+  char telemetryBuf[64];
+  float rpmVal = 0.0f;
+  if (mixerSpeedPercent > 0 && incomingData.motorSenseVolts > 0.01f) {
+    rpmVal = 66.0f - 160.19f * (incomingData.motorSenseVolts - 0.035f);
+    if (rpmVal < 0.0f) rpmVal = 0.0f;
+    if (rpmVal > 66.0f) rpmVal = 66.0f;
+  }
+  sprintf(telemetryBuf, "V: %.3fV  RPM: %.1f", incomingData.motorSenseVolts, rpmVal);
+  tft.drawCentreString(telemetryBuf, CENTER_X, 292, 2);
+
   if (currentMixerMode == MIXER_MANUAL)
-    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 318, 2);
+    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 318, 1);
   else
-    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 318, 2);
+    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 318, 1);
 
   if (currentMixerMode == MIXER_AUTO) {
     uint16_t statusColor = mixerRunning ? 0x0400 : 0x3566;

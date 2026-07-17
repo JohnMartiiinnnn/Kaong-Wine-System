@@ -123,6 +123,7 @@ typedef struct __attribute__((packed)) {
   float room2Pres;
   float phValue;
   float room2LiquidTemp;
+  float motorSenseVolts; // Volts on BTS7960 current sense
   uint8_t sensor2Status;
   uint8_t adsStatus;
   uint8_t ds18Status;

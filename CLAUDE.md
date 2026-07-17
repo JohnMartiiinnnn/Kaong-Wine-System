@@ -365,6 +365,11 @@ Options in `MIXER CONTROL`:
 3.  **Auto Mode:** Confirm that it starts mixing on initial activation, running for 5 minutes (`MIXER_ON_MS`) and sleeping for 355 minutes (`MIXER_OFF_MS`).
 4.  **ESTOP:** Confirm that pressing the emergency stop de-energizes the mixing motor instantly.
 
+### Speed Feedback, RPM Estimation & Stall Protection
+The JGB37 mixing motor speed is estimated by measuring the output voltage on the BTS7960's current sense (`IS`) pins, which are connected to ADS1115 Channel A1 (Secondary ESP32) with a 1kΩ pull-down resistor to GND.
+*   **RPM Equation:** `RPM = 66.0f - 160.19f * (SenseVoltage - 0.035f)` (range-bounded `[0.0, 66.0]`).
+*   **Stall Limit Protection:** If `SenseVoltage` exceeds `0.353 V` (representing `3.0 A` current draw) for more than `3 consecutive seconds`, the Primary Controller automatically shuts down the motor (turns off auto/manual mixing, sets speed to `0%`, and sends stop commands to Secondary) to prevent gearbox damage or motor winding burnouts.
+
 ---
 
 ## 9. UART Calibration Bridge (for Enclosed Secondary ESP32)

@@ -244,16 +244,6 @@ void setFanSpeed(int percent) {
                                : map(percent, 0, 100, 255, 0));
 }
 
-// ---- Mixer Speed Helper ----
-void setMixerSpeed(int percent) {
-  if (percent < 0)
-    percent = 0;
-  if (percent > 100)
-    percent = 100;
-  mixerSpeedPercent = percent;
-  ledcWrite(MOTOR_PWM_CHANNEL, map(percent, 0, 100, 0, 255));
-}
-
 // ---- Motor Command Sender ----
 void sendMotorCommand(int speed, bool cw) {
   motor_cmd_t cmd;
@@ -265,6 +255,17 @@ void sendMotorCommand(int speed, bool cw) {
   for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
     cmd.checksum ^= p[i];
   Serial2.write((uint8_t *)&cmd, sizeof(cmd));
+}
+
+// ---- Mixer Speed Helper ----
+void setMixerSpeed(int percent) {
+  if (percent < 0)
+    percent = 0;
+  if (percent > 100)
+    percent = 100;
+  mixerSpeedPercent = percent;
+  ledcWrite(MOTOR_PWM_CHANNEL, map(percent, 0, 100, 0, 255));
+  sendMotorCommand(percent, true);
 }
 
 // ---- Flow Sensor ISRs ----
@@ -2023,6 +2024,26 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
+      // Stall Limit Protection for Mixing Motor:
+      // If voltage on A1 exceeds 0.353V (3.0A) for > 3 consecutive seconds, shut down motor.
+      static uint32_t lastStallExceededMs = 0;
+      if (incomingData.motorSenseVolts > 0.353f) {
+        if (lastStallExceededMs == 0) {
+          lastStallExceededMs = millis();
+        } else if (millis() - lastStallExceededMs > 3000UL) {
+          if (mixerSpeedPercent > 0 || motorTestSpeed > 0) {
+            setMixerSpeed(0);
+            motorTestSpeed = 0;
+            currentMixerMode = MIXER_OFF;
+            mixerRunning = false;
+            sendMotorCommand(0, true);
+            Serial.println("ALERT: MIXER MOTOR STALL DETECTED! CUTTING POWER!");
+          }
+        }
+      } else {
+        lastStallExceededMs = 0;
+      }
+
       // Check for new RAPT Pill telemetry update
       if (incomingData.pillGravity > 0.1f) {
         static float lastPillTemp = -999.0f;
@@ -2677,6 +2698,12 @@ void loop() {
 
     if (currentAppState == RAPT_TEST_MENU)
       drawRaptTestPage(true);
+
+    if (currentAppState == MIXER_MENU)
+      drawMixerMenu();
+
+    if (currentAppState == MOTOR_TEST_MENU)
+      drawMotorTestMenu();
 
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();
