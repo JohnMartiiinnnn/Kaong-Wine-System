@@ -365,79 +365,129 @@ void drawLoadCellPage(bool valuesOnly) {
   if (!valuesOnly) {
     if (loadCellNeedsFullRedraw) {
       // Header
-      tft.fillRect(0, 0, 320, 50, 0x0493);
+      tft.fillRect(0, 0, 320, 50, 0x0493); // Dark slate header
       tft.fillRect(0, 50, 320, 430, TFT_WHITE);
       tft.setTextColor(TFT_WHITE);
-      tft.drawString("LOAD CELL", 10, 15, 4);
+      tft.drawString("SCALE CALIBRATION", 10, 15, 4);
       loadCellNeedsFullRedraw = false;
     }
 
-    // Weight display box (static frame)
-    tft.fillRect(10, 58, 300, 72, 0xCE79);
-    tft.drawRect(10, 58, 300, 72, TFT_DARKGREY);
+    // Live Weight Box Frame
+    tft.fillRect(10, 58, 300, 75, 0xCE79);
+    tft.drawRect(10, 58, 300, 75, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xCE79);
-    tft.drawCentreString("LIVE WEIGHT", CENTER_X, 63, 2);
+    tft.drawCentreString("LIVE NET WEIGHT", CENTER_X, 63, 2);
 
-    // TARE row
-    uint16_t tareBg = (loadCellSelection == 0) ? 0x3566 : 0xD6BA;
-    uint16_t tareTxt = (loadCellSelection == 0) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 142, 300, 65, tareBg);
-    tft.drawRect(10, 142, 300, 65, TFT_DARKGREY);
-    tft.setTextColor(tareTxt, tareBg);
-    tft.drawString("TARE", 25, 161, 4);
-    tft.drawRightString("SELECT TO ZERO", 290, 165, 2);
+    // Draw the 5 selectable tiles
+    const char *labels[] = {
+      "1. TARE EMPTY SCALE",
+      "2. MEASURE CHAMBER",
+      "3. KNOWN WEIGHT",
+      "4. CALIBRATE (ADD W)",
+      "5. CAL FACTOR (MAN)"
+    };
 
-    // CAL FACTOR row
-    uint16_t calBg =
-        (loadCellSelection == 1) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
-    uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 217, 300, 65, calBg);
-    tft.drawRect(10, 217, 300, 65, TFT_DARKGREY);
-    tft.setTextColor(calTxt, calBg);
-    tft.drawString("CAL FACTOR", 25, 236, 4);
-    sprintf(b, "%.2f", calibrationFactor);
-    tft.drawRightString(b, 290, 240, 2);
+    for (int i = 0; i < 5; i++) {
+      int y = 142 + (i * 50);
+      bool selected = (loadCellSelection == i);
+      // If editing this row, show a distinct green color
+      uint16_t bg = selected ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+      uint16_t fg = selected ? TFT_WHITE : TFT_BLACK;
+
+      tft.fillRect(10, y, 300, 42, bg);
+      tft.drawRect(10, y, 300, 42, TFT_DARKGREY);
+      tft.setTextColor(fg, bg);
+      tft.drawString(labels[i], 20, y + 13, 2);
+
+      // Draw values on the right side of the tile
+      if (i == 0) {
+        tft.drawRightString("SELECT", 290, y + 13, 2);
+      } else if (i == 1) {
+        sprintf(b, "%.2f kg", chamberEmptyWeight);
+        tft.drawRightString(b, 290, y + 13, 2);
+      } else if (i == 2) {
+        const char *wtStrings[] = {"1.10 kg", "2.25 kg", "3.35 kg"};
+        if (selected && wizardEditing) {
+          sprintf(b, "[ %s ]", wtStrings[calibWeightIndex]);
+        } else {
+          sprintf(b, "%s", wtStrings[calibWeightIndex]);
+        }
+        tft.drawRightString(b, 290, y + 13, 2);
+      } else if (i == 3) {
+        tft.drawRightString("START", 290, y + 13, 2);
+      } else if (i == 4) {
+        sprintf(b, "%.2f", calibrationFactor);
+        tft.drawRightString(b, 290, y + 13, 2);
+      }
+    }
 
     // HX711 status bar
     uint16_t statusBg = hx711Status ? 0x0400 : TFT_RED;
-    tft.fillRect(10, 292, 300, 45, statusBg);
-    tft.drawRect(10, 292, 300, 45, TFT_DARKGREY);
+    tft.fillRect(10, 392, 300, 30, statusBg);
+    tft.drawRect(10, 392, 300, 30, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(hx711Status ? "HX711  OK" : "HX711  FAILED", CENTER_X,
-                         308, 2);
+    tft.drawCentreString(hx711Status ? "HX711  OK" : "HX711  FAILED", CENTER_X, 399, 2);
 
     // Navigation hints
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP / DOWN : NAVIGATE", CENTER_X, 352, 2);
-    tft.drawCentreString("LEFT / RIGHT : ADJUST FACTOR  +-10", CENTER_X, 375,
-                         2);
-    tft.drawCentreString("RETURN : GO BACK", CENTER_X, 450, 2);
+    tft.drawCentreString("UP/DOWN: NAV   LEFT/RIGHT: EDIT VALUE", CENTER_X, 432, 1);
+    tft.drawCentreString("RETURN: GO BACK", CENTER_X, 458, 2);
   }
 
-  // Live weight value — always update
-  sprintf(b, "%.2f L", currentWeight);
+  // Live weight value — always update in place
+  sprintf(b, "%.2f kg", currentWeight);
   tft.setTextColor(TFT_BLACK, 0xCE79);
   tft.setTextPadding(200);
-  tft.drawCentreString(b, CENTER_X, 82, 4);
+  tft.drawCentreString(b, CENTER_X, 80, 4);
 
   // Show raw ADC value below the live weight for debugging
   sprintf(b, "RAW: %ld", rawHX711);
   tft.setTextPadding(150);
   tft.drawCentreString(b, CENTER_X, 108, 2);
-
   tft.setTextPadding(0);
 
-  // Always refresh cal factor value in case it changed
-  if (!valuesOnly)
-    return;
-  uint16_t calBg =
-      (loadCellSelection == 1) ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
-  uint16_t calTxt = (loadCellSelection == 1) ? TFT_WHITE : TFT_BLACK;
-  sprintf(b, "%.2f", calibrationFactor);
-  tft.setTextColor(calTxt, calBg);
-  tft.setTextPadding(120);
-  tft.drawRightString(b, 290, 240, 2);
-  tft.setTextPadding(0);
+  // If in valuesOnly mode, we also update the value strings in place for any changing values
+  if (valuesOnly) {
+    // Update empty chamber weight row (Row 1)
+    {
+      int y = 142 + 50;
+      bool selected = (loadCellSelection == 1);
+      uint16_t bg = selected ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+      uint16_t fg = selected ? TFT_WHITE : TFT_BLACK;
+      tft.setTextColor(fg, bg);
+      tft.setTextPadding(100);
+      sprintf(b, "%.2f kg", chamberEmptyWeight);
+      tft.drawRightString(b, 290, y + 13, 2);
+    }
+    // Update known weight row (Row 2)
+    {
+      int y = 142 + 100;
+      bool selected = (loadCellSelection == 2);
+      uint16_t bg = selected ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+      uint16_t fg = selected ? TFT_WHITE : TFT_BLACK;
+      tft.setTextColor(fg, bg);
+      tft.setTextPadding(100);
+      const char *wtStrings[] = {"1.10 kg", "2.25 kg", "3.35 kg"};
+      if (selected && wizardEditing) {
+        sprintf(b, "[ %s ]", wtStrings[calibWeightIndex]);
+      } else {
+        sprintf(b, "%s", wtStrings[calibWeightIndex]);
+      }
+      tft.drawRightString(b, 290, y + 13, 2);
+    }
+    // Update cal factor row (Row 4)
+    {
+      int y = 142 + 200;
+      bool selected = (loadCellSelection == 4);
+      uint16_t bg = selected ? (wizardEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+      uint16_t fg = selected ? TFT_WHITE : TFT_BLACK;
+      tft.setTextColor(fg, bg);
+      tft.setTextPadding(100);
+      sprintf(b, "%.2f", calibrationFactor);
+      tft.drawRightString(b, 290, y + 13, 2);
+    }
+    tft.setTextPadding(0);
+  }
 }
 
 void drawSystemCheckMenu() {
@@ -616,9 +666,6 @@ void drawRelayTestMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("RELAY TEST", 10, 15, 4);
-    tft.fillRect(0, 52, 320, 28, 0xFFE0);
-    tft.setTextColor(TFT_BLACK, 0xFFE0);
-    tft.drawCentreString("! PUMPS + FANS WILL ENERGIZE !", CENTER_X, 60, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 458, 1);
     relayTestNeedsFullRedraw = false;
@@ -638,18 +685,18 @@ void drawRelayTestMenu() {
 
   // Draw Relays (indices 0 to 8)
   for (int i = 0; i < 9; i++) {
-    int y = 85 + (i * 36);
+    int y = 60 + (i * 38);
     bool selected = (relayTestSelection == i);
     uint16_t color = selected ? 0x3566 : 0xD6BA;
     uint16_t txtColor = selected ? TFT_WHITE : TFT_BLACK;
     uint16_t ledColor = testRelayStates[i] ? TFT_GREEN : TFT_DARKGREY;
 
-    tft.fillRect(15, y, 290, 32, color);
-    tft.drawRect(15, y, 290, 32, TFT_DARKGREY);
+    tft.fillRect(15, y, 290, 34, color);
+    tft.drawRect(15, y, 290, 34, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawString(labels[i], 30, y + 8, 2);
-    tft.fillCircle(280, y + 16, 8, ledColor);
-    tft.drawCircle(280, y + 16, 8, TFT_BLACK);
+    tft.drawString(labels[i], 30, y + 9, 2);
+    tft.fillCircle(280, y + 17, 8, ledColor);
+    tft.drawCircle(280, y + 17, 8, TFT_BLACK);
   }
 }
 
