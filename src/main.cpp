@@ -461,6 +461,7 @@ void loop() {
   } else {
     digitalWrite(2, LOW);
   }
+
   static uint32_t ld = 0, ll = 0, ls = 0, lw = 0;
   static bool lsd = !sdStatus;
   char buf[64];
@@ -553,113 +554,6 @@ void loop() {
   bool cUp = latchedUp;
   bool cDown = latchedDown;
   bool cSelect = latchedSelect;
-
-  // E-stop confirm state
-  if (estopState == 1) {
-    if (cLeft && !ljLeft) {
-      estopState = 0;
-      isFanOn = prePauseFanOn;
-      isFermFanOn = prePauseFermFanOn;
-      currentFanMode = prePauseFanMode;
-      mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
-      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, isFermFanOn ? RELAY_ON : RELAY_OFF);
-      setFanSpeed(prePauseSpeed);
-      switch (currentAppState) {
-      case START_MENU:
-        menuNeedsFullRedraw = true;
-        drawStartMenu();
-        break;
-      case DASHBOARD_ACTIVE:
-        dashNeedsFullRedraw = true;
-        drawDashboardLayout();
-        break;
-      case COOLING_MENU:
-        drawCoolingMenu();
-        break;
-      case MIXER_MENU:
-        drawMixerMenu();
-        break;
-      case SENSOR_MONITOR:
-        monitorNeedsFullRedraw = true;
-        drawSensorMonitorPage();
-        break;
-      case CALIBRATION_MODE:
-        calNeedsFullRedraw = true;
-        drawCalibrationPage();
-        break;
-      case LOAD_CELL_PAGE:
-        loadCellNeedsFullRedraw = true;
-        drawLoadCellPage();
-        break;
-      case SYSTEM_CHECK_MENU:
-        systemCheckNeedsFullRedraw = true;
-        drawSystemCheckMenu();
-        break;
-      case PID_TEST_PICK:
-        pidTestNeedsFullRedraw = true;
-        drawPidTestPick();
-        break;
-      case PID_TEST_MENU:
-        pidTestNeedsFullRedraw = true;
-        drawPidTestMenu();
-        break;
-      case TRANSFER_TEST_MENU:
-        transferTestNeedsFullRedraw = true;
-        drawTransferTestMenu();
-        break;
-      case FLOW_CAL_MENU:
-        flowCalNeedsFullRedraw = true;
-        drawFlowCalMenu();
-        break;
-      case HEATER_TEST_PICK:
-        heaterTestNeedsFullRedraw = true;
-        drawHeaterTestPick();
-        break;
-      case HEATER_TEST_MENU:
-        heaterTestRunning = false;
-        heaterTestEditing = false;
-        heaterTestPercent = 0;
-        heaterTestSelection = 0;
-        currentHeatingPercent = 0;
-        heaterTestNeedsFullRedraw = true;
-        currentAppState = HEATER_TEST_PICK;
-        drawHeaterTestPick();
-        break;
-      case FAN_TEST_PICK:
-        fanTestNeedsFullRedraw = true;
-        drawFanTestPick();
-        break;
-      case FAN_TEST_MENU:
-        fanTestNeedsFullRedraw = true;
-        drawFanTestMenu();
-        break;
-      case LIGHT_TEST_MENU:
-        lightTestNeedsFullRedraw = true;
-        drawLightTestMenu();
-        break;
-      case RELAY_TEST_MENU:
-        relayTestNeedsFullRedraw = true;
-        drawRelayTestMenu();
-        break;
-      case MOTOR_TEST_MENU:
-        motorTestNeedsFullRedraw = true;
-        drawMotorTestMenu();
-        break;
-      case STAGE_PARAM_MENU:
-        stageParamNeedsFullRedraw = true;
-        drawStageParamMenu();
-        break;
-      default:
-        currentHeatingPercent = 0;
-        menuNeedsFullRedraw = true;
-        drawStartMenu();
-        break;
-      }
-    }
-    ljLeft = cLeft;
-    return;
-  }
 
   // Return confirm state
   if (returnConfirmState == 1) {

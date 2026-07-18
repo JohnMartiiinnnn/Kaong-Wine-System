@@ -195,7 +195,6 @@ tft.drawCentreString("Line 2 hints   RETURN: BACK", CENTER_X, 462, 1);
 3. Add draw function declaration to `display.h`
 4. Implement draw function in `display.cpp` following the layout/color rules above
 5. Add state transitions in `main.cpp` (SELECT to enter, LEFT to exit, set `xxxNeedsFullRedraw = true` on entry)
-6. Set `needsFullRedraw = true` in the ESTOP resume block if appropriate
 
 ### No `fillScreen` — draw header color first
 Never use `tft.fillScreen(TFT_WHITE)` in any draw function. It writes all 153,600 pixels before any content appears, causing a white flash on every screen transition. Instead:
@@ -363,7 +362,6 @@ Options in `MIXER CONTROL`:
 1.  **Bench Power:** Apply VM=12V, VCC=3.3V, tie STBY/AIN1 HIGH, AIN2 LOW. Connect PWMA to 3.3V. Motor should spin CW.
 2.  **Manual Mode:** Navigate to mixer control, set to MANUAL, verify speed adjustments in 10% increments.
 3.  **Auto Mode:** Confirm that it starts mixing on initial activation, running for 5 minutes (`MIXER_ON_MS`) and sleeping for 355 minutes (`MIXER_OFF_MS`).
-4.  **ESTOP:** Confirm that pressing the emergency stop de-energizes the mixing motor instantly.
 
 ### Speed Feedback, RPM Estimation & Stall Protection
 The JGB37 mixing motor speed is estimated by measuring the output voltage on the BTS7960's current sense (`IS`) pins, which are connected to ADS1115 Channel A1 (Secondary ESP32) with a 1kΩ pull-down resistor to GND.
@@ -428,7 +426,7 @@ Because the Secondary ESP32 is inside the fermentation enclosure, its USB port i
 | **GPA3** | `BTN_DOWN_PIN` | Keypad DOWN |
 | **GPA4** | `BTN_SELECT_PIN` | Keypad SELECT |
 | **GPA5** | — | Unused |
-| **GPA6** | `ESTOP_BUTTON_PIN` | Emergency stop |
+| **GPA6** | — | Unused |
 | **GPA7** | `FAN_RELAY_PIN` | Pre-heating fan relay |
 | **GPB0** | `FERM_FAN_RELAY_PIN`  | Fermentation fan relay 1 |
 | **GPB1** | `FERM_FAN2_RELAY_PIN` | Fermentation fan relay 2 |

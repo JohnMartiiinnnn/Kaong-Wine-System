@@ -21,16 +21,6 @@ void drawReturnConfirmation() {
   tft.drawCentreString("TO CONFIRM", 160, 250, 2);
 }
 
-void drawEstopPage() {
-  tft.fillScreen(TFT_BLACK);
-  tft.drawRect(10, 10, 300, 460, TFT_RED);
-  tft.setTextColor(TFT_RED);
-  tft.drawCentreString("EMERGENCY STOP", 160, 100, 4);
-  tft.setTextColor(TFT_WHITE);
-  tft.drawCentreString("ARE YOU SURE?", 160, 180, 2);
-  tft.drawCentreString("CLICK AGAIN TO HALT", 160, 220, 2);
-  tft.drawCentreString("RETURN TO CANCEL", 160, 260, 2);
-}
 
 void drawCoolingMenu() {
   tft.fillRect(0, 0, 320, 50, 0x03E0);

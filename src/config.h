@@ -42,7 +42,6 @@ const int BTN_UP_PIN = 2;        // GPA2
 const int BTN_DOWN_PIN = 3;      // GPA3
 const int BTN_SELECT_PIN = 4;    // GPA4
 
-
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
 #define GRAVITY_OFFSET 0.009
@@ -186,6 +185,9 @@ extern bool isLight1On;
 extern bool isLight2On;
 extern bool isLight3On;
 extern FanMode currentFanMode;
+extern bool isSystemHalted;
+extern int estopState;
+extern uint32_t estopTimer;
 extern int returnConfirmState;
 extern uint32_t returnConfirmTimer;
 extern int mixerSpeedPercent;

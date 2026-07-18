@@ -3,7 +3,6 @@
 
 void drawSplashScreen();
 void drawReturnConfirmation();
-void drawEstopPage();
 void drawCoolingMenu();
 void drawMixerMenu();
 void drawNewBrewWizard();
