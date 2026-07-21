@@ -2398,22 +2398,20 @@ void drawPhFermMenu(bool valuesOnly) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawCentreString("PH & FERM TEMP", CENTER_X, 15, 4);
+    // Pseudo-bold: draw twice at 1px vertical offset
+    tft.drawCentreString("PH & FERM TEMP", CENTER_X, 11, 4);
+    tft.drawCentreString("PH & FERM TEMP", CENTER_X, 12, 4);
 
     tft.fillRect(0, 52, 320, 28, 0x4208);
     tft.setTextColor(TFT_WHITE, 0x4208);
     tft.drawCentreString("pH SLOPE COMPENSATED BY LIQUID TEMP", CENTER_X, 60, 1);
 
-    // Static section labels
     tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString("pH READING (ADS1115)", CENTER_X, 84, 2);
-    tft.drawCentreString("AMBIENT (BME280)", CENTER_X, 210, 2);
-    tft.drawCentreString("LIQUID (DS18B20)", CENTER_X, 300, 2);
+    tft.drawCentreString("pH READING (ADS1115)", CENTER_X, 83, 2);
+    tft.drawCentreString("LIQUID TEMP (DS18B20)", CENTER_X, 259, 2);
 
-    // Panel outlines
-    tft.drawRect(10, 97, 300, 100, TFT_DARKGREY);
-    tft.drawRect(10, 223, 300, 66, TFT_DARKGREY);
-    tft.drawRect(10, 313, 300, 100, TFT_DARKGREY);
+    tft.drawRect(10, 100, 300, 148, TFT_DARKGREY);
+    tft.drawRect(10, 276, 300, 148, TFT_DARKGREY);
 
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
@@ -2422,55 +2420,38 @@ void drawPhFermMenu(bool valuesOnly) {
     phFermNeedsFullRedraw = false;
   }
 
-  // pH panel (y=97, h=100)
+  // pH panel (y=100, h=148): value fill 125px + status 22px
   bool adsOk = (incomingData.adsStatus == 1);
   uint16_t phBg = adsOk ? 0x2124 : 0x4208;
-  tft.fillRect(11, 98, 298, 78, phBg);
+  tft.fillRect(11, 101, 298, 125, phBg);
   tft.setTextColor(TFT_WHITE, phBg);
   if (adsOk) {
     sprintf(buf, "%.2f", incomingData.phValue);
-    tft.drawCentreString(buf, CENTER_X, 118, 6);
+    tft.drawCentreString(buf, CENTER_X, 151, 4);
   } else {
-    tft.drawCentreString("---", CENTER_X, 118, 6);
+    tft.drawCentreString("---", CENTER_X, 151, 4);
   }
   uint16_t phStatBg = adsOk ? 0x0400 : 0xF800;
-  tft.fillRect(11, 176, 298, 20, phStatBg);
+  tft.fillRect(11, 226, 298, 21, phStatBg);
   tft.setTextColor(TFT_WHITE, phStatBg);
-  tft.drawCentreString(adsOk ? "OK" : "ERROR", CENTER_X, 180, 1);
+  tft.drawCentreString(adsOk ? "OK" : "ERROR", CENTER_X, 230, 1);
 
-  // Ambient panel (y=223, h=66)
-  bool ambOk = (incomingData.sensor2Status > 0);
-  uint16_t ambBg = ambOk ? 0x2124 : 0x4208;
-  tft.fillRect(11, 224, 298, 44, ambBg);
-  tft.setTextColor(TFT_WHITE, ambBg);
-  if (ambOk) {
-    float t = incomingData.room2Temp + fermTempOffset;
-    sprintf(buf, "%.1f C", t);
-    tft.drawCentreString(buf, CENTER_X, 234, 4);
-  } else {
-    tft.drawCentreString("---", CENTER_X, 234, 4);
-  }
-  uint16_t ambStatBg = ambOk ? 0x0400 : 0xF800;
-  tft.fillRect(11, 268, 298, 20, ambStatBg);
-  tft.setTextColor(TFT_WHITE, ambStatBg);
-  tft.drawCentreString(ambOk ? "OK" : "NO DATA", CENTER_X, 272, 1);
-
-  // Liquid panel (y=313, h=100)
+  // Liquid panel (y=276, h=148): value fill 125px + status 22px
   bool liqOk = (incomingData.ds18Status == 1)
                && (incomingData.room2LiquidTemp > -100.0f);
   uint16_t liqBg = liqOk ? 0x2124 : 0x4208;
-  tft.fillRect(11, 314, 298, 78, liqBg);
+  tft.fillRect(11, 277, 298, 125, liqBg);
   tft.setTextColor(TFT_WHITE, liqBg);
   if (liqOk) {
     float t = incomingData.room2LiquidTemp + fermTempOffset;
     sprintf(buf, "%.1f C", t);
-    tft.drawCentreString(buf, CENTER_X, 334, 6);
+    tft.drawCentreString(buf, CENTER_X, 327, 4);
   } else {
-    tft.drawCentreString("---", CENTER_X, 334, 6);
+    tft.drawCentreString("---", CENTER_X, 327, 4);
   }
   uint16_t liqStatBg = liqOk ? 0x0400 : 0xF800;
-  tft.fillRect(11, 392, 298, 20, liqStatBg);
+  tft.fillRect(11, 402, 298, 21, liqStatBg);
   tft.setTextColor(TFT_WHITE, liqStatBg);
-  tft.drawCentreString(liqOk ? "OK" : "NO DATA", CENTER_X, 396, 1);
+  tft.drawCentreString(liqOk ? "OK" : "NO DATA", CENTER_X, 406, 1);
 }
 
