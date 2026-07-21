@@ -355,4 +355,5 @@ void loop() {
   if (!pBLEScan->isScanning()) {
     pBLEScan->start(0, nullptr, false);
   }
+  delay(10); // Yield to prevent Task Watchdog reset
 }
