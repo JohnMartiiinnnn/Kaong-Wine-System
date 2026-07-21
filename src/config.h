@@ -131,6 +131,8 @@ typedef struct __attribute__((packed)) {
   int16_t pillRSSI;
   uint8_t checksum;
 } struct_message;
+static_assert(sizeof(struct_message) == 40, "struct_message size must be 40 bytes");
+
 
 struct RaptLog {
   float gravity;

@@ -53,6 +53,8 @@ typedef struct __attribute__((packed)) {
   int16_t pillRSSI;      // Signal Strength
   uint8_t checksum;      // For data integrity
 } struct_message;
+static_assert(sizeof(struct_message) == 40, "struct_message size must be 40 bytes");
+
 
 struct_message txData;
 static portMUX_TYPE txDataMux = portMUX_INITIALIZER_UNLOCKED;
@@ -313,9 +315,14 @@ void loop() {
     snapshot.signature = 0xDEADBEEF;
     snapshot.checksum = calculateChecksum(snapshot);
     Serial2.write((uint8_t *)&snapshot, sizeof(snapshot));
+
+    // 6. BLE scanning check — happens in background via callbacks (check once per second)
+    if (!pBLEScan->isScanning()) {
+      pBLEScan->start(0, nullptr, false);
+    }
   }
 
-  // 6. Receive motor commands from main ESP32 (RUNS EVERY LOOP ITERATION, NO DELAY)
+  // 7. Receive motor commands from main ESP32 (RUNS EVERY LOOP ITERATION, NO DELAY)
   while (Serial2.available() >= (int)sizeof(motor_cmd_t)) {
     if (Serial2.peek() != 0xBE) {
       Serial.printf("Discarding non-BE byte: 0x%02X\n", Serial2.read());
@@ -350,9 +357,5 @@ void loop() {
     }
   }
 
-  // BLE scanning happens in the background via callbacks
-  if (!pBLEScan->isScanning()) {
-    pBLEScan->start(0, nullptr, false);
-  }
   delay(10); // Yield to prevent Task Watchdog reset
 }

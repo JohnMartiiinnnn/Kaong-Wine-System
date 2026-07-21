@@ -1812,7 +1812,8 @@ void loop() {
       break;
     struct_message t;
     Serial2.readBytes((uint8_t *)&t, sizeof(t));
-    if (t.signature == 0xDEADBEEF && calculateChecksum(t) == t.checksum) {
+    uint8_t calc_cs = calculateChecksum(t);
+    if (t.signature == 0xDEADBEEF && calc_cs == t.checksum) {
       incomingData = t;
       uartPacketCount++;
       incomingData.pillGravity += GRAVITY_OFFSET;
@@ -1837,7 +1838,6 @@ void loop() {
       } else {
         lastStallExceededMs = 0;
       }
-
       // Check for new RAPT Pill telemetry update
       if (incomingData.pillGravity > 0.1f) {
         static float lastPillTemp = -999.0f;
@@ -1885,6 +1885,8 @@ void loop() {
       }
     } else {
       uartChecksumErrors++;
+      Serial.printf("[UART Error] Recv sig=0x%08X (expected 0xDEADBEEF), cs=0x%02X, calc_cs=0x%02X\n",
+                    t.signature, t.checksum, calc_cs);
     }
   }
 
