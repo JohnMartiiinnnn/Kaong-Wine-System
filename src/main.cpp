@@ -120,6 +120,7 @@ bool testRelayStates[9] = {false, false, false, false, false,
 bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
+bool motorTestOn = false;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 int pidTestChoice = 0;
@@ -689,7 +690,7 @@ void loop() {
       motorTestSpeed -= 25;
       if (motorTestSpeed < 0)
         motorTestSpeed = 0;
-      sendMotorCommand(motorTestSpeed, motorTestCW);
+      if (motorTestOn) sendMotorCommand(motorTestSpeed, true);
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (cDown && !ljDown) {
@@ -835,7 +836,7 @@ void loop() {
       motorTestSpeed += 25;
       if (motorTestSpeed > 100)
         motorTestSpeed = 100;
-      sendMotorCommand(motorTestSpeed, motorTestCW);
+      if (motorTestOn) sendMotorCommand(motorTestSpeed, true);
       drawMotorTestMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (!stageParamEditing) {
@@ -1057,6 +1058,7 @@ void loop() {
       } else if (systemCheckSelection == 3) {
         motorTestSpeed = 0;
         motorTestCW = true;
+        motorTestOn = false;
         motorTestNeedsFullRedraw = true;
         sendMotorCommand(0, true);
         currentAppState = MOTOR_TEST_MENU;
@@ -1282,8 +1284,8 @@ void loop() {
       }
       drawLightTestMenu();
     } else if (currentAppState == MOTOR_TEST_MENU) {
-      motorTestSpeed = 0;
-      sendMotorCommand(0, motorTestCW);
+      motorTestOn = !motorTestOn;
+      sendMotorCommand(motorTestOn ? motorTestSpeed : 0, true);
       drawMotorTestMenu();
     } else if (currentAppState == SENSOR_MONITOR) {
       // Removed LOAD_CELL_PAGE trigger from SENSOR_MONITOR select key
@@ -1462,12 +1464,6 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == MOTOR_TEST_MENU) {
-    motorTestCW = !motorTestCW;
-    sendMotorCommand(motorTestSpeed, motorTestCW);
-    drawMotorTestMenu();
-  }
-
   if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
       !pidTestRunning) {
     pidTestTargetSelection =
@@ -1641,8 +1637,9 @@ void loop() {
       relayTestPickNeedsFullRedraw = true;
       drawRelayTestPick();
     } else if (currentAppState == MOTOR_TEST_MENU) {
-      sendMotorCommand(0, motorTestCW);
+      sendMotorCommand(0, true);
       motorTestSpeed = 0;
+      motorTestOn = false;
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();

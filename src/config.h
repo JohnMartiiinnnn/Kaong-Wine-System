@@ -234,6 +234,7 @@ extern bool testRelayStates[9];
 extern bool motorTestNeedsFullRedraw;
 extern int  motorTestSpeed;
 extern bool motorTestCW;
+extern bool motorTestOn;
 extern bool pidTestNeedsFullRedraw;
 extern int pidTestChoice;
 extern float pidTestHeatTarget;

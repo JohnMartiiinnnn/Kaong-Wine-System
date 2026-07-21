@@ -625,8 +625,8 @@ void drawMotorTestMenu() {
     tft.setTextColor(TFT_WHITE);
     tft.drawString("MOTOR TEST", 10, 15, 4);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: SPEED   L/R: DIRECTION", CENTER_X, 447, 1);
-    tft.drawCentreString("SELECT: STOP   RETURN: BACK", CENTER_X, 462, 1);
+    tft.drawCentreString("UP/DOWN: SPEED   SELECT: ON/OFF", CENTER_X, 447, 1);
+    tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
     motorTestNeedsFullRedraw = false;
   }
 
@@ -642,22 +642,22 @@ void drawMotorTestMenu() {
 
   char telemetryBuf[64];
   float rpmVal = 0.0f;
+  float currentA = incomingData.motorSenseVolts * (3.0f / 0.353f);
   if (motorTestSpeed > 0 && incomingData.motorSenseVolts > 0.01f) {
     rpmVal = 66.0f - 160.19f * (incomingData.motorSenseVolts - 0.035f);
     if (rpmVal < 0.0f) rpmVal = 0.0f;
     if (rpmVal > 66.0f) rpmVal = 66.0f;
   }
-  sprintf(telemetryBuf, "V: %.3fV  RPM: %.1f", incomingData.motorSenseVolts, rpmVal);
+  sprintf(telemetryBuf, "%.2fA  RPM: %.1f", currentA, rpmVal);
   tft.drawCentreString(telemetryBuf, CENTER_X, 168, 2);
 
-  // Direction tile
-  uint16_t dirColor = motorTestCW ? 0x001F : 0xF800;
-  tft.fillRect(20, 220, 280, 130, dirColor);
+  // ON/OFF tile
+  uint16_t onOffColor = motorTestOn ? 0x0400 : 0x4208;
+  tft.fillRect(20, 220, 280, 130, onOffColor);
   tft.drawRect(20, 220, 280, 130, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, dirColor);
-  tft.drawCentreString("DIRECTION", CENTER_X, 235, 2);
-  tft.drawCentreString(motorTestCW ? "CLOCKWISE" : "C-CLOCKWISE", CENTER_X, 270,
-                       4);
+  tft.setTextColor(TFT_WHITE, onOffColor);
+  tft.drawCentreString("MOTOR", CENTER_X, 235, 2);
+  tft.drawCentreString(motorTestOn ? "ON" : "OFF", CENTER_X, 270, 4);
 }
 
 void drawValueTile(int x, int y, const char *label, String value,
