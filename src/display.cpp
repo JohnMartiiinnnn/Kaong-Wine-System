@@ -2439,7 +2439,7 @@ void drawPhFermMenu(bool valuesOnly) {
   tft.drawCentreString(adsOk ? "OK" : "ERROR", CENTER_X, 180, 1);
 
   // Ambient panel (y=223, h=66)
-  bool ambOk = (incomingData.sensor2Status == 1) && remoteStatusReceived;
+  bool ambOk = (incomingData.sensor2Status > 0);
   uint16_t ambBg = ambOk ? 0x2124 : 0x4208;
   tft.fillRect(11, 224, 298, 44, ambBg);
   tft.setTextColor(TFT_WHITE, ambBg);
@@ -2456,7 +2456,7 @@ void drawPhFermMenu(bool valuesOnly) {
   tft.drawCentreString(ambOk ? "OK" : "NO DATA", CENTER_X, 272, 1);
 
   // Liquid panel (y=313, h=100)
-  bool liqOk = (incomingData.ds18Status == 1) && remoteStatusReceived
+  bool liqOk = (incomingData.ds18Status == 1)
                && (incomingData.room2LiquidTemp > -100.0f);
   uint16_t liqBg = liqOk ? 0x2124 : 0x4208;
   tft.fillRect(11, 314, 298, 78, liqBg);
