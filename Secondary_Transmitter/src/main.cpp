@@ -228,33 +228,32 @@ void setup() {
   txData.checksum = calculateChecksum(txData);
   Serial2.write((uint8_t *)&txData, sizeof(txData));
 }
-
 void loop() {
   ArduinoOTA.handle();
-
-  // 1. Dynamic Sensor Status Check (In case they weren't ready at boot)
-  if (txData.sensor2Status == 0) {
-    if (bme.begin(0x77))
-      txData.sensor2Status = 1;
-    else if (bmp.begin(0x77))
-      txData.sensor2Status = 2;
-  }
-
-  if (txData.ds18Status == 0) {
-    sensors.begin();
-    if (sensors.getDeviceCount() > 0)
-      txData.ds18Status = 1;
-  }
-
-  if (txData.adsStatus == 0) {
-    if (ads.begin())
-      txData.adsStatus = 1;
-  }
 
   // Read sensors and transmit every 1000ms
   static uint32_t lastSensorSendMs = 0;
   if (millis() - lastSensorSendMs >= 1000) {
     lastSensorSendMs = millis();
+
+    // 1. Dynamic Sensor Status Check (In case they weren't ready at boot)
+    if (txData.sensor2Status == 0) {
+      if (bme.begin(0x77))
+        txData.sensor2Status = 1;
+      else if (bmp.begin(0x77))
+        txData.sensor2Status = 2;
+    }
+
+    if (txData.ds18Status == 0) {
+      sensors.begin();
+      if (sensors.getDeviceCount() > 0)
+        txData.ds18Status = 1;
+    }
+
+    if (txData.adsStatus == 0) {
+      if (ads.begin())
+        txData.adsStatus = 1;
+    }
 
     // 2. Update ambient sensor data
     if (txData.sensor2Status == 1) {
