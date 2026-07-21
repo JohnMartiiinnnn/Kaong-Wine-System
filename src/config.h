@@ -97,7 +97,8 @@ enum AppState {
   FLOW_CAL_MENU,
   HEATER_TEST_PICK,
   CALIB_WIZARD,
-  RAPT_TEST_MENU
+  RAPT_TEST_MENU,
+  PH_FERM_MENU
 };
 
 extern long rawHX711;
@@ -142,6 +143,7 @@ struct RaptLog {
 extern RaptLog raptLogs[10];
 extern int raptLogCount;
 extern bool raptTestNeedsFullRedraw;
+extern bool phFermNeedsFullRedraw;
 
 // ---- Hardware Objects (defined in main.cpp) ----
 extern Adafruit_MCP23X17 mcp;

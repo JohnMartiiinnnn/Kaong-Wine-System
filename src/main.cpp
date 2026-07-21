@@ -52,6 +52,7 @@ float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
 RaptLog raptLogs[10] = {};
 int raptLogCount = 0;
 bool raptTestNeedsFullRedraw = true;
+bool phFermNeedsFullRedraw = true;
 float preheatTempOffset =
     0.0f; // Calibration offset for Pre-heat probe (Index 1)
 float pastTempOffset =
@@ -649,7 +650,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 12;
+      systemCheckSelection = (systemCheckSelection + 1) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
@@ -797,7 +798,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 11) % 12;
+      systemCheckSelection = (systemCheckSelection + 12) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
       pidTestChoice = (pidTestChoice + 2) % 3;
@@ -1108,6 +1109,10 @@ void loop() {
         raptLogCount = 0;
         memset(raptLogs, 0, sizeof(raptLogs));
         drawRaptTestPage();
+      } else if (systemCheckSelection == 12) {
+        currentAppState = PH_FERM_MENU;
+        phFermNeedsFullRedraw = true;
+        drawPhFermMenu();
       }
     } else if (currentAppState == PID_TEST_PICK) {
       currentAppState = PID_TEST_MENU;
@@ -1562,6 +1567,10 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == RAPT_TEST_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == PH_FERM_MENU) {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -2494,6 +2503,9 @@ void loop() {
 
     if (currentAppState == RAPT_TEST_MENU)
       drawRaptTestPage(true);
+
+    if (currentAppState == PH_FERM_MENU)
+      drawPhFermMenu(true);
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();
