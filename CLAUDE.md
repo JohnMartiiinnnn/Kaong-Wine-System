@@ -370,21 +370,31 @@ The JGB37 mixing motor speed is estimated by measuring the output voltage on the
 
 ---
 
-## 9. UART Calibration Bridge (for Enclosed Secondary ESP32)
+## 9. Flashing and Calibration for Enclosed Secondary ESP32
 
-Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible. Sensor calibration is handled over the board's inter-controller UART connection (`Serial2` at 115200 baud) using a bridge mode on the Primary.
+Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible during normal operation, and direct serial monitoring is not possible. Over-the-Air (OTA) flashing is unsupported due to high maintenance. Flashing is always performed by removing the Secondary ESP32 from the enclosure and plugging it in directly via Micro-USB.
 
-### Operation Workflow
-1.  Ensure the Secondary ESP32 is running its calibration utility (flashed via OTA).
+### Flashing the Secondary ESP32
+To flash the Secondary ESP32, remove it from the enclosure and run:
+```bash
+~/.platformio/penv/bin/pio run -d Secondary_Transmitter -t upload
+```
+
+### Sensor Calibration Workflow
+Sensor calibration is handled over the board's inter-controller UART connection (`Serial2` at 115200 baud) using a bridge mode on the Primary:
+1.  Remove the Secondary ESP32 from the enclosure and flash it with the calibration utility via Micro-USB:
+    ```bash
+    ~/.platformio/penv/bin/pio run -d Secondary_Transmitter -e calibration -t upload
+    ```
 2.  Flash the Primary ESP32 with the standalone bridge utility:
     *   Command: `cd pHSensor_Calibration && ~/.platformio/penv/bin/pio run -t upload`
 3.  Open the Serial Monitor on the Primary ESP32:
     *   Command: `~/.platformio/penv/bin/pio device monitor`
-4.  The monitor will immediately stream pH and fermentation temperature readouts from the Secondary ESP32.
+4.  The monitor will stream pH and fermentation temperature readouts forwarded from the Secondary.
 5.  Calibrate the Secondary pH probe using:
     *   `7`: pH 7.0 neutral offset calibration.
     *   `4`: pH 4.0 acid slope calibration.
-6.  Once calibration is done, flash the main production code back to the Primary ESP32.
+6.  Once calibration is done, re-flash the production code back to both microcontrollers (removing Secondary from the enclosure again to flash it via Micro-USB).
 
 ---
 
