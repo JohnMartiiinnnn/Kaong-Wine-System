@@ -251,72 +251,75 @@ void loop() {
       txData.adsStatus = 1;
   }
 
-  // 2. Update ambient sensor data
-  if (txData.sensor2Status == 1) {
-    float t = bme.readTemperature();
-    if (!isnan(t)) {
-      txData.room2Temp = t;
-      txData.room2Pres = bme.readPressure() / 100.0F;
-    } else {
-      txData.sensor2Status = 0; // Mark as lost if reading fails
+  // Read sensors and transmit every 1000ms
+  static uint32_t lastSensorSendMs = 0;
+  if (millis() - lastSensorSendMs >= 1000) {
+    lastSensorSendMs = millis();
+
+    // 2. Update ambient sensor data
+    if (txData.sensor2Status == 1) {
+      float t = bme.readTemperature();
+      if (!isnan(t)) {
+        txData.room2Temp = t;
+        txData.room2Pres = bme.readPressure() / 100.0F;
+      } else {
+        txData.sensor2Status = 0; // Mark as lost if reading fails
+      }
+    } else if (txData.sensor2Status == 2) {
+      float t = bmp.readTemperature();
+      if (!isnan(t)) {
+        txData.room2Temp = t;
+        txData.room2Pres = bmp.readPressure() / 100.0F;
+      } else {
+        txData.sensor2Status = 0;
+      }
     }
-  } else if (txData.sensor2Status == 2) {
-    float t = bmp.readTemperature();
-    if (!isnan(t)) {
-      txData.room2Temp = t;
-      txData.room2Pres = bmp.readPressure() / 100.0F;
+
+    // 3. Update Liquid Temp
+    // Read result of the PREVIOUS requestTemperatures(), then request the next
+    // one. The 1000ms millis() interval covers the 750ms DS18B20 conversion.
+    if (txData.ds18Status == 1) {
+      float t = sensors.getTempCByIndex(0);
+      if (t != DEVICE_DISCONNECTED_C) {
+        txData.room2LiquidTemp = t;
+      } else {
+        txData.ds18Status = 0; // Sensor lost
+      }
+      sensors.requestTemperatures(); // Start next conversion (completes during the next 1000ms)
     } else {
-      txData.sensor2Status = 0;
+      txData.room2LiquidTemp = -127.0;
     }
+
+    // 4. Update pH data and Motor Current Sense
+    if (txData.adsStatus == 1) {
+      int16_t results = ads.readADC_SingleEnded(0);
+      float voltage = ads.computeVolts(results);
+
+      // Temperature Compensation (Nernst-based)
+      float tempC = (txData.ds18Status == 1) ? txData.room2LiquidTemp : 25.0;
+      float slope_V_pH = 0.17126 * (tempC + 273.15) / 298.15;
+      txData.phValue = 7.0 - (voltage - 2.555) / slope_V_pH;
+
+      // Read channel A1 for BTS7960 current sense
+      int16_t results_motor = ads.readADC_SingleEnded(1);
+      txData.motorSenseVolts = ads.computeVolts(results_motor);
+    } else {
+      txData.motorSenseVolts = 0.0f;
+    }
+
+    // 5. UART Transmission — copy under lock so BLE callback can't tear a field mid-send
+    portENTER_CRITICAL(&txDataMux);
+    struct_message snapshot = txData;
+    portEXIT_CRITICAL(&txDataMux);
+    snapshot.signature = 0xDEADBEEF;
+    snapshot.checksum = calculateChecksum(snapshot);
+    Serial2.write((uint8_t *)&snapshot, sizeof(snapshot));
   }
 
-  // 3. Update Liquid Temp
-  // Read result of the PREVIOUS requestTemperatures(), then request the next
-  // one. With setWaitForConversion(false), the 1000ms delay() below covers the
-  // 750ms conversion.
-  if (txData.ds18Status == 1) {
-    float t = sensors.getTempCByIndex(0);
-    if (t != DEVICE_DISCONNECTED_C) {
-      txData.room2LiquidTemp = t;
-    } else {
-      txData.ds18Status = 0; // Sensor lost
-    }
-    sensors.requestTemperatures(); // Start next conversion (completes during
-                                   // delay(1000))
-  } else {
-    txData.room2LiquidTemp = -127.0;
-  }
-
-  // 4. Update pH data and Motor Current Sense
-  if (txData.adsStatus == 1) {
-    int16_t results = ads.readADC_SingleEnded(0);
-    float voltage = ads.computeVolts(results);
-
-    // Temperature Compensation (Nernst-based)
-    float tempC = (txData.ds18Status == 1) ? txData.room2LiquidTemp : 25.0;
-    float slope_V_pH = 0.17126 * (tempC + 273.15) / 298.15;
-    txData.phValue = 7.0 - (voltage - 2.555) / slope_V_pH;
-
-    // Read channel A1 for BTS7960 current sense
-    int16_t results_motor = ads.readADC_SingleEnded(1);
-    txData.motorSenseVolts = ads.computeVolts(results_motor);
-  } else {
-    txData.motorSenseVolts = 0.0f;
-  }
-
-  // 5. UART Transmission — copy under lock so BLE callback can't tear a field
-  // mid-send
-  portENTER_CRITICAL(&txDataMux);
-  struct_message snapshot = txData;
-  portEXIT_CRITICAL(&txDataMux);
-  snapshot.signature = 0xDEADBEEF;
-  snapshot.checksum = calculateChecksum(snapshot);
-  Serial2.write((uint8_t *)&snapshot, sizeof(snapshot));
-
-  // 6. Receive motor commands from main ESP32
+  // 6. Receive motor commands from main ESP32 (RUNS EVERY LOOP ITERATION, NO DELAY)
   while (Serial2.available() >= (int)sizeof(motor_cmd_t)) {
     if (Serial2.peek() != 0xBE) {
-      Serial2.read();
+      Serial.printf("Discarding non-BE byte: 0x%02X\n", Serial2.read());
       continue;
     }
     motor_cmd_t cmd;
@@ -325,8 +328,14 @@ void loop() {
     const uint8_t *p = (const uint8_t *)&cmd;
     for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
       cs ^= p[i];
+    
+    Serial.printf("[Motor CMD] Recv speed=%d cw=%d cs=0x%02X calc_cs=0x%02X\n",
+                  cmd.motorSpeed, cmd.motorCW, cmd.checksum, cs);
+
     if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
       int pwmSpeed = map(cmd.motorSpeed, 0, 100, 0, 255);
+      Serial.printf("  Setting PWM: LPWM=%s, RPWM=%s, val=%d\n", 
+                    cmd.motorCW ? "ON" : "OFF", cmd.motorCW ? "OFF" : "ON", pwmSpeed);
       if (cmd.motorSpeed == 0) {
         ledcWrite(LPWM_CH, 0);
         ledcWrite(RPWM_CH, 0);
@@ -337,6 +346,8 @@ void loop() {
         ledcWrite(LPWM_CH, 0);
         ledcWrite(RPWM_CH, pwmSpeed);
       }
+    } else {
+      Serial.println("  Error: Checksum or signature mismatch!");
     }
   }
 
@@ -344,5 +355,4 @@ void loop() {
   if (!pBLEScan->isScanning()) {
     pBLEScan->start(0, nullptr, false);
   }
-  delay(1000); // Send data every second
 }
