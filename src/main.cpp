@@ -332,8 +332,10 @@ void setup() {
 
   if (rtc.begin()) {
     rtcStatus = true;
-    if (rtc.lostPower())
+    DateTime now = rtc.now();
+    if (rtc.lostPower() || now.year() < 2026) {
       rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
   }
 
   if (bme1.begin(0x76))
