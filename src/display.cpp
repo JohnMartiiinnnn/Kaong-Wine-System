@@ -2484,7 +2484,11 @@ void drawPidTrackingMenu(bool valuesOnly) {
     // Footer
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("SELECT: START/STOP TEST   RETURN: BACK", CENTER_X, 458, 1);
+    if (!pidTrackRunning) {
+      tft.drawCentreString("UP/DN: TSET   RIGHT: +5C   SELECT: START   RETURN: BACK", CENTER_X, 458, 1);
+    } else {
+      tft.drawCentreString("SELECT: STOP TEST   RETURN: BACK", CENTER_X, 458, 1);
+    }
 
     pidTrackNeedsFullRedraw = false;
   }
@@ -2497,9 +2501,9 @@ void drawPidTrackingMenu(bool valuesOnly) {
   tft.setTextColor(TFT_WHITE, statBg);
   if (pidTrackRunning) {
     uint32_t runSec = (millis() - pidTrackStartMs) / 1000;
-    sprintf(buf, "TRACKING: RUNNING (%lus)", (unsigned long)runSec);
+    sprintf(buf, "RUNNING (%lus)  TSET: %.1f C", (unsigned long)runSec, pidTrackTargetTemp);
   } else {
-    sprintf(buf, "TRACKING: IDLE (PRESS SELECT)");
+    sprintf(buf, "TSET: %.1f C  (UP/DN TO EDIT)", pidTrackTargetTemp);
   }
   tft.drawCentreString(buf, CENTER_X, 62, 2);
 
@@ -2550,14 +2554,19 @@ void drawPidTrackingMenu(bool valuesOnly) {
   tft.drawFastHLine(15, 175, 290, TFT_LIGHTGREY);
 
   // Live Graph Render
+  int targetY = 415 - (int)((pidTrackTargetTemp - 20.0f) * 190.0f / 80.0f);
+  targetY = constrain(targetY, 218, 415);
+
   if (pidTrackHistoryCount > 1) {
     // Redraw graph area inside canvas (X: 16..304, Y: 216..424)
     tft.fillRect(16, 216, 288, 208, 0x2124);
     
-    // Draw 80.0C Target Line
-    tft.drawFastHLine(16, 265, 288, TFT_RED);
+    // Draw Dynamic Target Reference Line
+    tft.drawFastHLine(16, targetY, 288, TFT_RED);
     tft.setTextColor(TFT_RED, 0x2124);
-    tft.drawString("80C SETPOINT", 200, 253, 1);
+    sprintf(buf, "%.0fC SETPOINT", pidTrackTargetTemp);
+    int txtY = (targetY - 12 < 218) ? targetY + 2 : targetY - 12;
+    tft.drawString(buf, 190, txtY, 1);
 
     int count = min(pidTrackHistoryCount, 100);
     float xStep = 280.0f / max(1, count - 1);

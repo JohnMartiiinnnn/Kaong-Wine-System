@@ -684,6 +684,13 @@ void loop() {
         }
         drawPidTestMenu();
       }
+    } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
+      pidTrackTargetTemp -= 1.0f;
+      if (pidTrackTargetTemp < 20.0f) pidTrackTargetTemp = 20.0f;
+      pidTrackMetrics.targetTemp = pidTrackTargetTemp;
+      pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
+      pidTrackNeedsFullRedraw = true;
+      drawPidTrackingMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -830,6 +837,13 @@ void loop() {
           pidFermSensor ^= 1;
       }
       drawPidTestMenu();
+    } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
+      pidTrackTargetTemp += 1.0f;
+      if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 100.0f;
+      pidTrackMetrics.targetTemp = pidTrackTargetTemp;
+      pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
+      pidTrackNeedsFullRedraw = true;
+      drawPidTrackingMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -1492,6 +1506,15 @@ void loop() {
         drawDashboardLayout();
       }
     }
+  }
+
+  if (cRight && !ljRight && currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
+    pidTrackTargetTemp += 5.0f;
+    if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 20.0f;
+    pidTrackMetrics.targetTemp = pidTrackTargetTemp;
+    pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
+    pidTrackNeedsFullRedraw = true;
+    drawPidTrackingMenu();
   }
 
   if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD) {
