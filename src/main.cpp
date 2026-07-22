@@ -229,6 +229,9 @@ uint32_t calibLedTimer = 0;
 bool calibLedState = false;
 uint32_t calibLastPulseCount = 0;
 int rtcSetField = 0;
+int rtcSetYear = 2026;
+int rtcSetMonth = 7;
+int rtcSetDay = 22;
 int rtcSetHour = 0;
 int rtcSetMinute = 0;
 
@@ -741,7 +744,7 @@ void loop() {
       }
     } else if (currentAppState == RTC_SET_MENU) {
       if (cDown && !ljDown) {
-        rtcSetField = (rtcSetField + 1) % 2;
+        rtcSetField = (rtcSetField + 4) % 5;
         drawRtcSetMenu();
       }
     } else if (currentAppState == TRANSFER_TEST_MENU) {
@@ -884,7 +887,7 @@ void loop() {
       }
       drawHeaterTestMenu();
     } else if (currentAppState == RTC_SET_MENU) {
-      rtcSetField = (rtcSetField + 1) % 2;
+      rtcSetField = (rtcSetField + 1) % 5;
       drawRtcSetMenu();
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       transferTestSelection = (transferTestSelection + 3) % 4;
@@ -1112,10 +1115,17 @@ void loop() {
       } else if (systemCheckSelection == 8) {
         if (rtcStatus) {
           DateTime now = rtc.now();
+          rtcSetYear = now.year();
+          if (rtcSetYear < 2026) rtcSetYear = 2026;
+          rtcSetMonth = now.month();
+          rtcSetDay = now.day();
           rtcSetHour = now.hour();
           rtcSetMinute = now.minute();
         } else {
-          rtcSetHour = 0;
+          rtcSetYear = 2026;
+          rtcSetMonth = 7;
+          rtcSetDay = 22;
+          rtcSetHour = 12;
           rtcSetMinute = 0;
         }
         rtcSetField = 0;
@@ -1330,8 +1340,7 @@ void loop() {
       drawSdVerifyMenu();
     } else if (currentAppState == RTC_SET_MENU) {
       if (rtcStatus) {
-        DateTime now = rtc.now();
-        rtc.adjust(DateTime(now.year(), now.month(), now.day(), rtcSetHour,
+        rtc.adjust(DateTime(rtcSetYear, rtcSetMonth, rtcSetDay, rtcSetHour,
                             rtcSetMinute, 0));
       }
       currentAppState = SYSTEM_CHECK_MENU;
@@ -1601,8 +1610,15 @@ void loop() {
 
   if (cRight && !ljRight && currentAppState == RTC_SET_MENU) {
     if (rtcSetField == 0) {
+      rtcSetYear++;
+      if (rtcSetYear > 2099) rtcSetYear = 2026;
+    } else if (rtcSetField == 1) {
+      rtcSetMonth = (rtcSetMonth % 12) + 1;
+    } else if (rtcSetField == 2) {
+      rtcSetDay = (rtcSetDay % 31) + 1;
+    } else if (rtcSetField == 3) {
       rtcSetHour = (rtcSetHour + 1) % 24;
-    } else {
+    } else if (rtcSetField == 4) {
       rtcSetMinute = (rtcSetMinute + 1) % 60;
     }
     drawRtcSetMenu();
@@ -1971,6 +1987,8 @@ void loop() {
             if (raptLogCount == 0 || (millis() - lastLogTimeMs > 15000UL)) {
               lastLogTimeMs = millis();
               raptLogs[raptLogCount].gravity = incomingData.pillGravity;
+              raptLogs[raptLogCount].temp = incomingData.pillTemp;
+              raptLogs[raptLogCount].rssi = incomingData.pillRSSI;
               if (rtcStatus) {
                 DateTime now = rtc.now();
                 sprintf(raptLogs[raptLogCount].timeStr, "%02d:%02d:%02d",

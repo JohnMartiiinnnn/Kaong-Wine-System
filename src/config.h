@@ -138,6 +138,8 @@ static_assert(sizeof(struct_message) == 40, "struct_message size must be 40 byte
 
 struct RaptLog {
   float gravity;
+  float temp;
+  int16_t rssi;
   char timeStr[12];
 };
 
@@ -323,6 +325,9 @@ extern uint32_t uartChecksumErrors;
 extern bool     rtcSetNeedsFullRedraw;
 extern bool     brewSummaryNeedsFullRedraw;
 extern int      rtcSetField;
+extern int      rtcSetYear;
+extern int      rtcSetMonth;
+extern int      rtcSetDay;
 extern int      rtcSetHour;
 extern int      rtcSetMinute;
 extern uint32_t stageElapsedMs[3];

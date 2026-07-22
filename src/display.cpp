@@ -1604,13 +1604,13 @@ void drawUartMonitorMenu() {
 }
 
 void drawRtcSetMenu() {
-  char buf[32];
+  char buf[40];
 
   if (rtcSetNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("SET RTC TIME", 10, 15, 4);
+    tft.drawString("SET RTC DATE & TIME", 10, 15, 4);
     rtcSetNeedsFullRedraw = false;
   }
 
@@ -1619,52 +1619,86 @@ void drawRtcSetMenu() {
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   if (rtcStatus) {
     DateTime now = rtc.now();
-    sprintf(buf, "CURRENT: %02d:%02d:%02d", now.hour(), now.minute(),
-            now.second());
+    sprintf(buf, "CURRENT: %04d/%02d/%02d %02d:%02d:%02d",
+            now.year(), now.month(), now.day(),
+            now.hour(), now.minute(), now.second());
   } else {
     strcpy(buf, "RTC: NOT DETECTED");
   }
-  tft.drawCentreString(buf, CENTER_X, 60, 2);
+  tft.drawCentreString(buf, CENTER_X, 58, 2);
 
-  // Hour field
-  uint16_t hBg = (rtcSetField == 0) ? 0x3566 : 0xD6BA;
-  uint16_t hFg = (rtcSetField == 0) ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(15, 88, 130, 110, hBg);
-  tft.drawRect(15, 88, 130, 110, TFT_DARKGREY);
+  // --- Row 1: DATE FIELDS (Y=82 to 182) ---
+  // Year field (Field 0)
+  uint16_t yBg = (rtcSetField == 0) ? 0x3566 : 0xD6BA;
+  uint16_t yFg = (rtcSetField == 0) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(10, 82, 95, 100, yBg);
+  tft.drawRect(10, 82, 95, 100, TFT_DARKGREY);
+  tft.setTextColor(yFg, yBg);
+  tft.drawCentreString("YEAR", 57, 90, 2);
+  sprintf(buf, "%04d", rtcSetYear);
+  tft.drawCentreString(buf, 57, 120, 4);
+
+  // Month field (Field 1)
+  uint16_t moBg = (rtcSetField == 1) ? 0x3566 : 0xD6BA;
+  uint16_t moFg = (rtcSetField == 1) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(112, 82, 95, 100, moBg);
+  tft.drawRect(112, 82, 95, 100, TFT_DARKGREY);
+  tft.setTextColor(moFg, moBg);
+  tft.drawCentreString("MONTH", 159, 90, 2);
+  sprintf(buf, "%02d", rtcSetMonth);
+  tft.drawCentreString(buf, 159, 120, 4);
+
+  // Day field (Field 2)
+  uint16_t dBg = (rtcSetField == 2) ? 0x3566 : 0xD6BA;
+  uint16_t dFg = (rtcSetField == 2) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(215, 82, 95, 100, dBg);
+  tft.drawRect(215, 82, 95, 100, TFT_DARKGREY);
+  tft.setTextColor(dFg, dBg);
+  tft.drawCentreString("DAY", 262, 90, 2);
+  sprintf(buf, "%02d", rtcSetDay);
+  tft.drawCentreString(buf, 262, 120, 4);
+
+  // --- Row 2: TIME FIELDS (Y=192 to 292) ---
+  // Hour field (Field 3)
+  uint16_t hBg = (rtcSetField == 3) ? 0x3566 : 0xD6BA;
+  uint16_t hFg = (rtcSetField == 3) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(15, 192, 130, 100, hBg);
+  tft.drawRect(15, 192, 130, 100, TFT_DARKGREY);
   tft.setTextColor(hFg, hBg);
-  tft.drawCentreString("HOUR", 80, 98, 2);
+  tft.drawCentreString("HOUR", 80, 200, 2);
   sprintf(buf, "%02d", rtcSetHour);
-  tft.drawCentreString(buf, 80, 118, 7);
+  tft.drawCentreString(buf, 80, 230, 4);
 
   // Colon separator
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.fillRect(147, 120, 26, 60, TFT_WHITE);
-  tft.drawCentreString(":", CENTER_X, 122, 7);
+  tft.fillRect(147, 210, 26, 60, TFT_WHITE);
+  tft.drawCentreString(":", CENTER_X, 230, 4);
 
-  // Minute field
-  uint16_t mBg = (rtcSetField == 1) ? 0x3566 : 0xD6BA;
-  uint16_t mFg = (rtcSetField == 1) ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(175, 88, 130, 110, mBg);
-  tft.drawRect(175, 88, 130, 110, TFT_DARKGREY);
+  // Minute field (Field 4)
+  uint16_t mBg = (rtcSetField == 4) ? 0x3566 : 0xD6BA;
+  uint16_t mFg = (rtcSetField == 4) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(175, 192, 130, 100, mBg);
+  tft.drawRect(175, 192, 130, 100, TFT_DARKGREY);
   tft.setTextColor(mFg, mBg);
-  tft.drawCentreString("MIN", 240, 98, 2);
+  tft.drawCentreString("MIN", 240, 200, 2);
   sprintf(buf, "%02d", rtcSetMinute);
-  tft.drawCentreString(buf, 240, 118, 7);
+  tft.drawCentreString(buf, 240, 230, 4);
 
   // Save button
-  uint16_t saveBg = rtcStatus ? 0x3566 : TFT_DARKGREY;
-  tft.fillRect(10, 216, 300, 60, saveBg);
-  tft.drawRect(10, 216, 300, 60, TFT_DARKGREY);
+  uint16_t saveBg = rtcStatus ? 0x0400 : TFT_DARKGREY;
+  tft.fillRect(10, 302, 300, 55, saveBg);
+  tft.drawRect(10, 302, 300, 55, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, saveBg);
-  tft.drawCentreString("SELECT TO SAVE", CENTER_X, 232, 4);
-  tft.drawCentreString(rtcStatus ? "Writes to DS3231 chip"
+  tft.drawCentreString("SELECT TO SAVE", CENTER_X, 310, 4);
+  tft.drawCentreString(rtcStatus ? "Writes Date & Time to DS3231"
                                  : "RTC not available",
-                       CENTER_X, 262, 1);
+                       CENTER_X, 335, 1);
 
-  tft.fillRect(0, 440, 320, 40, TFT_WHITE);
+  // Footer
+  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: FIELD   L/R: ADJUST VALUE", CENTER_X, 447, 1);
-  tft.drawCentreString("SELECT: SAVE   RETURN: CANCEL", CENTER_X, 462, 1);
+  tft.drawCentreString("UP/DN: SWITCH FIELD   L/R: ADJUST VALUE", CENTER_X, 447, 1);
+  tft.drawCentreString("SELECT: SAVE TO RTC   RETURN: CANCEL", CENTER_X, 462, 1);
 }
 
 void updateDashboardGraph() {
@@ -2379,10 +2413,10 @@ void drawRaptTestPage(bool valuesOnly) {
     tft.drawRect(15, y, 290, 28, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
 
-    // Format log: e.g. "[1] SG: 1.0090  Time: 12:34:56"
-    sprintf(buf, "[%d] SG: %.4f  Time: %s", i + 1, 
-            raptLogs[i].gravity, raptLogs[i].timeStr);
-    tft.drawString(buf, 22, y + 6, 2);
+    // Format log: e.g. "[1] SG:1.0090  31.2C  -73dBm  12:34"
+    sprintf(buf, "[%d] SG:%.4f %.1fC %ddBm %s", i + 1,
+            raptLogs[i].gravity, raptLogs[i].temp, raptLogs[i].rssi, raptLogs[i].timeStr);
+    tft.drawString(buf, 20, y + 6, 2);
   }
 
   // If no logs yet
