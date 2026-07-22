@@ -296,10 +296,14 @@ void loop() {
       int16_t results = ads.readADC_SingleEnded(0);
       float voltage = ads.computeVolts(results);
 
-      // Temperature Compensation (Nernst-based)
-      float tempC = (txData.ds18Status == 1) ? txData.room2LiquidTemp : 25.0;
-      float slope_V_pH = 0.17126 * (tempC + 273.15) / 298.15;
-      txData.phValue = 7.0 - (voltage - 2.555) / slope_V_pH;
+      // Temperature Compensation & Dual-Slope Calibration (Nernst-based)
+      // Calibrated against 4.01, 6.86, and 9.18 buffers @ ~30C
+      float tempC = (txData.ds18Status == 1 && txData.room2LiquidTemp > -50.0f) ? txData.room2LiquidTemp : 25.0f;
+      float base_slope = (voltage >= 2.555f) ? 0.16553f : 0.17086f; // Acid vs Alkaline slope @ 25C
+      float slope_V_pH = base_slope * (tempC + 273.15f) / 298.15f;
+      txData.phValue = 7.0f - (voltage - 2.555f) / slope_V_pH;
+      if (txData.phValue < 0.0f) txData.phValue = 0.0f;
+      if (txData.phValue > 14.0f) txData.phValue = 14.0f;
 
       // Read channel A1 for BTS7960 current sense
       int16_t results_motor = ads.readADC_SingleEnded(1);
