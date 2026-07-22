@@ -46,10 +46,17 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 #define RELAY_OFF HIGH
 #define GRAVITY_OFFSET 0.009
 
+#include "PIDController.h"
+
 const float PID_KP = 2.0f;
 const float PID_KI = 0.05f;
 const float PID_KD = 1.0f;
 const float PID_THROTTLE_TEMP = 75.0f;
+
+extern PIDController preheatPid;
+extern PIDController pastPid;
+extern PIDController trackingPid;
+
 
 const int PWM_PIN = 25;
 const int SD_CS_PIN = 5;
@@ -86,8 +93,6 @@ enum AppState {
   RELAY_TEST_MENU,
   MOTOR_TEST_MENU,
   STAGE_PARAM_MENU,
-  PID_TEST_PICK,
-  PID_TEST_MENU,
   HEATER_TEST_MENU,
   SD_VERIFY_MENU,
   UART_MONITOR_MENU,

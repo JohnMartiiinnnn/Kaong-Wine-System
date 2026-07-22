@@ -135,6 +135,10 @@ int pidFanPercent = 0;
 int pidFermSensor = 1;
 int pidPreHeatSensor = 0;
 
+PIDController preheatPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
+PIDController pastPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
+PIDController trackingPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
+
 // ---- PID Thermal Tracking Test State ----
 bool pidTrackNeedsFullRedraw = true;
 bool pidTrackRunning = false;
@@ -667,29 +671,8 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 13;
+      systemCheckSelection = (systemCheckSelection + 1) % 12;
       drawSystemCheckMenu();
-    } else if (currentAppState == PID_TEST_PICK) {
-      pidTestChoice = (pidTestChoice + 1) % 4;
-      drawPidTestPick();
-    } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
-      if (cDown && !ljDown) {
-        if (pidTestTargetSelection == 0) {
-          pidTestHeatTarget -= 1.0f;
-          if (pidTestHeatTarget < 0.0f)
-            pidTestHeatTarget = 0.0f;
-        } else if (pidTestTargetSelection == 1) {
-          pidTestCoolTarget -= 1.0f;
-          if (pidTestCoolTarget < 0.0f)
-            pidTestCoolTarget = 0.0f;
-        } else {
-          if (pidTestChoice == 0)
-            pidPreHeatSensor ^= 1;
-          else
-            pidFermSensor ^= 1;
-        }
-        drawPidTestMenu();
-      }
     } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
       pidTrackTargetTemp -= 1.0f;
       if (pidTrackTargetTemp < 20.0f) pidTrackTargetTemp = 20.0f;
@@ -822,27 +805,8 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 12) % 13;
+      systemCheckSelection = (systemCheckSelection + 11) % 12;
       drawSystemCheckMenu();
-    } else if (currentAppState == PID_TEST_PICK) {
-      pidTestChoice = (pidTestChoice + 3) % 4;
-      drawPidTestPick();
-    } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
-      if (pidTestTargetSelection == 0) {
-        pidTestHeatTarget += 1.0f;
-        if (pidTestHeatTarget > 100.0f)
-          pidTestHeatTarget = 100.0f;
-      } else if (pidTestTargetSelection == 1) {
-        pidTestCoolTarget += 1.0f;
-        if (pidTestCoolTarget > 100.0f)
-          pidTestCoolTarget = 100.0f;
-      } else {
-        if (pidTestChoice == 0)
-          pidPreHeatSensor ^= 1;
-        else
-          pidFermSensor ^= 1;
-      }
-      drawPidTestMenu();
     } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
       pidTrackTargetTemp += 1.0f;
       if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 100.0f;
@@ -1094,25 +1058,31 @@ void loop() {
         currentAppState = MOTOR_TEST_MENU;
         drawMotorTestMenu();
       } else if (systemCheckSelection == 4) {
-        currentAppState = PID_TEST_PICK;
-        pidTestNeedsFullRedraw = true;
-        pidTestChoice = 0;
-        drawPidTestPick();
+        currentAppState = PID_TRACKING_MENU;
+        pidTrackNeedsFullRedraw = true;
+        pidTrackRunning = false;
+        pidTrackHistoryCount = 0;
+        pidTestChoice = -1; // Default to "Heater Output: Not Set"
+        float initTemp = 25.0f;
+        pidTrackMetrics.startTemp = initTemp;
+        pidTrackMetrics.targetTemp = 80.0f;
+        pidTrackMetrics.peakTemp = initTemp;
+        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
+        pidTrackMetrics.riseTimeSec = -1;
+        pidTrackMetrics.settlingTimeSec = -1;
+        pidTrackMetrics.overshootDeg = 0.0f;
+        strcpy(pidTrackMetrics.stabilityStr, "IDLE");
+        drawPidTrackingMenu();
       } else if (systemCheckSelection == 5) {
-        heaterTestStage = 0;
-        heaterTestNeedsFullRedraw = true;
-        currentAppState = HEATER_TEST_PICK;
-        drawHeaterTestPick();
-      } else if (systemCheckSelection == 6) {
         sdVerifyResult = -1;
         sdVerifyNeedsFullRedraw = true;
         currentAppState = SD_VERIFY_MENU;
         drawSdVerifyMenu();
-      } else if (systemCheckSelection == 7) {
+      } else if (systemCheckSelection == 6) {
         uartMonitorNeedsFullRedraw = true;
         currentAppState = UART_MONITOR_MENU;
         drawUartMonitorMenu();
-      } else if (systemCheckSelection == 8) {
+      } else if (systemCheckSelection == 7) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetYear = now.year();
@@ -1132,81 +1102,61 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         currentAppState = RTC_SET_MENU;
         drawRtcSetMenu();
-      } else if (systemCheckSelection == 9) {
+      } else if (systemCheckSelection == 8) {
         transferTestNeedsFullRedraw = true;
         currentAppState = TRANSFER_TEST_MENU;
         drawTransferTestMenu();
-      } else if (systemCheckSelection == 10) {
+      } else if (systemCheckSelection == 9) {
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
         loadCellSelection = 0;
         wizardEditing = false;
         drawLoadCellPage();
-      } else if (systemCheckSelection == 11) {
+      } else if (systemCheckSelection == 10) {
         currentAppState = RAPT_TEST_MENU;
         raptTestNeedsFullRedraw = true;
         raptLogCount = 0;
         memset(raptLogs, 0, sizeof(raptLogs));
         drawRaptTestPage();
-      } else if (systemCheckSelection == 12) {
+      } else if (systemCheckSelection == 11) {
         currentAppState = PH_FERM_MENU;
         phFermNeedsFullRedraw = true;
         drawPhFermMenu();
       }
-    } else if (currentAppState == PID_TEST_PICK) {
-      if (pidTestChoice == 3) {
-        currentAppState = PID_TRACKING_MENU;
-        pidTrackNeedsFullRedraw = true;
-        pidTrackRunning = false;
-        pidTrackHistoryCount = 0;
-        float initTemp = (liquid2Status) ? getPreheatTemp() : 25.0f;
-        pidTrackMetrics.startTemp = initTemp;
-        pidTrackMetrics.targetTemp = 80.0f;
-        pidTrackMetrics.peakTemp = initTemp;
-        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
-        pidTrackMetrics.riseTimeSec = -1;
-        pidTrackMetrics.settlingTimeSec = -1;
-        pidTrackMetrics.overshootDeg = 0.0f;
-        strcpy(pidTrackMetrics.stabilityStr, "IDLE");
-        drawPidTrackingMenu();
-      } else {
-        currentAppState = PID_TEST_MENU;
-        pidTestNeedsFullRedraw = true;
-        if (pidTestChoice == 0) {
-          pidTestHeatTarget = 35.0f;
-          pidTestCoolTarget = 30.0f;
-          pidPreHeatSensor = 0;
-        } else if (pidTestChoice == 1) {
-          pidTestHeatTarget = 27.0f;
-          pidTestCoolTarget = 30.0f;
-          pidFermSensor = 1;
-        } else {
-          pidTestHeatTarget = 35.0f;
-          pidTestCoolTarget = 30.0f;
-        }
-        pidTestRunning = false;
-        pidTestSuccess = false;
-        drawPidTestMenu();
-      }
     } else if (currentAppState == PID_TRACKING_MENU) {
       if (!pidTrackRunning) {
-        pidTrackRunning = true;
-        pidTrackStartMs = millis();
-        pidTrackLastSampleMs = 0;
-        pidTrackHistoryCount = 0;
-        float initTemp = (liquid2Status) ? getPreheatTemp() : 25.0f;
-        pidTrackMetrics.startTemp = initTemp;
-        pidTrackMetrics.targetTemp = pidTrackTargetTemp;
-        pidTrackMetrics.peakTemp = initTemp;
-        pidTrackMetrics.steadyStateError = fabs(initTemp - pidTrackTargetTemp);
-        pidTrackMetrics.riseTimeSec = -1;
-        pidTrackMetrics.settlingTimeSec = -1;
-        pidTrackMetrics.overshootDeg = 0.0f;
-        strcpy(pidTrackMetrics.stabilityStr, "TESTING");
-        static float pidTrackIntegral = 0.0f;
-        static float pidTrackPrevError = 0.0f;
-        pidTrackIntegral = 0.0f;
-        pidTrackPrevError = 0.0f;
+        if (pidTestChoice == -1) {
+          // Cannot start test until user chooses a valid heater output
+          strcpy(pidTrackMetrics.stabilityStr, "NO HEATER");
+          pidTrackNeedsFullRedraw = true;
+          drawPidTrackingMenu();
+        } else {
+          pidTrackRunning = true;
+          pidTrackStartMs = millis();
+          pidTrackLastSampleMs = 0;
+          pidTrackHistoryCount = 0;
+          float initTemp = 25.0f;
+          if (pidTestChoice == 0 && liquid2Status) initTemp = getPreheatTemp();
+          else if (pidTestChoice == 1 && incomingData.sensor2Status > 0) initTemp = incomingData.room2Temp;
+          else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
+
+          if (pidTestChoice == 1) {
+            // Fermentation Quartz Heater & Ventilation startup: 10% baseline fan speed
+            isFermFanOn = true;
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+            setFanSpeed(10);
+          }
+
+          pidTrackMetrics.startTemp = initTemp;
+          pidTrackMetrics.targetTemp = pidTrackTargetTemp;
+          pidTrackMetrics.peakTemp = initTemp;
+          pidTrackMetrics.steadyStateError = fabs(initTemp - pidTrackTargetTemp);
+          pidTrackMetrics.riseTimeSec = -1;
+          pidTrackMetrics.settlingTimeSec = -1;
+          pidTrackMetrics.overshootDeg = 0.0f;
+          strcpy(pidTrackMetrics.stabilityStr, "TESTING");
+          trackingPid.reset();
 
         // Create unique separate log filename for this test run
         if (rtcStatus) {
@@ -1228,32 +1178,23 @@ void loop() {
             f.close();
           }
         }
+      }
       } else {
         pidTrackRunning = false;
         currentHeatingPercent = 0;
         digitalWrite(SSR_PREHEAT, LOW);
-        strcpy(pidTrackMetrics.stabilityStr, "STOPPED");
-      }
-      pidTrackNeedsFullRedraw = true;
-      drawPidTrackingMenu();
-    } else if (currentAppState == PID_TEST_MENU) {
-      if (!pidTestRunning) {
-        pidTestRunning = true;
-        pidTestSuccess = false;
-        pidTestStableStart = 0;
-        pidTestStartMs = millis();
-      } else {
-        pidTestRunning = false;
-        currentHeatingPercent = 0;
-        pidFanPercent = 0;
+        digitalWrite(SSR_FERM, LOW);
+        digitalWrite(SSR_PAST, LOW);
+        setFanSpeed(0);
         isFermFanOn = false;
         isFanOn = false;
         mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
         mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
         mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+        strcpy(pidTrackMetrics.stabilityStr, "STOPPED");
       }
-      pidTestNeedsFullRedraw = true;
-      drawPidTestMenu();
+      pidTrackNeedsFullRedraw = true;
+      drawPidTrackingMenu();
     } else if (currentAppState == HEATER_TEST_PICK) {
       heaterTestPercent = 0;
       heaterTestRunning = false;
@@ -1533,10 +1474,8 @@ void loop() {
   }
 
   if (cRight && !ljRight && currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
-    pidTrackTargetTemp += 5.0f;
-    if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 20.0f;
-    pidTrackMetrics.targetTemp = pidTrackTargetTemp;
-    pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
+    pidTestChoice++;
+    if (pidTestChoice > 2) pidTestChoice = -1; // Cycle: -1 (NOT SET) -> 0 (PRE-HEAT) -> 1 (FERM) -> 2 (PAST) -> -1
     pidTrackNeedsFullRedraw = true;
     drawPidTrackingMenu();
   }
@@ -1572,13 +1511,6 @@ void loop() {
       calibCompleted = false;
       drawCalibWizard();
     }
-  }
-
-  if (cRight && !ljRight && currentAppState == PID_TEST_MENU &&
-      !pidTestRunning) {
-    pidTestTargetSelection =
-        (pidTestTargetSelection + 1) % (pidTestChoice <= 1 ? 3 : 2);
-    drawPidTestMenu();
   }
 
   if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE &&
@@ -1760,28 +1692,21 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
-    } else if (currentAppState == PID_TEST_PICK) {
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
     } else if (currentAppState == PID_TRACKING_MENU) {
       pidTrackRunning = false;
       currentHeatingPercent = 0;
       digitalWrite(SSR_PREHEAT, LOW);
-      currentAppState = PID_TEST_PICK;
-      pidTestNeedsFullRedraw = true;
-      drawPidTestPick();
-    } else if (currentAppState == PID_TEST_MENU) {
-      pidTestRunning = false;
-      currentHeatingPercent = 0;
+      digitalWrite(SSR_FERM, LOW);
+      digitalWrite(SSR_PAST, LOW);
+      setFanSpeed(0);
       isFermFanOn = false;
       isFanOn = false;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-      currentAppState = PID_TEST_PICK;
-      pidTestNeedsFullRedraw = true;
-      drawPidTestPick();
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (stageParamEditing) {
         if (stageParamSelection == 1)
@@ -2094,193 +2019,51 @@ void loop() {
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
-    // ---- PID Test Control ----
-    if (currentAppState == PID_TEST_MENU && pidTestRunning) {
-      static float pidTestIntegral = 0.0f;
-      static float pidTestPrevError = 0.0f;
-      static float pidFanPrevTemp = -999.0f;
-      const float TEST_KP = 20.0f;
-      const float TEST_KI = 0.05f;
-      const float TEST_KD = 2.0f;
-      const float FAN_KD = 10.0f;
-
-      float liquidTemp = -999.0f;
-      if (pidTestChoice == 0) {
-        if (pidPreHeatSensor == 0) {
-          if (liquid2Status)
-            liquidTemp = getPreheatTemp();
-          else if (bme1Status)
-            liquidTemp = bme1.readTemperature();
-        } else {
-          if (bme1Status)
-            liquidTemp = bme1.readTemperature();
-          else if (liquid2Status)
-            liquidTemp = getPreheatTemp();
-        }
-      } else if (pidTestChoice == 1) {
-        if (pidFermSensor == 0) {
-          if (incomingData.ds18Status == 1 &&
-              incomingData.room2LiquidTemp > -100.0f)
-            liquidTemp = getFermTemp();
-          else if (incomingData.sensor2Status == 1)
-            liquidTemp = incomingData.room2Temp;
-        } else {
-          if (incomingData.sensor2Status == 1)
-            liquidTemp = incomingData.room2Temp;
-          else if (incomingData.ds18Status == 1 &&
-                   incomingData.room2LiquidTemp > -100.0f)
-            liquidTemp = getFermTemp();
-        }
-      } else if (pidTestChoice == 2) {
-        if (liquid1Status)
-          liquidTemp = getPastTemp();
-      }
-
-      if (liquidTemp > -100.0f) {
-        float error = 0.0f;
-        if (liquidTemp < pidTestHeatTarget) {
-          error = pidTestHeatTarget - liquidTemp;
-          if (liquidTemp >= pidTestHeatTarget - 5.0f) {
-            pidTestIntegral += error;
-            if (pidTestIntegral > 100.0f)
-              pidTestIntegral = 100.0f;
-            if (pidTestIntegral < -100.0f)
-              pidTestIntegral = -100.0f;
-          } else {
-            pidTestIntegral = 0.0f;
-          }
-        } else if (liquidTemp > pidTestCoolTarget) {
-          error = pidTestCoolTarget - liquidTemp; // negative error for cooling
-          if (liquidTemp <= pidTestCoolTarget + 5.0f) {
-            pidTestIntegral += error;
-            if (pidTestIntegral > 100.0f)
-              pidTestIntegral = 100.0f;
-            if (pidTestIntegral < -100.0f)
-              pidTestIntegral = -100.0f;
-          } else {
-            pidTestIntegral = 0.0f;
-          }
-        } else {
-          error = 0.0f;
-          pidTestIntegral = 0.0f;
-        }
-
-        float pidOut = (TEST_KP * error) + (TEST_KI * pidTestIntegral) +
-                       (TEST_KD * (error - pidTestPrevError));
-        pidTestPrevError = error;
-        if (pidOut < -100.0f)
-          pidOut = -100.0f;
-        if (pidOut > 100.0f)
-          pidOut = 100.0f;
-
-        if (pidOut > 0.0f) {
-          int heat = (int)pidOut;
-          if (pidTestChoice == 1 && heat > 50)
-            heat = 50;
-          currentHeatingPercent = heat;
-          isFermFanOn = false;
-          isFanOn = false;
-        } else if (pidOut < 0.0f) {
-          currentHeatingPercent = 0;
-          if (pidTestChoice == 1) {
-            isFermFanOn = true;
-            isFanOn = false;
-          } else {
-            isFermFanOn = false;
-            isFanOn = true;
-          }
-        } else {
-          currentHeatingPercent = 0;
-          isFermFanOn = false;
-          isFanOn = false;
-        }
-
-        if (pidTestChoice == 1) {
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN,
-                           isFermFanOn ? RELAY_ON : RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN,
-                           isFermFanOn ? RELAY_ON : RELAY_OFF);
-          if (isFermFanOn) {
-            float dTemp = (pidFanPrevTemp > -100.0f)
-                              ? (liquidTemp - pidFanPrevTemp)
-                              : 0.0f;
-            pidFanPrevTemp = liquidTemp;
-            // P: how far above cool target; D: back off when temp is already
-            // falling fast
-            float eNeg = -error;
-            float baseFan = (eNeg >= 1.0f) ? 100.0f : (30.0f + eNeg * 70.0f);
-            int fanPct = (int)(baseFan + FAN_KD * dTemp);
-            if (fanPct > 100)
-              fanPct = 100;
-            if (fanPct < 30)
-              fanPct = 30;
-            pidFanPercent = fanPct;
-          } else {
-            pidFanPrevTemp = -999.0f;
-            pidFanPercent = 0;
-          }
-          setFanSpeed(pidFanPercent);
-        } else {
-          mcp.digitalWrite(FAN_RELAY_PIN, isFanOn ? RELAY_ON : RELAY_OFF);
-          pidFanPercent = isFanOn ? 100 : 0;
-          setFanSpeed(pidFanPercent);
-        }
-
-        if (abs(error) <= 0.5f) {
-          if (pidTestStableStart == 0)
-            pidTestStableStart = millis();
-          else if (millis() - pidTestStableStart > 15000UL) {
-            pidTestSuccess = true;
-          }
-        } else {
-          pidTestStableStart = 0;
-          pidTestSuccess = false;
-        }
-      } else {
-        currentHeatingPercent = 0;
-        isFanOn = false;
-        isFermFanOn = false;
-        pidFanPercent = 0;
-      }
-      drawPidTestMenu();
-    }
-
     // ---- PID Thermal Tracking Test Control ----
     if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
-      static float pidTrackIntegral = 0.0f;
-      static float pidTrackPrevError = 0.0f;
       static uint32_t pidTrackLastPidCalcMs = 0;
 
-      float curT = liquid2Status ? getPreheatTemp() : 25.0f;
+      float curT = 25.0f;
+      if (pidTestChoice == 0) {
+        curT = liquid2Status ? getPreheatTemp() : 25.0f;
+      } else if (pidTestChoice == 1) {
+        curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 25.0f;
+      } else {
+        curT = liquid1Status ? getPastTemp() : 25.0f;
+      }
+
       float error = pidTrackTargetTemp - curT;
 
       // Run PID calculation at fixed 1-second interval
       if (millis() - pidTrackLastPidCalcMs >= 1000) {
-        pidTrackLastPidCalcMs = millis();
+        uint32_t nowMs = millis();
+        float dt = (pidTrackLastPidCalcMs == 0) ? 1.0f : (nowMs - pidTrackLastPidCalcMs) / 1000.0f;
+        pidTrackLastPidCalcMs = nowMs;
 
-        if (error > 5.0f) {
-          // Full 100% duty cycle ramp phase when > 5C below target setpoint
-          currentHeatingPercent = 100;
-          pidTrackIntegral = 0.0f;
-        } else {
-          // Smooth PID throttling within 5C of target setpoint
-          pidTrackIntegral += error;
-          if (pidTrackIntegral > 100.0f) pidTrackIntegral = 100.0f;
-          if (pidTrackIntegral < 0.0f) pidTrackIntegral = 0.0f;
+        float pidOut = trackingPid.compute(pidTrackTargetTemp, curT, dt);
+        currentHeatingPercent = (int)pidOut;
 
-          float dTerm = (error - pidTrackPrevError);
-          float pidOut = (PID_KP * error) + (PID_KI * pidTrackIntegral) + (PID_KD * dTerm);
+        // Fermentation Chamber Fan Ventilation Control (pidTestChoice == 1)
+        if (pidTestChoice == 1) {
+          isFermFanOn = true;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
-          if (pidOut < 0.0f) pidOut = 0.0f;
-          if (pidOut > 100.0f) pidOut = 100.0f;
-
-          currentHeatingPercent = (int)pidOut;
+          if (curT > pidTrackTargetTemp) {
+            // Overshoot detected -> Ramp fan speed up above 10% baseline up to 100%
+            float over = curT - pidTrackTargetTemp;
+            int fanSpd = 10 + (int)(over * 30.0f);
+            if (fanSpd > 100) fanSpd = 100;
+            setFanSpeed(fanSpd);
+          } else {
+            // Startup / Normal Heating / Back at Setpoint -> 10% baseline ventilation speed
+            setFanSpeed(10);
+          }
         }
-        pidTrackPrevError = error;
       }
 
-      // Sampling every 2000ms
-      if (millis() - pidTrackLastSampleMs >= 2000) {
+      // Sampling every 1000ms (1 second)
+      if (millis() - pidTrackLastSampleMs >= 1000) {
         pidTrackLastSampleMs = millis();
         uint32_t elapsedSec = (millis() - pidTrackStartMs) / 1000;
 
@@ -2335,7 +2118,7 @@ void loop() {
           strcpy(pidTrackMetrics.stabilityStr, "UNSTABLE");
         }
 
-        // SD Card CSV Logging every 2s to unique run file
+        // SD Card CSV Logging every 1s to unique run file
         if (sdStatus && pidLogFileName[0] != '\0') {
           File f = SD.open(pidLogFileName, FILE_APPEND);
           if (f) {
@@ -2380,12 +2163,10 @@ void loop() {
 
     // ---- Closed-Loop Brew Stage Control ----
     if (activeBrewStage >= 0 && activeBrewStage <= 2 && !stageTransferring) {
-      static float pidIntegral = 0.0f;
-      static float pidPrevError = 0.0f;
       static int lastCtrlStage = -1;
       if (activeBrewStage != lastCtrlStage) {
-        pidIntegral = 0.0f;
-        pidPrevError = 0.0f;
+        preheatPid.reset();
+        pastPid.reset();
         lastCtrlStage = activeBrewStage;
       }
 
@@ -2406,25 +2187,9 @@ void loop() {
             preHeatSterilized = true;
             preHeatHolding = false;
             currentHeatingPercent = 0;
-            pidIntegral = 0.0f;
+            preheatPid.reset();
           } else if (liquidTemp > -100.0f) {
-            float error = 80.0f - liquidTemp;
-            if (liquidTemp >= PID_THROTTLE_TEMP) {
-              pidIntegral += error;
-              if (pidIntegral > 100.0f)
-                pidIntegral = 100.0f;
-              if (pidIntegral < -100.0f)
-                pidIntegral = -100.0f;
-            } else {
-              pidIntegral = 0.0f;
-            }
-            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) +
-                           (PID_KD * (error - pidPrevError));
-            pidPrevError = error;
-            if (pidOut < 0.0f)
-              pidOut = 0.0f;
-            if (pidOut > 100.0f)
-              pidOut = 100.0f;
+            float pidOut = preheatPid.compute(80.0f, liquidTemp, 1.0f);
             currentHeatingPercent = (int)pidOut;
             if (simManual[0])
               currentHeatingPercent = 0;
@@ -2438,7 +2203,7 @@ void loop() {
                 preHeatSterilized = true;
                 preHeatHolding = false;
                 currentHeatingPercent = 0;
-                pidIntegral = 0.0f;
+                preheatPid.reset();
               }
             } else {
               preHeatHolding = false;
@@ -2484,23 +2249,7 @@ void loop() {
       } else if (activeBrewStage == 2) {
         if (!pastSterilized) {
           if (liquidTemp > -100.0f) {
-            float error = 80.0f - liquidTemp;
-            if (liquidTemp >= PID_THROTTLE_TEMP) {
-              pidIntegral += error;
-              if (pidIntegral > 100.0f)
-                pidIntegral = 100.0f;
-              if (pidIntegral < -100.0f)
-                pidIntegral = -100.0f;
-            } else {
-              pidIntegral = 0.0f;
-            }
-            float pidOut = (PID_KP * error) + (PID_KI * pidIntegral) +
-                           (PID_KD * (error - pidPrevError));
-            pidPrevError = error;
-            if (pidOut < 0.0f)
-              pidOut = 0.0f;
-            if (pidOut > 100.0f)
-              pidOut = 100.0f;
+            float pidOut = pastPid.compute(80.0f, liquidTemp, 1.0f);
             currentHeatingPercent = (int)pidOut;
             if (simManual[2])
               currentHeatingPercent = 0;
@@ -2514,7 +2263,7 @@ void loop() {
                 pastSterilized = true;
                 pastHolding = false;
                 currentHeatingPercent = 0;
-                pidIntegral = 0.0f;
+                pastPid.reset();
                 mcp.digitalWrite(LIGHT_G, RELAY_ON);
               }
             } else {
@@ -2616,15 +2365,13 @@ void loop() {
     }
 
     int activeHeaterPin = -1;
-    if (currentAppState == PID_TEST_MENU && pidTestRunning) {
+    if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
       if (pidTestChoice == 0)
         activeHeaterPin = SSR_PREHEAT;
       else if (pidTestChoice == 1)
         activeHeaterPin = SSR_FERM;
       else
         activeHeaterPin = SSR_PAST;
-    } else if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
-      activeHeaterPin = SSR_PREHEAT;
     } else if (currentAppState == HEATER_TEST_MENU && heaterTestRunning) {
       currentHeatingPercent = heaterTestPercent;
       if (heaterTestStage == 0)
@@ -2646,6 +2393,11 @@ void loop() {
     }
     uint32_t onTime = (currentHeatingPercent * PID_WINDOW_MS) / 100;
 
+    // Quartz Heater Safety Limit for Fermentation (SSR_FERM): Max 2 seconds (2000 ms) continuous ON pulse
+    if (activeHeaterPin == SSR_FERM && onTime > 2000) {
+      onTime = 2000;
+    }
+
     bool pState = LOW;
     bool fState = LOW;
     bool pastState = LOW;
@@ -2657,6 +2409,17 @@ void loop() {
         fState = HIGH;
       else if (activeHeaterPin == SSR_PAST)
         pastState = HIGH;
+    }
+
+    // Failsafe: Maximum continuous ON pulse for Fermentation Quartz Heater is 2.0 seconds
+    static uint32_t quartzOnStartMs = 0;
+    if (fState == HIGH) {
+      if (quartzOnStartMs == 0) quartzOnStartMs = millis();
+      if (millis() - quartzOnStartMs >= 2000) {
+        fState = LOW; // Cut off pulse after 2.0 seconds continuous burst
+      }
+    } else {
+      quartzOnStartMs = 0;
     }
 
     digitalWrite(SSR_PREHEAT, pState);

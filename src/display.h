@@ -18,8 +18,6 @@ void drawLightTestMenu();
 void drawRelayTestPick();
 void drawRelayTestMenu();
 void drawMotorTestMenu();
-void drawPidTestPick();
-void drawPidTestMenu();
 void drawHeaterTestPick();
 void drawHeaterTestMenu();
 void drawSdVerifyMenu();

@@ -408,18 +408,17 @@ void drawSystemCheckMenu() {
   static int prevSel = -1;
 
   const char *options[] = {
-      "FAN TEST",     "LIGHT INDICATORS", "RELAY TEST",      "MOTOR TEST",
-      "PID CONTROL",  "HEATER OUTPUT",    "SD CARD VERIFY",  "UART MONITOR",
-      "SET RTC TIME", "TRANSFER TEST",    "LOAD CELL",       "RAPT PILL",
-      "PH & FERM TEMP"};
+      "FAN TEST",     "LIGHT INDICATORS", "RELAY TEST",     "MOTOR TEST",
+      "PID CONTROL",  "SD CARD VERIFY",   "UART MONITOR",   "SET RTC TIME",
+      "TRANSFER TEST","LOAD CELL",        "RAPT PILL",      "PH & FERM TEMP"};
 
   auto drawTile = [&](int i, bool sel) {
     uint16_t color = sel ? 0x3566 : 0xD6BA;
     uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 52 + (i * 27), 300, 24, color);
-    tft.drawRect(10, 52 + (i * 27), 300, 24, TFT_DARKGREY);
+    tft.fillRect(10, 52 + (i * 29), 300, 26, color);
+    tft.drawRect(10, 52 + (i * 29), 300, 26, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 56 + (i * 27), 2);
+    tft.drawCentreString(options[i], CENTER_X, 56 + (i * 29), 2);
   };
 
   if (systemCheckNeedsFullRedraw) {
@@ -427,7 +426,7 @@ void drawSystemCheckMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SYSTEM CHECK", 10, 15, 4);
-    for (int i = 0; i < 13; i++)
+    for (int i = 0; i < 12; i++)
       drawTile(i, systemCheckSelection == i);
     tft.fillRect(0, 432, 320, 48, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
@@ -1147,231 +1146,6 @@ void drawStageParamMenu() {
                          CENTER_X, 462, 1);
 }
 
-void drawPidTestPick() {
-  static int prevSel = -1;
-
-  const char *options[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION", "THERMAL TRACKING"};
-
-  auto drawTile = [&](int i, bool sel) {
-    uint16_t color = sel ? 0x3566 : 0xD6BA;
-    uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
-    int y = 70 + (i * 85);
-    tft.fillRect(20, y, 280, 70, color);
-    tft.drawRect(20, y, 280, 70, TFT_DARKGREY);
-    tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, y + 22, 4);
-  };
-
-  if (pidTestNeedsFullRedraw) {
-    tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawString("PID CONTROL MODE", 10, 15, 4);
-    for (int i = 0; i < 4; i++)
-      drawTile(i, pidTestChoice == i);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK",
-                         CENTER_X, 458, 1);
-    pidTestNeedsFullRedraw = false;
-    prevSel = pidTestChoice;
-  } else if (prevSel != pidTestChoice) {
-    if (prevSel >= 0)
-      drawTile(prevSel, false);
-    drawTile(pidTestChoice, true);
-    prevSel = pidTestChoice;
-  }
-}
-
-void drawPidTestMenu() {
-  if (pidTestNeedsFullRedraw) {
-    tft.fillRect(0, 0, 320, 50, 0x03E0);
-    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawString("PID CONTROL TEST", 10, 15, 4);
-    pidTestNeedsFullRedraw = false;
-  }
-
-  const char *chamberTitle;
-  if (pidTestChoice == 0)
-    chamberTitle = "PRE-HEAT";
-  else if (pidTestChoice == 1)
-    chamberTitle = "FERMENTATION";
-  else
-    chamberTitle = "PASTEURIZATION";
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.drawCentreString(chamberTitle, CENTER_X, 60, 4);
-
-  // Target Heat Setting
-  uint16_t heatBg =
-      (!pidTestRunning && pidTestTargetSelection == 0) ? TFT_YELLOW : 0xD6BA;
-  tft.fillRect(20, 100, 135, 62, heatBg);
-  tft.drawRect(20, 100, 135, 62, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, heatBg);
-  tft.drawCentreString("HEAT TARGET", 87, 108, 1);
-  char buf[32];
-  sprintf(buf, "%.1f C", pidTestHeatTarget);
-  tft.drawCentreString(buf, 87, 118, 4);
-
-  // Target Cool Setting
-  uint16_t coolBg =
-      (!pidTestRunning && pidTestTargetSelection == 1) ? TFT_YELLOW : 0xD6BA;
-  tft.fillRect(165, 100, 135, 62, coolBg);
-  tft.drawRect(165, 100, 135, 62, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, coolBg);
-  tft.drawCentreString("COOL TARGET", 232, 108, 1);
-  sprintf(buf, "%.1f C", pidTestCoolTarget);
-  tft.drawCentreString(buf, 232, 118, 4);
-
-  // Sensor selector (pre-heat + ferm only, y=165-177)
-  if (pidTestChoice == 0 || pidTestChoice == 1) {
-    uint16_t sensBg =
-        (!pidTestRunning && pidTestTargetSelection == 2) ? TFT_YELLOW : 0xD6BA;
-    tft.fillRect(20, 165, 280, 13, sensBg);
-    tft.drawRect(20, 165, 280, 13, TFT_DARKGREY);
-    tft.setTextColor(TFT_BLACK, sensBg);
-    int sel = (pidTestChoice == 0) ? pidPreHeatSensor : pidFermSensor;
-    tft.drawCentreString(sel == 0 ? "SENSOR: LIQUID (DS18B20)"
-                                  : "SENSOR: AMBIENT (BME280)",
-                         CENTER_X, 167, 1);
-  } else {
-    tft.fillRect(20, 165, 280, 13, TFT_WHITE);
-  }
-
-  // Start / Stop Button
-  uint16_t btnColor = pidTestRunning ? 0x0400 : 0xF800;
-  tft.fillRect(20, 180, 280, 50, btnColor);
-  tft.drawRect(20, 180, 280, 50, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, btnColor);
-  tft.drawCentreString(pidTestRunning ? "STOP TEST" : "START TEST", CENTER_X,
-                       195, 4);
-
-  // Live Data Dashboard (drawn only if running)
-  if (pidTestRunning) {
-    float liquidTemp = -999.0f;
-    float ambientTemp = -999.0f;
-    if (pidTestChoice == 0) {
-      if (liquid2Status)
-        liquidTemp = getPreheatTemp();
-      if (bme1Status)
-        ambientTemp = bme1.readTemperature();
-    } else if (pidTestChoice == 1) {
-      if (incomingData.ds18Status == 1)
-        liquidTemp = getFermTemp();
-      if (incomingData.sensor2Status == 1)
-        ambientTemp = incomingData.room2Temp;
-    } else if (pidTestChoice == 2) {
-      if (liquid1Status)
-        liquidTemp = getPastTemp();
-    }
-
-    // Row 1: temp panels (y=240, h=55)
-    if (pidTestChoice == 2) {
-      // Pasteurization: single full-width liquid temp panel
-      tft.fillRect(10, 240, 300, 55, 0x2124);
-      tft.drawRect(10, 240, 300, 55, TFT_DARKGREY);
-      tft.setTextColor(TFT_WHITE, 0x2124);
-      tft.drawCentreString("LIQUID TEMP", CENTER_X, 250, 1);
-      if (liquidTemp > -100.0f)
-        sprintf(buf, "%.1f C", liquidTemp);
-      else
-        strcpy(buf, "---");
-      tft.setTextPadding(280);
-      tft.drawCentreString(buf, CENTER_X, 264, 2);
-      tft.setTextPadding(0);
-    } else {
-      // Pre-heat and ferm: LIQUID TEMP | AMBIENT TEMP
-      tft.fillRect(10, 240, 145, 55, 0x2124);
-      tft.drawRect(10, 240, 145, 55, TFT_DARKGREY);
-      tft.setTextColor(TFT_WHITE, 0x2124);
-      tft.drawCentreString("LIQUID TEMP", 82, 250, 1);
-      if (liquidTemp > -100.0f)
-        sprintf(buf, "%.1f C", liquidTemp);
-      else
-        strcpy(buf, "---");
-      tft.setTextPadding(130);
-      tft.drawCentreString(buf, 82, 264, 2);
-
-      tft.fillRect(165, 240, 145, 55, 0x2124);
-      tft.drawRect(165, 240, 145, 55, TFT_DARKGREY);
-      tft.setTextColor(TFT_WHITE, 0x2124);
-      tft.drawCentreString("AMBIENT TEMP", 237, 250, 1);
-      if (ambientTemp > -100.0f)
-        sprintf(buf, "%.1f C", ambientTemp);
-      else
-        strcpy(buf, "---");
-      tft.setTextPadding(130);
-      tft.drawCentreString(buf, 237, 264, 2);
-      tft.setTextPadding(0);
-    }
-
-    // Row 2: HEATER % | FAN % (y=302, h=50)
-    bool heaterOn = currentHeatingPercent > 0;
-    bool fanOn = isFanOn || isFermFanOn;
-    uint16_t htrBg = heaterOn ? 0x0400 : 0xD6BA;
-    uint16_t htrFg = heaterOn ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, 302, 145, 50, htrBg);
-    tft.drawRect(10, 302, 145, 50, TFT_DARKGREY);
-    tft.setTextColor(htrFg, htrBg);
-    tft.drawCentreString("HEATER", 82, 312, 1);
-    if (heaterOn)
-      sprintf(buf, "%d%%", currentHeatingPercent);
-    else
-      strcpy(buf, "OFF");
-    tft.setTextPadding(130);
-    tft.drawCentreString(buf, 82, 322, 2);
-
-    uint16_t fanBg = fanOn ? 0x001F : 0xD6BA;
-    uint16_t fanFg = fanOn ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(165, 302, 145, 50, fanBg);
-    tft.drawRect(165, 302, 145, 50, TFT_DARKGREY);
-    tft.setTextColor(fanFg, fanBg);
-    tft.drawCentreString("FAN", 237, 312, 1);
-    if (fanOn)
-      sprintf(buf, "%d%%", pidFanPercent);
-    else
-      strcpy(buf, "OFF");
-    tft.setTextPadding(130);
-    tft.drawCentreString(buf, 237, 322, 2);
-    tft.setTextPadding(0);
-
-    // Row 3: Status banner (y=360, h=48)
-    uint16_t statusBg;
-    const char *statusText;
-    if (pidTestSuccess) {
-      statusBg = 0x0400;
-      statusText = "STABLE!";
-    } else if (heaterOn) {
-      statusBg = 0xF800;
-      statusText = "HEATING";
-    } else if (fanOn) {
-      statusBg = 0x001F;
-      statusText = "COOLING";
-    } else {
-      statusBg = TFT_ORANGE;
-      statusText = "AUTOMATING...";
-    }
-    tft.fillRect(10, 360, 300, 48, statusBg);
-    tft.drawRect(10, 360, 300, 48, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(statusText, CENTER_X, 376, 4);
-
-    // Elapsed time
-    char timeStr[32];
-    uint32_t elapsedSecs = (millis() - pidTestStartMs) / 1000;
-    sprintf(timeStr, "TIME: %02d:%02d", elapsedSecs / 60, elapsedSecs % 60);
-    tft.fillRect(10, 414, 300, 16, TFT_WHITE);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString(timeStr, CENTER_X, 416, 1);
-  } else {
-    tft.fillRect(10, 240, 300, 196, TFT_WHITE);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("SELECT START TO BEGIN", CENTER_X, 320, 2);
-  }
-
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DN: ADJ TEMP  |  SEL: START/STOP", CENTER_X, 447, 1);
-  tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
-}
 
 void drawHeaterTestPick() {
   static int prevSel = -1;
@@ -2517,7 +2291,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     if (!pidTrackRunning) {
-      tft.drawCentreString("UP/DN: TSET   RIGHT: +5C   SELECT: START   RETURN: BACK", CENTER_X, 458, 1);
+      tft.drawCentreString("UP/DN: TSET   RIGHT: HEATER   SELECT: START   RETURN: BACK", CENTER_X, 458, 1);
     } else {
       tft.drawCentreString("SELECT: STOP TEST   RETURN: BACK", CENTER_X, 458, 1);
     }
@@ -2526,16 +2300,22 @@ void drawPidTrackingMenu(bool valuesOnly) {
   }
 
   // --- Dynamic Value Updates ---
-  // Status Bar (Y=55 to 85)
-  uint16_t statBg = pidTrackRunning ? 0x0400 : 0x4208;
+  // Status Bar (Y=55 to 85) - Selectable Heater Output
+  const char *hName = "NOT SET";
+  if (pidTestChoice == 0) hName = "PRE-HEAT";
+  else if (pidTestChoice == 1) hName = "FERMENTATION (AMBIENT)";
+  else if (pidTestChoice == 2) hName = "PASTEURIZATION";
+
+  uint16_t statBg = pidTrackRunning ? 0x0400 : (pidTestChoice == -1 ? 0x9000 : 0x3566);
   tft.fillRect(10, 55, 300, 30, statBg);
   tft.drawRect(10, 55, 300, 30, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, statBg);
+
   if (pidTrackRunning) {
     uint32_t runSec = (millis() - pidTrackStartMs) / 1000;
-    sprintf(buf, "RUNNING (%lus)  TSET: %.1f C", (unsigned long)runSec, pidTrackTargetTemp);
+    sprintf(buf, "[%s] %lus  TSET: %.1f C", (pidTestChoice==0?"PRE":(pidTestChoice==1?"FERM":"PAST")), (unsigned long)runSec, pidTrackTargetTemp);
   } else {
-    sprintf(buf, "TSET: %.1f C  (UP/DN TO EDIT)", pidTrackTargetTemp);
+    sprintf(buf, "HEATER: %s", hName);
   }
   tft.drawCentreString(buf, CENTER_X, 62, 2);
 
@@ -2543,16 +2323,24 @@ void drawPidTrackingMenu(bool valuesOnly) {
   tft.fillRect(11, 91, 298, 113, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
-  // Current Temp / Setpoint
-  float curTemp = liquid2Status ? getPreheatTemp() : 0.0f;
+  // Current Temp / Setpoint based on selected heater chamber
+  float curTemp = 0.0f;
+  if (pidTestChoice == 0) {
+    curTemp = liquid2Status ? getPreheatTemp() : 0.0f;
+  } else if (pidTestChoice == 1) {
+    curTemp = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f;
+  } else if (pidTestChoice == 2) {
+    curTemp = liquid1Status ? getPastTemp() : 0.0f;
+  }
+
+  // Row 1: Temp & Error
   sprintf(buf, "TEMP: %.1f C / %.1f C", curTemp, pidTrackTargetTemp);
   tft.drawString(buf, 20, 96, 2);
 
-  // Steady Error
   sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
   tft.drawRightString(buf, 300, 96, 2);
 
-  // Rise Time
+  // Row 2: Rise Time & Settle Time
   if (pidTrackMetrics.riseTimeSec >= 0) {
     sprintf(buf, "RISE TIME: %ds", pidTrackMetrics.riseTimeSec);
   } else {
@@ -2560,7 +2348,6 @@ void drawPidTrackingMenu(bool valuesOnly) {
   }
   tft.drawString(buf, 20, 122, 2);
 
-  // Settling Time
   if (pidTrackMetrics.settlingTimeSec >= 0) {
     sprintf(buf, "SETTLE TIME: %ds", pidTrackMetrics.settlingTimeSec);
   } else {
@@ -2568,11 +2355,10 @@ void drawPidTrackingMenu(bool valuesOnly) {
   }
   tft.drawRightString(buf, 300, 122, 2);
 
-  // Overshoot
+  // Row 3: Overshoot & Stability
   sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
   tft.drawString(buf, 20, 148, 2);
 
-  // Stability Status
   uint16_t stabColor = TFT_BLACK;
   if (strcmp(pidTrackMetrics.stabilityStr, "STABLE") == 0) stabColor = 0x0400;
   else if (strcmp(pidTrackMetrics.stabilityStr, "SETTLING") == 0) stabColor = 0xE7E0;
@@ -2581,45 +2367,88 @@ void drawPidTrackingMenu(bool valuesOnly) {
   tft.setTextColor(stabColor, TFT_WHITE);
   sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
   tft.drawRightString(buf, 300, 148, 2);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+  // Row 4: Heater Power (under Overshoot)
+  sprintf(buf, "HEATER POWER: %d%%", currentHeatingPercent);
+  tft.drawString(buf, 20, 174, 2);
 
   // Divider line inside metrics box
   tft.drawFastHLine(15, 175, 290, TFT_LIGHTGREY);
 
-  // Live Graph Render
-  int targetY = 415 - (int)((pidTrackTargetTemp - 20.0f) * 190.0f / 80.0f);
-  targetY = constrain(targetY, 218, 415);
+  // --- Professional Line Graph rendering with X and Y Axes & Labels ---
+  const int gX = 40;     // Graph canvas left offset (leaving 40px for Y-axis labels)
+  const int gY = 216;    // Graph canvas top
+  const int gW = 265;    // Graph width
+  const int gH = 205;    // Graph height
+  const int gBottom = gY + gH; // Y = 421
 
-  // Redraw graph area inside canvas (X: 16..304, Y: 216..424)
-  tft.fillRect(16, 216, 288, 208, 0x2124);
-  
-  // Draw Dynamic Target Reference Line
-  tft.drawFastHLine(16, targetY, 288, TFT_RED);
-  tft.setTextColor(TFT_RED, 0x2124);
-  sprintf(buf, "%.0fC SETPOINT", pidTrackTargetTemp);
-  int txtY = (targetY - 12 < 218) ? targetY + 2 : targetY - 12;
-  tft.drawString(buf, 190, txtY, 1);
+  // 1. Draw Graph Background & Frame
+  tft.fillRect(gX, gY, gW, gH, 0x10A2); // Sleek dark slate canvas
+  tft.drawRect(gX - 1, gY - 1, gW + 2, gH + 2, TFT_DARKGREY);
 
+  // 2. Draw Y-Axis (Temperature: 20°C to 100°C) with Ticks & Labels
+  tft.drawLine(gX - 1, gY, gX - 1, gBottom, TFT_WHITE); // Y-axis solid line
+  tft.setTextColor(TFT_LIGHTGREY, 0x2124);
+  tft.setTextDatum(MR_DATUM); // Middle-Right aligned text for Y axis
+
+  // Draw 5 Y-axis gridlines and labels: 20C, 40C, 60C, 80C, 100C
+  for (int tempVal = 20; tempVal <= 100; tempVal += 20) {
+    int yPos = gBottom - (int)((float)(tempVal - 20) * (gH - 10) / 80.0f) - 5;
+    tft.drawFastHLine(gX, yPos, gW, 0x2965); // Dark gridline across graph
+    tft.drawFastHLine(gX - 4, yPos, 4, TFT_WHITE); // Tick mark on Y axis
+    sprintf(buf, "%d", tempVal);
+    tft.drawString(buf, gX - 6, yPos, 1);
+  }
+
+  // 3. Draw X-Axis (Time: 0s to Total Elapsed Time) with Ticks & Labels
+  tft.drawLine(gX - 1, gBottom + 1, gX + gW, gBottom + 1, TFT_WHITE); // X-axis solid line
+  tft.setTextDatum(TC_DATUM); // Top-Center aligned text for X axis
+
+  uint32_t totalSec = pidTrackRunning ? ((millis() - pidTrackStartMs) / 1000) : 0;
+  if (totalSec < 200) totalSec = 200; // Minimum 200s X-axis scale so full curve is visible
+
+  for (int xPct = 0; xPct <= 100; xPct += 25) {
+    int xPos = gX + (int)(xPct * gW / 100.0f);
+    tft.drawFastVLine(xPos, gY, gH, 0x2965); // Vertical gridline
+    tft.drawFastVLine(xPos, gBottom + 1, 4, TFT_WHITE); // Tick mark on X axis
+    uint32_t secLabel = (totalSec * xPct) / 100;
+    sprintf(buf, "%lus", (unsigned long)secLabel);
+    tft.drawString(buf, xPos, gBottom + 5, 1);
+  }
+
+  tft.setTextDatum(TL_DATUM); // Reset text datum to Top-Left default
+
+  // 4. Target Setpoint Reference Line (Dashed Red Line)
+  int targetY = gBottom - (int)((pidTrackTargetTemp - 20.0f) * (gH - 10) / 80.0f) - 5;
+  targetY = constrain(targetY, gY + 5, gBottom - 5);
+
+  for (int dx = gX; dx < gX + gW; dx += 8) {
+    tft.drawFastHLine(dx, targetY, 4, TFT_RED);
+  }
+  tft.setTextColor(TFT_RED, 0x10A2);
+  sprintf(buf, "SET: %.0fC", pidTrackTargetTemp);
+  int txtY = (targetY - 10 < gY + 2) ? targetY + 2 : targetY - 10;
+  tft.drawString(buf, gX + gW - 65, txtY, 1);
+
+  // 5. Plot Full-History Temperature Line (Zoomed out to show overall run)
   if (pidTrackHistoryCount > 1) {
-
     int count = min(pidTrackHistoryCount, 100);
-    float xStep = 280.0f / max(1, count - 1);
+    float xStep = (float)gW / max(1, count - 1);
 
     for (int i = 0; i < count - 1; i++) {
-      float t1 = pidTrackHistory[i];
-      float t2 = pidTrackHistory[i + 1];
+      float t1 = constrain(pidTrackHistory[i], 20.0f, 100.0f);
+      float t2 = constrain(pidTrackHistory[i + 1], 20.0f, 100.0f);
 
-      // Constrain temperature between 20C and 100C for plotting
-      t1 = constrain(t1, 20.0f, 100.0f);
-      t2 = constrain(t2, 20.0f, 100.0f);
+      int y1 = gBottom - (int)((t1 - 20.0f) * (gH - 10) / 80.0f) - 5;
+      int y2 = gBottom - (int)((t2 - 20.0f) * (gH - 10) / 80.0f) - 5;
 
-      // Y scale: 20C maps to Y=415, 100C maps to Y=225 (height 190px)
-      int y1 = 415 - (int)((t1 - 20.0f) * 190.0f / 80.0f);
-      int y2 = 415 - (int)((t2 - 20.0f) * 190.0f / 80.0f);
+      int x1 = gX + (int)(i * xStep);
+      int x2 = gX + (int)((i + 1) * xStep);
 
-      int x1 = 20 + (int)(i * xStep);
-      int x2 = 20 + (int)((i + 1) * xStep);
-
-      tft.drawLine(x1, y1, x2, y2, 0x07E0); // Bright green line
+      // Draw double-thick bright cyan/green line for high clarity
+      tft.drawLine(x1, y1, x2, y2, 0x07FF);
+      tft.drawLine(x1, y1 + 1, x2, y2 + 1, 0x07FF);
     }
   }
 }
