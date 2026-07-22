@@ -53,8 +53,8 @@ typedef struct __attribute__((packed)) {
   int16_t pillRSSI;      // Signal Strength
   uint8_t checksum;      // For data integrity
 } struct_message;
-static_assert(sizeof(struct_message) == 40, "struct_message size must be 40 bytes");
-
+static_assert(sizeof(struct_message) == 40,
+              "struct_message size must be 40 bytes");
 
 struct_message txData;
 static portMUX_TYPE txDataMux = portMUX_INITIALIZER_UNLOCKED;
@@ -286,7 +286,8 @@ void loop() {
       } else {
         txData.ds18Status = 0; // Sensor lost
       }
-      sensors.requestTemperatures(); // Start next conversion (completes during the next 1000ms)
+      sensors.requestTemperatures(); // Start next conversion (completes during
+                                     // the next 1000ms)
     } else {
       txData.room2LiquidTemp = -127.0;
     }
@@ -298,12 +299,18 @@ void loop() {
 
       // Temperature Compensation & Dual-Slope Calibration (Nernst-based)
       // Calibrated against 4.01, 6.86, and 9.18 buffers @ ~30C
-      float tempC = (txData.ds18Status == 1 && txData.room2LiquidTemp > -50.0f) ? txData.room2LiquidTemp : 25.0f;
-      float base_slope = (voltage >= 2.555f) ? 0.16553f : 0.17086f; // Acid vs Alkaline slope @ 25C
+      float tempC = (txData.ds18Status == 1 && txData.room2LiquidTemp > -50.0f)
+                        ? txData.room2LiquidTemp
+                        : 25.0f;
+      float base_slope = (voltage >= 2.555f)
+                             ? 0.16553f
+                             : 0.17086f; // Acid vs Alkaline slope @ 25C
       float slope_V_pH = base_slope * (tempC + 273.15f) / 298.15f;
       txData.phValue = 7.0f - (voltage - 2.555f) / slope_V_pH;
-      if (txData.phValue < 0.0f) txData.phValue = 0.0f;
-      if (txData.phValue > 14.0f) txData.phValue = 14.0f;
+      if (txData.phValue < 0.0f)
+        txData.phValue = 0.0f;
+      if (txData.phValue > 14.0f)
+        txData.phValue = 14.0f;
 
       // Read channel A1 for BTS7960 current sense
       int16_t results_motor = ads.readADC_SingleEnded(1);
@@ -312,7 +319,8 @@ void loop() {
       txData.motorSenseVolts = 0.0f;
     }
 
-    // 5. UART Transmission — copy under lock so BLE callback can't tear a field mid-send
+    // 5. UART Transmission — copy under lock so BLE callback can't tear a field
+    // mid-send
     portENTER_CRITICAL(&txDataMux);
     struct_message snapshot = txData;
     portEXIT_CRITICAL(&txDataMux);
@@ -320,13 +328,15 @@ void loop() {
     snapshot.checksum = calculateChecksum(snapshot);
     Serial2.write((uint8_t *)&snapshot, sizeof(snapshot));
 
-    // 6. BLE scanning check — happens in background via callbacks (check once per second)
+    // 6. BLE scanning check — happens in background via callbacks (check once
+    // per second)
     if (!pBLEScan->isScanning()) {
       pBLEScan->start(0, nullptr, false);
     }
   }
 
-  // 7. Receive motor commands from main ESP32 (RUNS EVERY LOOP ITERATION, NO DELAY)
+  // 7. Receive motor commands from main ESP32 (RUNS EVERY LOOP ITERATION, NO
+  // DELAY)
   while (Serial2.available() >= (int)sizeof(motor_cmd_t)) {
     if (Serial2.peek() != 0xBE) {
       Serial.printf("Discarding non-BE byte: 0x%02X\n", Serial2.read());
@@ -338,14 +348,15 @@ void loop() {
     const uint8_t *p = (const uint8_t *)&cmd;
     for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
       cs ^= p[i];
-    
+
     Serial.printf("[Motor CMD] Recv speed=%d cw=%d cs=0x%02X calc_cs=0x%02X\n",
                   cmd.motorSpeed, cmd.motorCW, cmd.checksum, cs);
 
     if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
       int pwmSpeed = map(cmd.motorSpeed, 0, 100, 0, 255);
-      Serial.printf("  Setting PWM: LPWM=%s, RPWM=%s, val=%d\n", 
-                    cmd.motorCW ? "ON" : "OFF", cmd.motorCW ? "OFF" : "ON", pwmSpeed);
+      Serial.printf("  Setting PWM: LPWM=%s, RPWM=%s, val=%d\n",
+                    cmd.motorCW ? "ON" : "OFF", cmd.motorCW ? "OFF" : "ON",
+                    pwmSpeed);
       if (cmd.motorSpeed == 0) {
         ledcWrite(LPWM_CH, 0);
         ledcWrite(RPWM_CH, 0);
