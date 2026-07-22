@@ -144,6 +144,7 @@ float pidTrackTargetTemp = 80.0f;
 float pidTrackHistory[100];
 int pidTrackHistoryCount = 0;
 PidTrackingMetrics pidTrackMetrics = {0.0f, 80.0f, 0.0f, 0.0f, -1, -1, 0.0f, "IDLE"};
+char pidLogFileName[32] = "/pid_track.csv";
 
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
@@ -1195,10 +1196,23 @@ void loop() {
         pidTrackIntegral = 0.0f;
         pidTrackPrevError = 0.0f;
 
+        // Create unique separate log filename for this test run
+        if (rtcStatus) {
+          DateTime now = rtc.now();
+          sprintf(pidLogFileName, "/pid_%02d%02d_%02d%02d.csv", now.month(), now.day(), now.hour(), now.minute());
+        } else {
+          int runNum = 1;
+          while (runNum < 999) {
+            sprintf(pidLogFileName, "/pid_run_%02d.csv", runNum);
+            if (!sdStatus || !SD.exists(pidLogFileName)) break;
+            runNum++;
+          }
+        }
+
         if (sdStatus) {
-          File f = SD.open("/pid_track.csv", FILE_WRITE);
+          File f = SD.open(pidLogFileName, FILE_WRITE);
           if (f) {
-            f.println("timestamp_s,temp_c,setpoint_c,pwm_pct,error_c");
+            f.println("RTC_Time,Elapsed_s,Temp_C,Setpoint_C,PWM_pct,Error_C");
             f.close();
           }
         }
@@ -2288,12 +2302,17 @@ void loop() {
           strcpy(pidTrackMetrics.stabilityStr, "UNSTABLE");
         }
 
-        // SD Card CSV Logging every 2s
-        if (sdStatus) {
-          File f = SD.open("/pid_track.csv", FILE_APPEND);
+        // SD Card CSV Logging every 2s to unique run file
+        if (sdStatus && pidLogFileName[0] != '\0') {
+          File f = SD.open(pidLogFileName, FILE_APPEND);
           if (f) {
-            f.printf("%lu,%.2f,%.1f,%d,%.2f\n",
-                     (unsigned long)elapsedSec, curT, pidTrackTargetTemp,
+            char timeBuf[12] = "--:--:--";
+            if (rtcStatus) {
+              DateTime now = rtc.now();
+              sprintf(timeBuf, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+            }
+            f.printf("%s,%lu,%.2f,%.1f,%d,%.2f\n",
+                     timeBuf, (unsigned long)elapsedSec, curT, pidTrackTargetTemp,
                      currentHeatingPercent, error);
             f.close();
           }

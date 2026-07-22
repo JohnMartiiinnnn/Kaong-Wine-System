@@ -2472,9 +2472,12 @@ void drawPidTrackingMenu(bool valuesOnly) {
     tft.fillRect(15, 215, 290, 210, 0x2124); // Dark panel
     tft.drawRect(15, 215, 290, 210, TFT_DARKGREY);
 
-    // Graph Title
+    // Graph Title & Active Log File
     tft.setTextColor(TFT_LIGHTGREY, 0x2124);
     tft.drawString("TEMP TREND (20C - 100C)", 22, 220, 1);
+    if (pidLogFileName[0] != '\0') {
+      tft.drawRightString(pidLogFileName, 298, 220, 1);
+    }
 
     // Footer
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);

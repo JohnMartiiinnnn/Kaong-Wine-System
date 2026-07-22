@@ -266,6 +266,7 @@ extern float pidTrackTargetTemp;
 extern float pidTrackHistory[100];
 extern int pidTrackHistoryCount;
 extern PidTrackingMetrics pidTrackMetrics;
+extern char pidLogFileName[32];
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;
