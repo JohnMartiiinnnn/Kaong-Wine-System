@@ -2249,22 +2249,35 @@ void loop() {
     if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
       static float pidTrackIntegral = 0.0f;
       static float pidTrackPrevError = 0.0f;
+      static uint32_t pidTrackLastPidCalcMs = 0;
+
       float curT = liquid2Status ? getPreheatTemp() : 25.0f;
       float error = pidTrackTargetTemp - curT;
 
-      // PID Calculation
-      if (curT >= PID_THROTTLE_TEMP) {
-        pidTrackIntegral += error;
-        if (pidTrackIntegral > 100.0f) pidTrackIntegral = 100.0f;
-        if (pidTrackIntegral < -100.0f) pidTrackIntegral = -100.0f;
-      } else {
-        pidTrackIntegral = 0.0f;
+      // Run PID calculation at fixed 1-second interval
+      if (millis() - pidTrackLastPidCalcMs >= 1000) {
+        pidTrackLastPidCalcMs = millis();
+
+        if (error > 5.0f) {
+          // Full 100% duty cycle ramp phase when > 5C below target setpoint
+          currentHeatingPercent = 100;
+          pidTrackIntegral = 0.0f;
+        } else {
+          // Smooth PID throttling within 5C of target setpoint
+          pidTrackIntegral += error;
+          if (pidTrackIntegral > 100.0f) pidTrackIntegral = 100.0f;
+          if (pidTrackIntegral < 0.0f) pidTrackIntegral = 0.0f;
+
+          float dTerm = (error - pidTrackPrevError);
+          float pidOut = (PID_KP * error) + (PID_KI * pidTrackIntegral) + (PID_KD * dTerm);
+
+          if (pidOut < 0.0f) pidOut = 0.0f;
+          if (pidOut > 100.0f) pidOut = 100.0f;
+
+          currentHeatingPercent = (int)pidOut;
+        }
+        pidTrackPrevError = error;
       }
-      float pidOut = (PID_KP * error) + (PID_KI * pidTrackIntegral) + (PID_KD * (error - pidTrackPrevError));
-      pidTrackPrevError = error;
-      if (pidOut < 0.0f) pidOut = 0.0f;
-      if (pidOut > 100.0f) pidOut = 100.0f;
-      currentHeatingPercent = (int)pidOut;
 
       // Sampling every 2000ms
       if (millis() - pidTrackLastSampleMs >= 2000) {
