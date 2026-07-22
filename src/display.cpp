@@ -2472,14 +2472,9 @@ void drawPidTrackingMenu(bool valuesOnly) {
     tft.fillRect(15, 215, 290, 210, 0x2124); // Dark panel
     tft.drawRect(15, 215, 290, 210, TFT_DARKGREY);
 
-    // Graph Title & Target reference
+    // Graph Title
     tft.setTextColor(TFT_LIGHTGREY, 0x2124);
     tft.drawString("TEMP TREND (20C - 100C)", 22, 220, 1);
-    
-    // Draw 80C target reference line (Y_pixel = 265)
-    tft.drawFastHLine(15, 265, 290, TFT_RED);
-    tft.setTextColor(TFT_RED, 0x2124);
-    tft.drawString("80C SETPOINT", 200, 253, 1);
 
     // Footer
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
@@ -2557,16 +2552,17 @@ void drawPidTrackingMenu(bool valuesOnly) {
   int targetY = 415 - (int)((pidTrackTargetTemp - 20.0f) * 190.0f / 80.0f);
   targetY = constrain(targetY, 218, 415);
 
+  // Redraw graph area inside canvas (X: 16..304, Y: 216..424)
+  tft.fillRect(16, 216, 288, 208, 0x2124);
+  
+  // Draw Dynamic Target Reference Line
+  tft.drawFastHLine(16, targetY, 288, TFT_RED);
+  tft.setTextColor(TFT_RED, 0x2124);
+  sprintf(buf, "%.0fC SETPOINT", pidTrackTargetTemp);
+  int txtY = (targetY - 12 < 218) ? targetY + 2 : targetY - 12;
+  tft.drawString(buf, 190, txtY, 1);
+
   if (pidTrackHistoryCount > 1) {
-    // Redraw graph area inside canvas (X: 16..304, Y: 216..424)
-    tft.fillRect(16, 216, 288, 208, 0x2124);
-    
-    // Draw Dynamic Target Reference Line
-    tft.drawFastHLine(16, targetY, 288, TFT_RED);
-    tft.setTextColor(TFT_RED, 0x2124);
-    sprintf(buf, "%.0fC SETPOINT", pidTrackTargetTemp);
-    int txtY = (targetY - 12 < 218) ? targetY + 2 : targetY - 12;
-    tft.drawString(buf, 190, txtY, 1);
 
     int count = min(pidTrackHistoryCount, 100);
     float xStep = 280.0f / max(1, count - 1);
