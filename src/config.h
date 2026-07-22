@@ -98,7 +98,8 @@ enum AppState {
   HEATER_TEST_PICK,
   CALIB_WIZARD,
   RAPT_TEST_MENU,
-  PH_FERM_MENU
+  PH_FERM_MENU,
+  PID_TRACKING_MENU
 };
 
 extern long rawHX711;
@@ -244,6 +245,27 @@ extern bool pidTestRunning;
 extern bool pidTestSuccess;
 extern uint32_t pidTestStableStart;
 extern uint32_t pidTestStartMs;
+
+// ---- PID Thermal Tracking Test ----
+struct PidTrackingMetrics {
+  float startTemp;
+  float targetTemp;
+  float peakTemp;
+  float steadyStateError;
+  int riseTimeSec;     // -1 if not reached
+  int settlingTimeSec; // -1 if not settled
+  float overshootDeg;  // Peak above target
+  char stabilityStr[12];
+};
+
+extern bool pidTrackNeedsFullRedraw;
+extern bool pidTrackRunning;
+extern uint32_t pidTrackStartMs;
+extern uint32_t pidTrackLastSampleMs;
+extern float pidTrackTargetTemp;
+extern float pidTrackHistory[100];
+extern int pidTrackHistoryCount;
+extern PidTrackingMetrics pidTrackMetrics;
 
 // ---- Button Latch State ----
 extern bool ljRight, ljLeft, ljUp, ljDown, ljSelect;

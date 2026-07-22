@@ -38,3 +38,4 @@ void drawFlowCalMenu(bool valuesOnly = false);
 void drawCalibWizard();
 void drawRaptTestPage(bool valuesOnly = false);
 void drawPhFermMenu(bool valuesOnly = false);
+void drawPidTrackingMenu(bool valuesOnly = false);

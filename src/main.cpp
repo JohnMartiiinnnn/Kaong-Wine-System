@@ -135,6 +135,16 @@ int pidFanPercent = 0;
 int pidFermSensor = 1;
 int pidPreHeatSensor = 0;
 
+// ---- PID Thermal Tracking Test State ----
+bool pidTrackNeedsFullRedraw = true;
+bool pidTrackRunning = false;
+uint32_t pidTrackStartMs = 0;
+uint32_t pidTrackLastSampleMs = 0;
+float pidTrackTargetTemp = 80.0f;
+float pidTrackHistory[100];
+int pidTrackHistoryCount = 0;
+PidTrackingMetrics pidTrackMetrics = {0.0f, 80.0f, 0.0f, 0.0f, -1, -1, 0.0f, "IDLE"};
+
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
@@ -654,7 +664,7 @@ void loop() {
       systemCheckSelection = (systemCheckSelection + 1) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
-      pidTestChoice = (pidTestChoice + 1) % 3;
+      pidTestChoice = (pidTestChoice + 1) % 4;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
       if (cDown && !ljDown) {
@@ -802,7 +812,7 @@ void loop() {
       systemCheckSelection = (systemCheckSelection + 12) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TEST_PICK) {
-      pidTestChoice = (pidTestChoice + 2) % 3;
+      pidTestChoice = (pidTestChoice + 3) % 4;
       drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU && !pidTestRunning) {
       if (pidTestTargetSelection == 0) {
@@ -1117,23 +1127,76 @@ void loop() {
         drawPhFermMenu();
       }
     } else if (currentAppState == PID_TEST_PICK) {
-      currentAppState = PID_TEST_MENU;
-      pidTestNeedsFullRedraw = true;
-      if (pidTestChoice == 0) {
-        pidTestHeatTarget = 35.0f;
-        pidTestCoolTarget = 30.0f;
-        pidPreHeatSensor = 0;
-      } else if (pidTestChoice == 1) {
-        pidTestHeatTarget = 27.0f;
-        pidTestCoolTarget = 30.0f;
-        pidFermSensor = 1;
+      if (pidTestChoice == 3) {
+        currentAppState = PID_TRACKING_MENU;
+        pidTrackNeedsFullRedraw = true;
+        pidTrackRunning = false;
+        pidTrackHistoryCount = 0;
+        float initTemp = (liquid2Status) ? getPreheatTemp() : 25.0f;
+        pidTrackMetrics.startTemp = initTemp;
+        pidTrackMetrics.targetTemp = 80.0f;
+        pidTrackMetrics.peakTemp = initTemp;
+        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
+        pidTrackMetrics.riseTimeSec = -1;
+        pidTrackMetrics.settlingTimeSec = -1;
+        pidTrackMetrics.overshootDeg = 0.0f;
+        strcpy(pidTrackMetrics.stabilityStr, "IDLE");
+        drawPidTrackingMenu();
       } else {
-        pidTestHeatTarget = 35.0f;
-        pidTestCoolTarget = 30.0f;
+        currentAppState = PID_TEST_MENU;
+        pidTestNeedsFullRedraw = true;
+        if (pidTestChoice == 0) {
+          pidTestHeatTarget = 35.0f;
+          pidTestCoolTarget = 30.0f;
+          pidPreHeatSensor = 0;
+        } else if (pidTestChoice == 1) {
+          pidTestHeatTarget = 27.0f;
+          pidTestCoolTarget = 30.0f;
+          pidFermSensor = 1;
+        } else {
+          pidTestHeatTarget = 35.0f;
+          pidTestCoolTarget = 30.0f;
+        }
+        pidTestRunning = false;
+        pidTestSuccess = false;
+        drawPidTestMenu();
       }
-      pidTestRunning = false;
-      pidTestSuccess = false;
-      drawPidTestMenu();
+    } else if (currentAppState == PID_TRACKING_MENU) {
+      if (!pidTrackRunning) {
+        pidTrackRunning = true;
+        pidTrackStartMs = millis();
+        pidTrackLastSampleMs = 0;
+        pidTrackHistoryCount = 0;
+        pidTrackTargetTemp = 80.0f;
+        float initTemp = (liquid2Status) ? getPreheatTemp() : 25.0f;
+        pidTrackMetrics.startTemp = initTemp;
+        pidTrackMetrics.targetTemp = 80.0f;
+        pidTrackMetrics.peakTemp = initTemp;
+        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
+        pidTrackMetrics.riseTimeSec = -1;
+        pidTrackMetrics.settlingTimeSec = -1;
+        pidTrackMetrics.overshootDeg = 0.0f;
+        strcpy(pidTrackMetrics.stabilityStr, "TESTING");
+        static float pidTrackIntegral = 0.0f;
+        static float pidTrackPrevError = 0.0f;
+        pidTrackIntegral = 0.0f;
+        pidTrackPrevError = 0.0f;
+
+        if (sdStatus) {
+          File f = SD.open("/pid_track.csv", FILE_WRITE);
+          if (f) {
+            f.println("timestamp_s,temp_c,setpoint_c,pwm_pct,error_c");
+            f.close();
+          }
+        }
+      } else {
+        pidTrackRunning = false;
+        currentHeatingPercent = 0;
+        digitalWrite(SSR_PREHEAT, LOW);
+        strcpy(pidTrackMetrics.stabilityStr, "STOPPED");
+      }
+      pidTrackNeedsFullRedraw = true;
+      drawPidTrackingMenu();
     } else if (currentAppState == PID_TEST_MENU) {
       if (!pidTestRunning) {
         pidTestRunning = true;
@@ -1647,6 +1710,13 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
+    } else if (currentAppState == PID_TRACKING_MENU) {
+      pidTrackRunning = false;
+      currentHeatingPercent = 0;
+      digitalWrite(SSR_PREHEAT, LOW);
+      currentAppState = PID_TEST_PICK;
+      pidTestNeedsFullRedraw = true;
+      drawPidTestPick();
     } else if (currentAppState == PID_TEST_MENU) {
       pidTestRunning = false;
       currentHeatingPercent = 0;
@@ -2119,6 +2189,96 @@ void loop() {
       drawPidTestMenu();
     }
 
+    // ---- PID Thermal Tracking Test Control ----
+    if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
+      static float pidTrackIntegral = 0.0f;
+      static float pidTrackPrevError = 0.0f;
+      float curT = liquid2Status ? getPreheatTemp() : 25.0f;
+      float error = pidTrackTargetTemp - curT;
+
+      // PID Calculation
+      if (curT >= PID_THROTTLE_TEMP) {
+        pidTrackIntegral += error;
+        if (pidTrackIntegral > 100.0f) pidTrackIntegral = 100.0f;
+        if (pidTrackIntegral < -100.0f) pidTrackIntegral = -100.0f;
+      } else {
+        pidTrackIntegral = 0.0f;
+      }
+      float pidOut = (PID_KP * error) + (PID_KI * pidTrackIntegral) + (PID_KD * (error - pidTrackPrevError));
+      pidTrackPrevError = error;
+      if (pidOut < 0.0f) pidOut = 0.0f;
+      if (pidOut > 100.0f) pidOut = 100.0f;
+      currentHeatingPercent = (int)pidOut;
+
+      // Sampling every 2000ms
+      if (millis() - pidTrackLastSampleMs >= 2000) {
+        pidTrackLastSampleMs = millis();
+        uint32_t elapsedSec = (millis() - pidTrackStartMs) / 1000;
+
+        // Push to graph history array
+        if (pidTrackHistoryCount < 100) {
+          pidTrackHistory[pidTrackHistoryCount++] = curT;
+        } else {
+          for (int i = 0; i < 99; i++) {
+            pidTrackHistory[i] = pidTrackHistory[i + 1];
+          }
+          pidTrackHistory[99] = curT;
+        }
+
+        // Metrics Calculation
+        pidTrackMetrics.steadyStateError = fabs(curT - pidTrackTargetTemp);
+
+        if (curT > pidTrackMetrics.peakTemp) {
+          pidTrackMetrics.peakTemp = curT;
+        }
+        if (pidTrackMetrics.peakTemp > pidTrackTargetTemp) {
+          pidTrackMetrics.overshootDeg = pidTrackMetrics.peakTemp - pidTrackTargetTemp;
+        }
+
+        // Rise Time: Time to reach 90% of setpoint
+        if (pidTrackMetrics.riseTimeSec < 0) {
+          float target90 = pidTrackMetrics.startTemp + 0.9f * (pidTrackTargetTemp - pidTrackMetrics.startTemp);
+          if (curT >= target90) {
+            pidTrackMetrics.riseTimeSec = (int)elapsedSec;
+          }
+        }
+
+        // Settling Time: Time when temp enters and remains within +-2% / +-1.6C band (78.4C to 81.6C)
+        static uint32_t inBandStartMs = 0;
+        if (curT >= 78.4f && curT <= 81.6f) {
+          if (inBandStartMs == 0) inBandStartMs = millis();
+          if (pidTrackMetrics.settlingTimeSec < 0 && (millis() - inBandStartMs >= 5000)) {
+            pidTrackMetrics.settlingTimeSec = (int)((inBandStartMs - pidTrackStartMs) / 1000);
+          }
+        } else {
+          inBandStartMs = 0;
+        }
+
+        // Stability Status
+        if (curT < 78.0f) {
+          strcpy(pidTrackMetrics.stabilityStr, "TESTING");
+        } else if (pidTrackMetrics.steadyStateError <= 0.5f) {
+          strcpy(pidTrackMetrics.stabilityStr, "STABLE");
+        } else if (pidTrackMetrics.steadyStateError <= 2.0f) {
+          strcpy(pidTrackMetrics.stabilityStr, "SETTLING");
+        } else {
+          strcpy(pidTrackMetrics.stabilityStr, "UNSTABLE");
+        }
+
+        // SD Card CSV Logging every 2s
+        if (sdStatus) {
+          File f = SD.open("/pid_track.csv", FILE_APPEND);
+          if (f) {
+            f.printf("%lu,%.2f,%.1f,%d,%.2f\n",
+                     (unsigned long)elapsedSec, curT, pidTrackTargetTemp,
+                     currentHeatingPercent, error);
+            f.close();
+          }
+        }
+      }
+      drawPidTrackingMenu(true);
+    }
+
     // ---- Transfer Completion ----
     if (stageTransferring && millis() - transferStartMs >= 10000UL) {
       stageTransferring = false;
@@ -2388,6 +2548,8 @@ void loop() {
         activeHeaterPin = SSR_FERM;
       else
         activeHeaterPin = SSR_PAST;
+    } else if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
+      activeHeaterPin = SSR_PREHEAT;
     } else if (currentAppState == HEATER_TEST_MENU && heaterTestRunning) {
       currentHeatingPercent = heaterTestPercent;
       if (heaterTestStage == 0)

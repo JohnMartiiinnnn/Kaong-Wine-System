@@ -316,7 +316,7 @@ Selecting an option enters the corresponding `AppState`:
 | **1** | LIGHT INDICATORS | `LIGHT_TEST_MENU` | Toggle Green, Yellow, and Red status lights |
 | **2** | RELAY TEST | `RELAY_TEST_MENU` | Manual/automated sequencing of all 9 relays |
 | **3** | MOTOR TEST | `MOTOR_TEST_MENU` | Test JGB37 mixing motor speed & direction |
-| **4** | PID CONTROL | `PID_TEST_PICK` | Test temperature profiles and PID controller |
+| **4** | PID CONTROL | `PID_TEST_PICK` | Test temperature profiles, PID controller, and PID Thermal Tracking (80°C step test with live graph & SD logging) |
 | **5** | HEATER OUTPUT | `HEATER_TEST_MENU` | Test pre-heat and pasteurization heaters (no fermentation) |
 | **6** | SD CARD VERIFY | `SD_VERIFY_MENU` | Check SPI connection & read/write capabilities on SD card |
 | **7** | UART MONITOR | `UART_MONITOR_MENU` | Monitor incoming data struct from Secondary Controller |

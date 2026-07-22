@@ -1150,23 +1150,24 @@ void drawStageParamMenu() {
 void drawPidTestPick() {
   static int prevSel = -1;
 
-  const char *options[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
+  const char *options[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION", "THERMAL TRACKING"};
 
   auto drawTile = [&](int i, bool sel) {
     uint16_t color = sel ? 0x3566 : 0xD6BA;
     uint16_t txtColor = sel ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(20, 80 + (i * 110), 280, 80, color);
-    tft.drawRect(20, 80 + (i * 110), 280, 80, TFT_DARKGREY);
+    int y = 70 + (i * 85);
+    tft.fillRect(20, y, 280, 70, color);
+    tft.drawRect(20, y, 280, 70, TFT_DARKGREY);
     tft.setTextColor(txtColor, color);
-    tft.drawCentreString(options[i], CENTER_X, 105 + (i * 110), 4);
+    tft.drawCentreString(options[i], CENTER_X, y + 22, 4);
   };
 
   if (pidTestNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("SELECT CHAMBER", 10, 15, 4);
-    for (int i = 0; i < 3; i++)
+    tft.drawString("PID CONTROL MODE", 10, 15, 4);
+    for (int i = 0; i < 4; i++)
       drawTile(i, pidTestChoice == i);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     tft.drawCentreString("UP/DOWN: SELECT   SELECT: CONFIRM   RETURN: BACK",
@@ -2453,5 +2454,131 @@ void drawPhFermMenu(bool valuesOnly) {
   tft.fillRect(11, 402, 298, 21, liqStatBg);
   tft.setTextColor(TFT_WHITE, liqStatBg);
   tft.drawCentreString(liqOk ? "OK" : "NO DATA", CENTER_X, 406, 1);
+}
+
+void drawPidTrackingMenu(bool valuesOnly) {
+  char buf[40];
+
+  if (!valuesOnly || pidTrackNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("PID THERMAL TRACKING", 10, 15, 4);
+
+    // Static Metrics Container (Y=90 to 205)
+    tft.drawRect(10, 90, 300, 115, TFT_DARKGREY);
+
+    // Graph Area Border & Canvas Setup (Y=215 to 425)
+    tft.fillRect(15, 215, 290, 210, 0x2124); // Dark panel
+    tft.drawRect(15, 215, 290, 210, TFT_DARKGREY);
+
+    // Graph Title & Target reference
+    tft.setTextColor(TFT_LIGHTGREY, 0x2124);
+    tft.drawString("TEMP TREND (20C - 100C)", 22, 220, 1);
+    
+    // Draw 80C target reference line (Y_pixel = 265)
+    tft.drawFastHLine(15, 265, 290, TFT_RED);
+    tft.setTextColor(TFT_RED, 0x2124);
+    tft.drawString("80C SETPOINT", 200, 253, 1);
+
+    // Footer
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("SELECT: START/STOP TEST   RETURN: BACK", CENTER_X, 458, 1);
+
+    pidTrackNeedsFullRedraw = false;
+  }
+
+  // --- Dynamic Value Updates ---
+  // Status Bar (Y=55 to 85)
+  uint16_t statBg = pidTrackRunning ? 0x0400 : 0x4208;
+  tft.fillRect(10, 55, 300, 30, statBg);
+  tft.drawRect(10, 55, 300, 30, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, statBg);
+  if (pidTrackRunning) {
+    uint32_t runSec = (millis() - pidTrackStartMs) / 1000;
+    sprintf(buf, "TRACKING: RUNNING (%lus)", (unsigned long)runSec);
+  } else {
+    sprintf(buf, "TRACKING: IDLE (PRESS SELECT)");
+  }
+  tft.drawCentreString(buf, CENTER_X, 62, 2);
+
+  // Metrics Grid (Y=90 to 205)
+  tft.fillRect(11, 91, 298, 113, TFT_WHITE);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+  // Current Temp / Setpoint
+  float curTemp = liquid2Status ? getPreheatTemp() : 0.0f;
+  sprintf(buf, "TEMP: %.1f C / %.1f C", curTemp, pidTrackTargetTemp);
+  tft.drawString(buf, 20, 96, 2);
+
+  // Steady Error
+  sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
+  tft.drawRightString(buf, 300, 96, 2);
+
+  // Rise Time
+  if (pidTrackMetrics.riseTimeSec >= 0) {
+    sprintf(buf, "RISE TIME: %ds", pidTrackMetrics.riseTimeSec);
+  } else {
+    sprintf(buf, "RISE TIME: ---");
+  }
+  tft.drawString(buf, 20, 122, 2);
+
+  // Settling Time
+  if (pidTrackMetrics.settlingTimeSec >= 0) {
+    sprintf(buf, "SETTLE TIME: %ds", pidTrackMetrics.settlingTimeSec);
+  } else {
+    sprintf(buf, "SETTLE TIME: ---");
+  }
+  tft.drawRightString(buf, 300, 122, 2);
+
+  // Overshoot
+  sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
+  tft.drawString(buf, 20, 148, 2);
+
+  // Stability Status
+  uint16_t stabColor = TFT_BLACK;
+  if (strcmp(pidTrackMetrics.stabilityStr, "STABLE") == 0) stabColor = 0x0400;
+  else if (strcmp(pidTrackMetrics.stabilityStr, "SETTLING") == 0) stabColor = 0xE7E0;
+  else if (strcmp(pidTrackMetrics.stabilityStr, "UNSTABLE") == 0) stabColor = TFT_RED;
+  
+  tft.setTextColor(stabColor, TFT_WHITE);
+  sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
+  tft.drawRightString(buf, 300, 148, 2);
+
+  // Divider line inside metrics box
+  tft.drawFastHLine(15, 175, 290, TFT_LIGHTGREY);
+
+  // Live Graph Render
+  if (pidTrackHistoryCount > 1) {
+    // Redraw graph area inside canvas (X: 16..304, Y: 216..424)
+    tft.fillRect(16, 216, 288, 208, 0x2124);
+    
+    // Draw 80.0C Target Line
+    tft.drawFastHLine(16, 265, 288, TFT_RED);
+    tft.setTextColor(TFT_RED, 0x2124);
+    tft.drawString("80C SETPOINT", 200, 253, 1);
+
+    int count = min(pidTrackHistoryCount, 100);
+    float xStep = 280.0f / max(1, count - 1);
+
+    for (int i = 0; i < count - 1; i++) {
+      float t1 = pidTrackHistory[i];
+      float t2 = pidTrackHistory[i + 1];
+
+      // Constrain temperature between 20C and 100C for plotting
+      t1 = constrain(t1, 20.0f, 100.0f);
+      t2 = constrain(t2, 20.0f, 100.0f);
+
+      // Y scale: 20C maps to Y=415, 100C maps to Y=225 (height 190px)
+      int y1 = 415 - (int)((t1 - 20.0f) * 190.0f / 80.0f);
+      int y2 = 415 - (int)((t2 - 20.0f) * 190.0f / 80.0f);
+
+      int x1 = 20 + (int)(i * xStep);
+      int x2 = 20 + (int)((i + 1) * xStep);
+
+      tft.drawLine(x1, y1, x2, y2, 0x07E0); // Bright green line
+    }
+  }
 }
 
