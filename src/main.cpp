@@ -1181,12 +1181,11 @@ void loop() {
         pidTrackStartMs = millis();
         pidTrackLastSampleMs = 0;
         pidTrackHistoryCount = 0;
-        pidTrackTargetTemp = 80.0f;
         float initTemp = (liquid2Status) ? getPreheatTemp() : 25.0f;
         pidTrackMetrics.startTemp = initTemp;
-        pidTrackMetrics.targetTemp = 80.0f;
+        pidTrackMetrics.targetTemp = pidTrackTargetTemp;
         pidTrackMetrics.peakTemp = initTemp;
-        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
+        pidTrackMetrics.steadyStateError = fabs(initTemp - pidTrackTargetTemp);
         pidTrackMetrics.riseTimeSec = -1;
         pidTrackMetrics.settlingTimeSec = -1;
         pidTrackMetrics.overshootDeg = 0.0f;
@@ -2266,9 +2265,10 @@ void loop() {
           }
         }
 
-        // Settling Time: Time when temp enters and remains within +-2% / +-1.6C band (78.4C to 81.6C)
+        // Settling Time: Time when temp enters and remains within +-2% band around pidTrackTargetTemp
         static uint32_t inBandStartMs = 0;
-        if (curT >= 78.4f && curT <= 81.6f) {
+        float band = max(1.5f, pidTrackTargetTemp * 0.02f);
+        if (curT >= (pidTrackTargetTemp - band) && curT <= (pidTrackTargetTemp + band)) {
           if (inBandStartMs == 0) inBandStartMs = millis();
           if (pidTrackMetrics.settlingTimeSec < 0 && (millis() - inBandStartMs >= 5000)) {
             pidTrackMetrics.settlingTimeSec = (int)((inBandStartMs - pidTrackStartMs) / 1000);
@@ -2278,7 +2278,7 @@ void loop() {
         }
 
         // Stability Status
-        if (curT < 78.0f) {
+        if (curT < (pidTrackTargetTemp - band)) {
           strcpy(pidTrackMetrics.stabilityStr, "TESTING");
         } else if (pidTrackMetrics.steadyStateError <= 0.5f) {
           strcpy(pidTrackMetrics.stabilityStr, "STABLE");
