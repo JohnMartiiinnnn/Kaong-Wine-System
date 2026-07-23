@@ -2062,8 +2062,8 @@ void loop() {
         }
       }
 
-      // Sampling every 1000ms (1 second)
-      if (millis() - pidTrackLastSampleMs >= 1000) {
+      // Sampling every 2000ms (2 seconds)
+      if (millis() - pidTrackLastSampleMs >= 2000) {
         pidTrackLastSampleMs = millis();
         uint32_t elapsedSec = (millis() - pidTrackStartMs) / 1000;
 
@@ -2118,7 +2118,7 @@ void loop() {
           strcpy(pidTrackMetrics.stabilityStr, "UNSTABLE");
         }
 
-        // SD Card CSV Logging every 1s to unique run file
+        // SD Card CSV Logging every 2s to unique run file
         if (sdStatus && pidLogFileName[0] != '\0') {
           File f = SD.open(pidLogFileName, FILE_APPEND);
           if (f) {
