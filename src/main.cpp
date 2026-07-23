@@ -21,7 +21,7 @@
 #include "logging.h"
 #include "server.h"
 // RBDdimmer removed. Using Slow PWM (Time-Proportional Control)
-const uint32_t PID_WINDOW_MS = 2000;
+const uint32_t PID_WINDOW_MS = 3000;
 uint32_t pidWindowStart = 0;
 
 // ---- Hardware Object Definitions ----
@@ -2402,9 +2402,9 @@ void loop() {
     }
     uint32_t onTime = (currentHeatingPercent * PID_WINDOW_MS) / 100;
 
-    // Quartz Heater Safety Limit for Fermentation (SSR_FERM): Max 2 seconds (2000 ms) continuous ON pulse
-    if (activeHeaterPin == SSR_FERM && onTime > 2000) {
-      onTime = 2000;
+    // Quartz Heater Safety Limit for Fermentation (SSR_FERM): Max 3.0 seconds (3000 ms) continuous ON pulse
+    if (activeHeaterPin == SSR_FERM && onTime > 3000) {
+      onTime = 3000;
     }
 
     bool pState = LOW;
