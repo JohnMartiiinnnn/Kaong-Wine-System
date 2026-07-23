@@ -2282,7 +2282,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
 
     // Graph Title & Active Log File
     tft.setTextColor(TFT_LIGHTGREY, 0x2124);
-    tft.drawString("TEMP TREND (20C - 100C)", 22, 220, 1);
+    tft.drawString("TEMP TREND (AUTO-RANGE)", 22, 220, 1);
     if (pidLogFileName[0] != '\0') {
       tft.drawRightString(pidLogFileName, 298, 220, 1);
     }
@@ -2376,51 +2376,86 @@ void drawPidTrackingMenu(bool valuesOnly) {
   // Divider line inside metrics box
   tft.drawFastHLine(15, 175, 290, TFT_LIGHTGREY);
 
-  // --- Professional Line Graph rendering with X and Y Axes & Labels ---
+  // --- Professional Dynamic Auto-Ranging Line Graph ---
   const int gX = 40;     // Graph canvas left offset (leaving 40px for Y-axis labels)
   const int gY = 216;    // Graph canvas top
   const int gW = 265;    // Graph width
   const int gH = 205;    // Graph height
   const int gBottom = gY + gH; // Y = 421
 
-  // 1. Draw Graph Background & Frame
+  // 1. Calculate Dynamic Temperature Min/Max Range from collected data & setpoint
+  float minT = pidTrackTargetTemp;
+  float maxT = pidTrackTargetTemp;
+
+  if (curTemp > 0.0f) {
+    minT = min(minT, curTemp);
+    maxT = max(maxT, curTemp);
+  }
+
+  for (int i = 0; i < pidTrackHistoryCount; i++) {
+    if (pidTrackHistory[i] > 0.0f) {
+      minT = min(minT, pidTrackHistory[i]);
+      maxT = max(maxT, pidTrackHistory[i]);
+    }
+  }
+
+  // Add 15% margin padding above and below
+  float tempSpan = maxT - minT;
+  float pad = max(2.0f, tempSpan * 0.15f);
+  float yMin = floor(minT - pad);
+  float yMax = ceil(maxT + pad);
+
+  // Guarantee at least 10C span so minor sensor fluctuations don't over-magnify
+  if ((yMax - yMin) < 10.0f) {
+    float mid = (yMin + yMax) / 2.0f;
+    yMin = mid - 5.0f;
+    yMax = mid + 5.0f;
+  }
+  yMin = max(0.0f, yMin);
+  yMax = min(110.0f, yMax);
+  float yRange = yMax - yMin;
+  if (yRange < 1.0f) yRange = 1.0f;
+
+  // 2. Draw Graph Background & Frame
   tft.fillRect(gX, gY, gW, gH, 0x10A2); // Sleek dark slate canvas
   tft.drawRect(gX - 1, gY - 1, gW + 2, gH + 2, TFT_DARKGREY);
 
-  // 2. Draw Y-Axis (Temperature: 20°C to 100°C) with Ticks & Labels
+  // 3. Draw Dynamic Y-Axis Ticks & Temperature Labels
   tft.drawLine(gX - 1, gY, gX - 1, gBottom, TFT_WHITE); // Y-axis solid line
   tft.setTextColor(TFT_LIGHTGREY, 0x2124);
-  tft.setTextDatum(MR_DATUM); // Middle-Right aligned text for Y axis
+  tft.setTextDatum(MR_DATUM); // Middle-Right text alignment for Y axis labels
 
-  // Draw 5 Y-axis gridlines and labels: 20C, 40C, 60C, 80C, 100C
-  for (int tempVal = 20; tempVal <= 100; tempVal += 20) {
-    int yPos = gBottom - (int)((float)(tempVal - 20) * (gH - 10) / 80.0f) - 5;
-    tft.drawFastHLine(gX, yPos, gW, 0x2965); // Dark gridline across graph
+  for (int step = 0; step <= 4; step++) {
+    float val = yMin + (yRange * step / 4.0f);
+    int yPos = gBottom - (int)((val - yMin) * (gH - 10) / yRange) - 5;
+    tft.drawFastHLine(gX, yPos, gW, 0x2965); // Horizontal gridline
     tft.drawFastHLine(gX - 4, yPos, 4, TFT_WHITE); // Tick mark on Y axis
-    sprintf(buf, "%d", tempVal);
+    sprintf(buf, "%.0f", val);
     tft.drawString(buf, gX - 6, yPos, 1);
   }
 
-  // 3. Draw X-Axis (Time: 0s to Total Elapsed Time) with Ticks & Labels
+  // 4. Draw Dynamic X-Axis (Time Scaling: 0s to actual elapsed duration)
   tft.drawLine(gX - 1, gBottom + 1, gX + gW, gBottom + 1, TFT_WHITE); // X-axis solid line
-  tft.setTextDatum(TC_DATUM); // Top-Center aligned text for X axis
+  tft.setTextDatum(TC_DATUM); // Top-Center text alignment for X axis labels
 
   uint32_t totalSec = pidTrackRunning ? ((millis() - pidTrackStartMs) / 1000) : 0;
-  if (totalSec < 200) totalSec = 200; // Minimum 200s X-axis scale so full curve is visible
+  uint32_t sampleCountSec = pidTrackHistoryCount * 2; // 2 seconds per sample
+  uint32_t xSpanSec = max(totalSec, sampleCountSec);
+  if (xSpanSec < 30) xSpanSec = 30; // Minimum 30s initial X scale
 
   for (int xPct = 0; xPct <= 100; xPct += 25) {
     int xPos = gX + (int)(xPct * gW / 100.0f);
     tft.drawFastVLine(xPos, gY, gH, 0x2965); // Vertical gridline
     tft.drawFastVLine(xPos, gBottom + 1, 4, TFT_WHITE); // Tick mark on X axis
-    uint32_t secLabel = (totalSec * xPct) / 100;
+    uint32_t secLabel = (xSpanSec * xPct) / 100;
     sprintf(buf, "%lus", (unsigned long)secLabel);
     tft.drawString(buf, xPos, gBottom + 5, 1);
   }
 
   tft.setTextDatum(TL_DATUM); // Reset text datum to Top-Left default
 
-  // 4. Target Setpoint Reference Line (Dashed Red Line)
-  int targetY = gBottom - (int)((pidTrackTargetTemp - 20.0f) * (gH - 10) / 80.0f) - 5;
+  // 5. Target Setpoint Reference Line (Dashed Red Line)
+  int targetY = gBottom - (int)((pidTrackTargetTemp - yMin) * (gH - 10) / yRange) - 5;
   targetY = constrain(targetY, gY + 5, gBottom - 5);
 
   for (int dx = gX; dx < gX + gW; dx += 8) {
@@ -2431,22 +2466,22 @@ void drawPidTrackingMenu(bool valuesOnly) {
   int txtY = (targetY - 10 < gY + 2) ? targetY + 2 : targetY - 10;
   tft.drawString(buf, gX + gW - 65, txtY, 1);
 
-  // 5. Plot Full-History Temperature Line (Zoomed out to show overall run)
+  // 6. Plot Dynamic Temperature Curve across canvas
   if (pidTrackHistoryCount > 1) {
     int count = min(pidTrackHistoryCount, 100);
     float xStep = (float)gW / max(1, count - 1);
 
     for (int i = 0; i < count - 1; i++) {
-      float t1 = constrain(pidTrackHistory[i], 20.0f, 100.0f);
-      float t2 = constrain(pidTrackHistory[i + 1], 20.0f, 100.0f);
+      float t1 = constrain(pidTrackHistory[i], yMin, yMax);
+      float t2 = constrain(pidTrackHistory[i + 1], yMin, yMax);
 
-      int y1 = gBottom - (int)((t1 - 20.0f) * (gH - 10) / 80.0f) - 5;
-      int y2 = gBottom - (int)((t2 - 20.0f) * (gH - 10) / 80.0f) - 5;
+      int y1 = gBottom - (int)((t1 - yMin) * (gH - 10) / yRange) - 5;
+      int y2 = gBottom - (int)((t2 - yMin) * (gH - 10) / yRange) - 5;
 
       int x1 = gX + (int)(i * xStep);
       int x2 = gX + (int)((i + 1) * xStep);
 
-      // Draw double-thick bright cyan/green line for high clarity
+      // Draw double-thick bright cyan line for high clarity
       tft.drawLine(x1, y1, x2, y2, 0x07FF);
       tft.drawLine(x1, y1 + 1, x2, y2 + 1, 0x07FF);
     }
