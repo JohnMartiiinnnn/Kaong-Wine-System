@@ -61,8 +61,8 @@ const float PAST_RAMP_BAND = 5.0f;
 
 // ---- Quartz Radiant/Air Heater PID Parameters (Fermentation) ----
 const float QUARTZ_PID_KP = 3.5f;
-const float QUARTZ_PID_KI = 0.02f;
-const float QUARTZ_PID_KD = 1.5f;
+const float QUARTZ_PID_KI = 0.03f;
+const float QUARTZ_PID_KD = 1.2f;
 const float QUARTZ_RAMP_BAND = 3.0f;
 
 // Shared fallback constants for legacy references
