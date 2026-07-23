@@ -146,8 +146,9 @@ bool pidTrackRunning = false;
 uint32_t pidTrackStartMs = 0;
 uint32_t pidTrackLastSampleMs = 0;
 float pidTrackTargetTemp = 80.0f;
-float pidTrackHistory[100];
+float pidTrackHistory[600];
 int pidTrackHistoryCount = 0;
+int pidTrackSampleIntervalSec = 2;
 PidTrackingMetrics pidTrackMetrics = {0.0f, 80.0f, 0.0f, 0.0f, -1, -1, 0.0f, "IDLE"};
 char pidLogFileName[32] = "/pid_track.csv";
 
@@ -675,7 +676,7 @@ void loop() {
       systemCheckSelection = (systemCheckSelection + 1) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
-      pidTrackTargetTemp -= 1.0f;
+      pidTrackTargetTemp -= 5.0f;
       if (pidTrackTargetTemp < 20.0f) pidTrackTargetTemp = 20.0f;
       pidTrackMetrics.targetTemp = pidTrackTargetTemp;
       pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
@@ -1063,6 +1064,7 @@ void loop() {
         pidTrackNeedsFullRedraw = true;
         pidTrackRunning = false;
         pidTrackHistoryCount = 0;
+        pidTrackSampleIntervalSec = 2;
         pidTestChoice = -1; // Default to "Heater Output: Not Set"
         float initTemp = 25.0f;
         pidTrackMetrics.startTemp = initTemp;
@@ -1136,6 +1138,7 @@ void loop() {
           pidTrackStartMs = millis();
           pidTrackLastSampleMs = 0;
           pidTrackHistoryCount = 0;
+          pidTrackSampleIntervalSec = 2;
           float initTemp = 25.0f;
           if (pidTestChoice == 0 && liquid2Status) initTemp = getPreheatTemp();
           else if (pidTestChoice == 1 && incomingData.sensor2Status > 0) initTemp = incomingData.room2Temp;
@@ -1183,7 +1186,7 @@ void loop() {
         if (sdStatus) {
           File f = SD.open(pidLogFileName, FILE_WRITE);
           if (f) {
-            f.println("RTC_Time,Elapsed_s,Temp_C,Setpoint_C,PWM_pct,Error_C");
+            f.println("RTC_Time,Elapsed_s,Temp_C,Setpoint_C,PWM_pct,Fan_pct,Error_C");
             f.close();
           }
         }
@@ -2058,32 +2061,38 @@ void loop() {
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
+          static uint32_t fermTrackOvershootStartMs = 0;
           if (curT > pidTrackTargetTemp) {
-            // Overshoot detected -> Ramp fan speed up above 20% baseline up to 100%
-            float over = curT - pidTrackTargetTemp;
-            int fanSpd = 20 + (int)(over * 30.0f);
+            if (fermTrackOvershootStartMs == 0) {
+              fermTrackOvershootStartMs = millis();
+            }
+            uint32_t overSec = (millis() - fermTrackOvershootStartMs) / 1000;
+            float overDeg = curT - pidTrackTargetTemp;
+            int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);
           } else {
-            // Startup / Normal Heating / Back at Setpoint -> 20% baseline ventilation speed
-            setFanSpeed(20);
+            fermTrackOvershootStartMs = 0;
+            setFanSpeed(20); // 20% baseline power during heating / setpoint
           }
         }
       }
 
-      // Sampling every 2000ms (2 seconds)
-      if (millis() - pidTrackLastSampleMs >= 2000) {
+      // Dynamic sampling based on pidTrackSampleIntervalSec
+      if (millis() - pidTrackLastSampleMs >= (uint32_t)(pidTrackSampleIntervalSec * 1000)) {
         pidTrackLastSampleMs = millis();
         uint32_t elapsedSec = (millis() - pidTrackStartMs) / 1000;
 
-        // Push to graph history array
-        if (pidTrackHistoryCount < 100) {
+        // Push to graph history array with dynamic time zoom (in-place downsampling when full)
+        if (pidTrackHistoryCount < 600) {
           pidTrackHistory[pidTrackHistoryCount++] = curT;
         } else {
-          for (int i = 0; i < 99; i++) {
-            pidTrackHistory[i] = pidTrackHistory[i + 1];
+          for (int i = 0; i < 300; i++) {
+            pidTrackHistory[i] = (pidTrackHistory[2 * i] + pidTrackHistory[2 * i + 1]) / 2.0f;
           }
-          pidTrackHistory[99] = curT;
+          pidTrackHistoryCount = 300;
+          pidTrackSampleIntervalSec *= 2;
+          pidTrackHistory[pidTrackHistoryCount++] = curT;
         }
 
         // Metrics Calculation
@@ -2136,9 +2145,9 @@ void loop() {
               DateTime now = rtc.now();
               sprintf(timeBuf, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
             }
-            f.printf("%s,%lu,%.2f,%.1f,%d,%.2f\n",
+            f.printf("%s,%lu,%.2f,%.1f,%d,%d,%.2f\n",
                      timeBuf, (unsigned long)elapsedSec, curT, pidTrackTargetTemp,
-                     currentHeatingPercent, error);
+                     currentHeatingPercent, currentSpeedPercent, error);
             f.close();
           }
         }
@@ -2184,8 +2193,8 @@ void loop() {
         liquidTemp = simTempOverride[activeBrewStage];
       } else if (activeBrewStage == 0 && liquid2Status) {
         liquidTemp = getPreheatTemp();
-      } else if (activeBrewStage == 1 && incomingData.ds18Status == 1) {
-        liquidTemp = getFermTemp();
+      } else if (activeBrewStage == 1 && incomingData.sensor2Status > 0) {
+        liquidTemp = incomingData.room2Temp;
       } else if (activeBrewStage == 2 && liquid1Status) {
         liquidTemp = getPastTemp();
       }
@@ -2236,18 +2245,31 @@ void loop() {
 
       } else if (activeBrewStage == 1) {
         if (liquidTemp > -100.0f) {
+          isFermFanOn = true;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+
+          static uint32_t fermStageOvershootStartMs = 0;
+          float targetTemp = 30.0f;
+
           if (liquidTemp < 27.0f) {
-            currentHeatingPercent = 100;
-            isFermFanOn = false;
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          } else if (liquidTemp > 30.0f) {
+            currentHeatingPercent = 50; // 50% duty cycle (1.5s ON / 1.5s OFF per 3s cycle) for effective quartz heating
+            fermStageOvershootStartMs = 0;
+            setFanSpeed(20); // 20% baseline power during active heating
+          } else if (liquidTemp > targetTemp) {
             currentHeatingPercent = 0;
-            isFermFanOn = true;
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+            if (fermStageOvershootStartMs == 0) {
+              fermStageOvershootStartMs = millis();
+            }
+            uint32_t overSec = (millis() - fermStageOvershootStartMs) / 1000;
+            float overDeg = liquidTemp - targetTemp;
+            int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
+            if (fanSpd > 100) fanSpd = 100;
+            setFanSpeed(fanSpd);
           } else {
             currentHeatingPercent = 0;
+            fermStageOvershootStartMs = 0;
+            setFanSpeed(20); // 20% baseline power within setpoint range
           }
         }
         if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
@@ -2402,9 +2424,9 @@ void loop() {
     }
     uint32_t onTime = (currentHeatingPercent * PID_WINDOW_MS) / 100;
 
-    // Quartz Heater Safety Limit for Fermentation (SSR_FERM): Max 3.0 seconds (3000 ms) continuous ON pulse
-    if (activeHeaterPin == SSR_FERM && onTime > 3000) {
-      onTime = 3000;
+    // Quartz Heater Safety Limit for Fermentation (SSR_FERM): Max 1.5 seconds (1500 ms) continuous ON pulse
+    if (activeHeaterPin == SSR_FERM && onTime > 1500) {
+      onTime = 1500;
     }
 
     bool pState = LOW;
@@ -2418,6 +2440,17 @@ void loop() {
         fState = HIGH;
       else if (activeHeaterPin == SSR_PAST)
         pastState = HIGH;
+    }
+
+    // Failsafe: Maximum continuous ON pulse for Fermentation Quartz Heater is 1.5 seconds (1500 ms)
+    static uint32_t quartzOnStartMs = 0;
+    if (fState == HIGH) {
+      if (quartzOnStartMs == 0) quartzOnStartMs = millis();
+      if (millis() - quartzOnStartMs >= 1500) {
+        fState = LOW; // Cut off pulse after 1.5s continuous burst to protect insulation while maintaining fast ramp
+      }
+    } else {
+      quartzOnStartMs = 0;
     }
 
     digitalWrite(SSR_PREHEAT, pState);
@@ -2504,6 +2537,9 @@ void loop() {
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();
+
+    if (currentAppState == FAN_TEST_MENU)
+      drawFanTestMenu();
 
     if (currentAppState == MOTOR_TEST_MENU)
       drawMotorTestMenu();

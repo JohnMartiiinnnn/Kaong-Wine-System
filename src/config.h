@@ -288,8 +288,9 @@ extern bool pidTrackRunning;
 extern uint32_t pidTrackStartMs;
 extern uint32_t pidTrackLastSampleMs;
 extern float pidTrackTargetTemp;
-extern float pidTrackHistory[100];
+extern float pidTrackHistory[600];
 extern int pidTrackHistoryCount;
+extern int pidTrackSampleIntervalSec;
 extern PidTrackingMetrics pidTrackMetrics;
 extern char pidLogFileName[32];
 

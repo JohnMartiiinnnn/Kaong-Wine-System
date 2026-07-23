@@ -519,27 +519,58 @@ void drawFanTestMenu() {
     fanTestNeedsFullRedraw = false;
   }
 
-  const char *title = (fanTestFanChoice == 0) ? "PRE-HEATING" : "FERMENTATION";
+  const char *title = (fanTestFanChoice == 0) ? "PRE-HEATING FANS" : "FERMENTATION FANS";
   tft.fillRect(0, 52, 320, 28, 0x4208);
   tft.setTextColor(TFT_WHITE, 0x4208);
   tft.drawCentreString(title, CENTER_X, 60, 2);
 
-  bool activeFanOn = (currentFanMode == FAN_ON);
-  uint16_t statusColor = activeFanOn ? 0x0400 : TFT_RED;
-  tft.fillRect(20, 120, 280, 160, statusColor);
-  tft.drawRect(20, 120, 280, 160, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, statusColor);
-  tft.drawCentreString(activeFanOn ? "RUNNING" : "STOPPED", CENTER_X, 170, 4);
-  tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 240, 2);
+  // Temperature Monitor Tiles (Ambient & Liquid Temp)
+  char ambBuf[16] = "--";
+  char liqBuf[16] = "--";
 
-  tft.fillRect(20, 300, 280, 80, 0xD6BA);
-  tft.drawRect(20, 300, 280, 80, TFT_DARKGREY);
+  if (fanTestFanChoice == 0) {
+    if (bme1Status) sprintf(ambBuf, "%.1f C", bme1.readTemperature());
+    if (liquid2Status) sprintf(liqBuf, "%.1f C", getPreheatTemp());
+  } else {
+    if (incomingData.sensor2Status > 0) sprintf(ambBuf, "%.1f C", incomingData.room2Temp);
+    if (incomingData.ds18Status == 1) sprintf(liqBuf, "%.1f C", getFermTemp());
+  }
+
+  // Ambient Temp Tile (Left)
+  tft.fillRect(20, 88, 135, 75, 0x2124);
+  tft.drawRect(20, 88, 135, 75, TFT_DARKGREY);
+  tft.setTextColor(TFT_LIGHTGREY, 0x2124);
+  tft.drawCentreString("AMBIENT TEMP", 87, 96, 1);
+  tft.setTextColor(TFT_WHITE, 0x2124);
+  tft.drawCentreString(ambBuf, 87, 122, 4);
+
+  // Liquid Temp Tile (Right)
+  tft.fillRect(165, 88, 135, 75, 0x2124);
+  tft.drawRect(165, 88, 135, 75, TFT_DARKGREY);
+  tft.setTextColor(TFT_LIGHTGREY, 0x2124);
+  tft.drawCentreString("LIQUID TEMP", 232, 96, 1);
+  tft.setTextColor(TFT_WHITE, 0x2124);
+  tft.drawCentreString(liqBuf, 232, 122, 4);
+
+  // Fan Running Status Panel
+  bool activeFanOn = (currentFanMode == FAN_ON);
+  uint16_t statusColor = activeFanOn ? 0x0400 : 0xF800;
+  tft.fillRect(20, 173, 280, 120, statusColor);
+  tft.drawRect(20, 173, 280, 120, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, statusColor);
+  tft.drawCentreString(activeFanOn ? "RUNNING" : "STOPPED", CENTER_X, 205, 4);
+  tft.drawCentreString("SELECT TO TOGGLE", CENTER_X, 255, 2);
+
+  // Fan Speed Control Panel
+  tft.fillRect(20, 303, 280, 115, 0xD6BA);
+  tft.drawRect(20, 303, 280, 115, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("UP/DOWN: SPEED", CENTER_X, 315, 2);
+  tft.drawCentreString("FAN SPEED", CENTER_X, 318, 2);
   char buf[16];
   sprintf(buf, "%d %%", fanTestSpeed);
-  tft.drawCentreString(buf, CENTER_X, 340, 4);
+  tft.drawCentreString(buf, CENTER_X, 350, 4);
 
+  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("UP/DOWN: SPEED   SELECT: TOGGLE FAN   RETURN: BACK",
                        CENTER_X, 458, 1);
@@ -2383,36 +2414,28 @@ void drawPidTrackingMenu(bool valuesOnly) {
   const int gH = 205;    // Graph height
   const int gBottom = gY + gH; // Y = 421
 
-  // 1. Calculate Dynamic Temperature Min/Max Range from collected data & setpoint
-  float minT = pidTrackTargetTemp;
-  float maxT = pidTrackTargetTemp;
+  // 1. Calculate Dynamic Temperature Min/Max Range from starting temp & setpoint
+  float startT = (pidTrackMetrics.startTemp > 0.0f) ? pidTrackMetrics.startTemp : ((curTemp > 0.0f) ? curTemp : pidTrackTargetTemp);
+  float baseLow = min(startT, pidTrackTargetTemp);
+  float baseHigh = max(startT, pidTrackTargetTemp);
 
+  float yMin = baseLow - 5.0f;
+  float yMax = baseHigh + 5.0f;
+
+  // Auto-expand range if temperature drops below yMin or exceeds yMax
   if (curTemp > 0.0f) {
-    minT = min(minT, curTemp);
-    maxT = max(maxT, curTemp);
+    if (curTemp < yMin) yMin = floor(curTemp);
+    if (curTemp > yMax) yMax = ceil(curTemp);
   }
 
   for (int i = 0; i < pidTrackHistoryCount; i++) {
     if (pidTrackHistory[i] > 0.0f) {
-      minT = min(minT, pidTrackHistory[i]);
-      maxT = max(maxT, pidTrackHistory[i]);
+      if (pidTrackHistory[i] < yMin) yMin = floor(pidTrackHistory[i]);
+      if (pidTrackHistory[i] > yMax) yMax = ceil(pidTrackHistory[i]);
     }
   }
 
-  // Add 15% margin padding above and below
-  float tempSpan = maxT - minT;
-  float pad = max(2.0f, tempSpan * 0.15f);
-  float yMin = floor(minT - pad);
-  float yMax = ceil(maxT + pad);
-
-  // Guarantee at least 10C span so minor sensor fluctuations don't over-magnify
-  if ((yMax - yMin) < 10.0f) {
-    float mid = (yMin + yMax) / 2.0f;
-    yMin = mid - 5.0f;
-    yMax = mid + 5.0f;
-  }
-  yMin = max(0.0f, yMin);
-  yMax = min(110.0f, yMax);
+  if (yMin < 0.0f) yMin = 0.0f;
   float yRange = yMax - yMin;
   if (yRange < 1.0f) yRange = 1.0f;
 
@@ -2430,7 +2453,11 @@ void drawPidTrackingMenu(bool valuesOnly) {
     int yPos = gBottom - (int)((val - yMin) * (gH - 10) / yRange) - 5;
     tft.drawFastHLine(gX, yPos, gW, 0x2965); // Horizontal gridline
     tft.drawFastHLine(gX - 4, yPos, 4, TFT_WHITE); // Tick mark on Y axis
-    sprintf(buf, "%.0f", val);
+    if (yRange <= 20.0f) {
+      sprintf(buf, "%.1f", val);
+    } else {
+      sprintf(buf, "%.0f", val);
+    }
     tft.drawString(buf, gX - 6, yPos, 1);
   }
 
@@ -2439,7 +2466,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
   tft.setTextDatum(TC_DATUM); // Top-Center text alignment for X axis labels
 
   uint32_t totalSec = pidTrackRunning ? ((millis() - pidTrackStartMs) / 1000) : 0;
-  uint32_t sampleCountSec = pidTrackHistoryCount * 2; // 2 seconds per sample
+  uint32_t sampleCountSec = (uint32_t)pidTrackHistoryCount * pidTrackSampleIntervalSec; // Dynamic sample interval
   uint32_t xSpanSec = max(totalSec, sampleCountSec);
   if (xSpanSec < 30) xSpanSec = 30; // Minimum 30s initial X scale
 
@@ -2468,7 +2495,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
 
   // 6. Plot Dynamic Temperature Curve across canvas
   if (pidTrackHistoryCount > 1) {
-    int count = min(pidTrackHistoryCount, 100);
+    int count = pidTrackHistoryCount;
     float xStep = (float)gW / max(1, count - 1);
 
     for (int i = 0; i < count - 1; i++) {

@@ -53,7 +53,7 @@ float PIDController::compute(float setpoint, float currentTemp, float dt) {
     dTempFiltered = dTempFiltered * 0.7f + dTempRaw * 0.3f;
 
     // RULE 2: Reduced Thermal Lag Dampening (Active only when heating rapidly > 0.06 deg C / sec)
-    float coastBuffer = (dTempFiltered > 0.06f) ? (dTempFiltered * 4.0f) : 0.0f;
+    float coastBuffer = (dTempFiltered > 0.06f) ? (dTempFiltered * 6.0f) : 0.0f;
     float effectiveError = error - coastBuffer;
 
     if (effectiveError <= 0.0f) {
@@ -67,9 +67,14 @@ float PIDController::compute(float setpoint, float currentTemp, float dt) {
         return maxOut;
     }
 
-    // RULE 4: Smooth Approach Tapering with 25% Holding Floor for Ambient Heat Loss
+    // RULE 4: Smooth Approach Tapering during Rapid Heating; Immediate Holding Floor during Cooling
     float linearCap = maxOut * (effectiveError / rampBand);
-    float maxApproachCap = (linearCap < 25.0f) ? 25.0f : linearCap;
+    float minFloor = 25.0f;
+    if (dTempFiltered > 0.02f && effectiveError <= 0.5f) {
+        // Temperature is rising rapidly toward setpoint -> taper cap to prevent overshoot
+        minFloor = 25.0f * (effectiveError / 0.5f);
+    }
+    float maxApproachCap = (linearCap < minFloor) ? minFloor : linearCap;
 
     // RULE 5: Fine Holding Zone (within 0.5C of setpoint)
     // Build integral holding power to overcome ambient thermal loss
@@ -85,10 +90,10 @@ float PIDController::compute(float setpoint, float currentTemp, float dt) {
     // Calculate P + I - D with increased proportional drive
     float pTerm = kp * effectiveError * 12.0f;
 
-    // Minimum proportional drive near setpoint to ensure firm setpoint contact
+    // Immediate holding drive near setpoint when temperature is dropping or static
     if (effectiveError > 0.0f && effectiveError <= 0.5f) {
-        float minPDrive = 10.0f * (effectiveError / 0.5f);
-        if (pTerm < minPDrive) pTerm = minPDrive;
+        float floorDrive = (dTempFiltered <= 0.02f) ? 20.0f : (10.0f * (effectiveError / 0.5f));
+        if (pTerm < floorDrive) pTerm = floorDrive;
     }
 
     // Reduced Derivative Dampening (Braking)

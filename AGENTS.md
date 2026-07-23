@@ -63,7 +63,7 @@ src/
 *   **Actuators:**
     *   **PWM (Pin 25):** 4-wire Fan speed control. Preheat fan is inverted; fermentation fan is non-inverted.
     *   **PWM (TBD):** TB6612FN PWMA — mixing impeller speed (LEDC ch1, 1 kHz, 8-bit).
-    *   **SSR Heaters:** Pins 13 (Pre-Heat), 12 (Fermentation), and 14 (Pasteurization) driving solid-state relays (SSRs) via slow time-proportional PWM. *Note: Fermentation Quartz Radiant Heater (`SSR_FERM`, pin 12) pulse duration is capped at a maximum of 3.0 seconds (3000ms) per window to prevent radiant overheating and thermal shock.*
+    *   **SSR Heaters:** Pins 13 (Pre-Heat), 12 (Fermentation), and 14 (Pasteurization) driving solid-state relays (SSRs) via slow time-proportional PWM. *Note: Fermentation Quartz Radiant Heater (`SSR_FERM`, pin 12) pulse duration is capped at a maximum of 1.5 seconds (1500ms) per window to prevent radiant overheating, thermal shock, and insulation melting.*
     *   **Status LED:** GPIO 2 (onboard LED) used for Calibration Wizard signaling.
 *   **Motor Driver (TB6612FN):**
     *   **PWMA → GPIO0** (ESP32) — speed control (0-100% duty)
