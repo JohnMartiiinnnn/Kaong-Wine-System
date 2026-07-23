@@ -2420,17 +2420,6 @@ void loop() {
         pastState = HIGH;
     }
 
-    // Failsafe: Maximum continuous ON pulse for Fermentation Quartz Heater is 2.0 seconds
-    static uint32_t quartzOnStartMs = 0;
-    if (fState == HIGH) {
-      if (quartzOnStartMs == 0) quartzOnStartMs = millis();
-      if (millis() - quartzOnStartMs >= 2000) {
-        fState = LOW; // Cut off pulse after 2.0 seconds continuous burst
-      }
-    } else {
-      quartzOnStartMs = 0;
-    }
-
     digitalWrite(SSR_PREHEAT, pState);
     digitalWrite(SSR_FERM, fState);
     digitalWrite(SSR_PAST, pastState);
