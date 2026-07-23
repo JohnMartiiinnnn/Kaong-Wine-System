@@ -135,9 +135,10 @@ int pidFanPercent = 0;
 int pidFermSensor = 1;
 int pidPreHeatSensor = 0;
 
-PIDController preheatPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
-PIDController pastPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
-PIDController trackingPid(PID_KP, PID_KI, PID_KD, 5.0f, 0.0f, 100.0f);
+PIDController preheatPid(PREHEAT_PID_KP, PREHEAT_PID_KI, PREHEAT_PID_KD, PREHEAT_RAMP_BAND, 0.0f, 100.0f);
+PIDController pastPid(PAST_PID_KP, PAST_PID_KI, PAST_PID_KD, PAST_RAMP_BAND, 0.0f, 100.0f);
+PIDController quartzPid(QUARTZ_PID_KP, QUARTZ_PID_KI, QUARTZ_PID_KD, QUARTZ_RAMP_BAND, 0.0f, 100.0f);
+PIDController trackingPid(PREHEAT_PID_KP, PREHEAT_PID_KI, PREHEAT_PID_KD, PREHEAT_RAMP_BAND, 0.0f, 100.0f);
 
 // ---- PID Thermal Tracking Test State ----
 bool pidTrackNeedsFullRedraw = true;
@@ -1141,11 +1142,19 @@ void loop() {
           else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
 
           if (pidTestChoice == 1) {
-            // Fermentation Quartz Heater & Ventilation startup: 10% baseline fan speed
+            // Fermentation Quartz Heater: Configure Quartz PID parameters & 10% baseline fan speed
+            trackingPid.setGains(QUARTZ_PID_KP, QUARTZ_PID_KI, QUARTZ_PID_KD);
+            trackingPid.setRampBand(QUARTZ_RAMP_BAND);
             isFermFanOn = true;
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
             mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
             setFanSpeed(10);
+          } else if (pidTestChoice == 2) {
+            trackingPid.setGains(PAST_PID_KP, PAST_PID_KI, PAST_PID_KD);
+            trackingPid.setRampBand(PAST_RAMP_BAND);
+          } else {
+            trackingPid.setGains(PREHEAT_PID_KP, PREHEAT_PID_KI, PREHEAT_PID_KD);
+            trackingPid.setRampBand(PREHEAT_RAMP_BAND);
           }
 
           pidTrackMetrics.startTemp = initTemp;

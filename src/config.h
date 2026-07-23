@@ -48,13 +48,31 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 
 #include "PIDController.h"
 
+// ---- Immersion Heater PID Parameters (Pre-Heat & Pasteurization) ----
+const float PREHEAT_PID_KP = 2.0f;
+const float PREHEAT_PID_KI = 0.05f;
+const float PREHEAT_PID_KD = 1.0f;
+const float PREHEAT_RAMP_BAND = 5.0f;
+
+const float PAST_PID_KP = 2.0f;
+const float PAST_PID_KI = 0.05f;
+const float PAST_PID_KD = 1.0f;
+const float PAST_RAMP_BAND = 5.0f;
+
+// ---- Quartz Radiant/Air Heater PID Parameters (Fermentation) ----
+const float QUARTZ_PID_KP = 3.5f;
+const float QUARTZ_PID_KI = 0.02f;
+const float QUARTZ_PID_KD = 1.5f;
+const float QUARTZ_RAMP_BAND = 3.0f;
+
+// Shared fallback constants for legacy references
 const float PID_KP = 2.0f;
 const float PID_KI = 0.05f;
 const float PID_KD = 1.0f;
-const float PID_THROTTLE_TEMP = 75.0f;
 
 extern PIDController preheatPid;
 extern PIDController pastPid;
+extern PIDController quartzPid;
 extern PIDController trackingPid;
 
 
