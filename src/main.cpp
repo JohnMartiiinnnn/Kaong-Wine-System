@@ -1142,13 +1142,13 @@ void loop() {
           else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
 
           if (pidTestChoice == 1) {
-            // Fermentation Quartz Heater: Configure Quartz PID parameters & 10% baseline fan speed
+            // Fermentation Quartz Heater: Configure Quartz PID parameters & 20% baseline fan speed
             trackingPid.setGains(QUARTZ_PID_KP, QUARTZ_PID_KI, QUARTZ_PID_KD);
             trackingPid.setRampBand(QUARTZ_RAMP_BAND);
             isFermFanOn = true;
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
             mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
-            setFanSpeed(10);
+            setFanSpeed(20);
           } else if (pidTestChoice == 2) {
             trackingPid.setGains(PAST_PID_KP, PAST_PID_KI, PAST_PID_KD);
             trackingPid.setRampBand(PAST_RAMP_BAND);
@@ -2059,14 +2059,14 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
           if (curT > pidTrackTargetTemp) {
-            // Overshoot detected -> Ramp fan speed up above 10% baseline up to 100%
+            // Overshoot detected -> Ramp fan speed up above 20% baseline up to 100%
             float over = curT - pidTrackTargetTemp;
-            int fanSpd = 10 + (int)(over * 30.0f);
+            int fanSpd = 20 + (int)(over * 30.0f);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);
           } else {
-            // Startup / Normal Heating / Back at Setpoint -> 10% baseline ventilation speed
-            setFanSpeed(10);
+            // Startup / Normal Heating / Back at Setpoint -> 20% baseline ventilation speed
+            setFanSpeed(20);
           }
         }
       }
