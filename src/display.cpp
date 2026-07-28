@@ -1488,17 +1488,33 @@ void drawSettingsMenu() {
   static int prevSel = -1;
 
   auto drawTile = [&](int i, bool sel) {
-    uint16_t bg = sel ? (settingsEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+    bool isEditingThis = sel && settingsEditing;
+    uint16_t bg = isEditingThis ? 0x03E0 : (sel ? 0x3566 : 0xD6BA);
     uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 65 + (i * 85), 300, 70, bg);
-    tft.drawRect(10, 65 + (i * 85), 300, 70, TFT_DARKGREY);
+
+    if (isEditingThis) {
+      tft.drawRect(10, 65 + (i * 85), 300, 70, TFT_WHITE);
+      tft.drawRect(11, 66 + (i * 85), 298, 68, TFT_WHITE);
+    } else if (sel) {
+      tft.drawRect(10, 65 + (i * 85), 300, 70, TFT_WHITE);
+    } else {
+      tft.drawRect(10, 65 + (i * 85), 300, 70, TFT_DARKGREY);
+    }
+
     tft.setTextColor(fg, bg);
 
     char buf[48];
     if (i == 0) {
-      sprintf(buf, "MIN VOLUME: %.1f L", minVolumeReq);
+      if (isEditingThis)
+        sprintf(buf, "MIN VOLUME: < %.1f L >", minVolumeReq);
+      else
+        sprintf(buf, "MIN VOLUME: %.1f L", minVolumeReq);
     } else if (i == 1) {
-      sprintf(buf, "FERM FAN BASELINE: %d%%", pidFanPercent > 0 ? pidFanPercent : 20);
+      if (isEditingThis)
+        sprintf(buf, "FERM FAN BASELINE: < %d%% >", pidFanPercent > 0 ? pidFanPercent : 20);
+      else
+        sprintf(buf, "FERM FAN BASELINE: %d%%", pidFanPercent > 0 ? pidFanPercent : 20);
     } else if (i == 2) {
       strcpy(buf, "SET RTC DATE & TIME");
     } else {
@@ -1507,11 +1523,24 @@ void drawSettingsMenu() {
     tft.drawCentreString(buf, CENTER_X, 80 + (i * 85), 2);
 
     if (i == 0 || i == 1) {
-      tft.drawCentreString(sel && settingsEditing ? "[ EDITING - L/R TO ADJUST ]"
-                                                 : "< L/R OR SELECT TO EDIT >",
-                           CENTER_X, 107 + (i * 85), 1);
+      if (isEditingThis) {
+        tft.drawCentreString("[ EDITING - UP/DN/L/R TO ADJUST ]",
+                             CENTER_X, 107 + (i * 85), 1);
+      } else if (sel) {
+        tft.drawCentreString("[ PRESS SELECT TO EDIT ]",
+                             CENTER_X, 107 + (i * 85), 1);
+      } else {
+        tft.drawCentreString("[ ADJUSTABLE VALUE ]",
+                             CENTER_X, 107 + (i * 85), 1);
+      }
     } else {
-      tft.drawCentreString("< SELECT TO ENTER MENU >", CENTER_X, 107 + (i * 85), 1);
+      if (sel) {
+        tft.drawCentreString("[ PRESS SELECT TO OPEN ]",
+                             CENTER_X, 107 + (i * 85), 1);
+      } else {
+        tft.drawCentreString("[ MENU ACTION ]",
+                             CENTER_X, 107 + (i * 85), 1);
+      }
     }
   };
 
@@ -1525,9 +1554,15 @@ void drawSettingsMenu() {
     }
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DN: SELECT   L/R: ADJUST   SELECT: EDIT/ENTER",
-                         CENTER_X, 447, 1);
-    tft.drawCentreString("RETURN: BACK TO MAIN MENU", CENTER_X, 462, 1);
+    if (settingsEditing) {
+      tft.drawCentreString("UP/DN/L/R: ADJUST VALUE   SELECT: SAVE",
+                           CENTER_X, 447, 1);
+      tft.drawCentreString("RETURN (LEFT): BACK TO SETTINGS", CENTER_X, 462, 1);
+    } else {
+      tft.drawCentreString("UP/DN: NAVIGATE   SELECT: EDIT/OPEN",
+                           CENTER_X, 447, 1);
+      tft.drawCentreString("RETURN (LEFT): BACK TO MAIN MENU", CENTER_X, 462, 1);
+    }
     settingsNeedsFullRedraw = false;
     prevSel = settingsSelection;
   } else {

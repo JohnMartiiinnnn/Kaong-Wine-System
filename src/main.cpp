@@ -638,8 +638,16 @@ void loop() {
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
-      if (cDown && !ljDown && !settingsEditing) {
-        settingsSelection = (settingsSelection + 1) % 4;
+      if (cDown && !ljDown) {
+        if (settingsEditing) {
+          if (settingsSelection == 0) {
+            minVolumeReq = max(1.0f, minVolumeReq - 0.5f);
+          } else if (settingsSelection == 1) {
+            pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
+          }
+        } else {
+          settingsSelection = (settingsSelection + 1) % 4;
+        }
         drawSettingsMenu();
       }
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
@@ -778,10 +786,16 @@ void loop() {
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
-      if (!settingsEditing) {
+      if (settingsEditing) {
+        if (settingsSelection == 0) {
+          minVolumeReq = min(50.0f, minVolumeReq + 0.5f);
+        } else if (settingsSelection == 1) {
+          pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
+        }
+      } else {
         settingsSelection = (settingsSelection + 3) % 4;
-        drawSettingsMenu();
       }
+      drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
       if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
         simTempOverride[activeBrewStage] += 5.0f;
@@ -924,13 +938,7 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (wizardSelection == 0) {
-        wizardEditing = !wizardEditing;
-        drawNewBrewWizard();
-      } else if (wizardSelection == 1) {
-        skipPreheatHeater = !skipPreheatHeater;
-        drawNewBrewWizard();
-      } else if (wizardSelection == 2 && currentWeight >= minVolumeReq) {
+      if (currentWeight >= minVolumeReq) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
@@ -1604,13 +1612,38 @@ void loop() {
   }
 
   if (cRight && !ljRight && currentAppState == SETTINGS_MENU) {
-    if (settingsSelection == 0) {
-      minVolumeReq += 0.5f;
-      if (minVolumeReq > 50.0f) minVolumeReq = 50.0f;
-    } else if (settingsSelection == 1) {
-      pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
+    if (settingsEditing) {
+      if (settingsSelection == 0) {
+        minVolumeReq = min(50.0f, minVolumeReq + 0.5f);
+      } else if (settingsSelection == 1) {
+        pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
+      }
+      drawSettingsMenu();
+    } else {
+      if (settingsSelection == 0 || settingsSelection == 1) {
+        settingsEditing = true;
+        drawSettingsMenu();
+      } else if (settingsSelection == 2) {
+        if (rtcStatus) {
+          DateTime now = rtc.now();
+          rtcSetYear = max((uint16_t)2026, now.year());
+          rtcSetMonth = now.month();
+          rtcSetDay = now.day();
+          rtcSetHour = now.hour();
+          rtcSetMinute = now.minute();
+        }
+        currentAppState = RTC_SET_MENU;
+        rtcSetNeedsFullRedraw = true;
+        rtcSetField = 0;
+        drawRtcSetMenu();
+      } else if (settingsSelection == 3) {
+        currentAppState = LOAD_CELL_PAGE;
+        loadCellNeedsFullRedraw = true;
+        loadCellSelection = 0;
+        wizardEditing = false;
+        drawLoadCellPage();
+      }
     }
-    drawSettingsMenu();
   }
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
@@ -1820,21 +1853,16 @@ void loop() {
       }
     } else if (currentAppState == SETTINGS_MENU) {
       if (settingsEditing) {
-        settingsEditing = false;
-        drawSettingsMenu();
-      } else {
         if (settingsSelection == 0) {
-          minVolumeReq -= 0.5f;
-          if (minVolumeReq < 1.0f) minVolumeReq = 1.0f;
-          drawSettingsMenu();
+          minVolumeReq = max(1.0f, minVolumeReq - 0.5f);
         } else if (settingsSelection == 1) {
           pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
-          drawSettingsMenu();
-        } else {
-          currentAppState = START_MENU;
-          menuNeedsFullRedraw = true;
-          drawStartMenu();
         }
+        drawSettingsMenu();
+      } else {
+        currentAppState = START_MENU;
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
       }
     } else if (currentAppState == TRANSFER_TEST_MENU) {
       pumpPreHeatFermOn = false;
