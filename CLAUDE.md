@@ -308,7 +308,7 @@ Two separate temperature readouts are sent by the secondary controller via `inco
 
 ---
 
-## 7. System Check Menu (12 items, indices 0–11)
+## 7. System Check Menu (10 items, indices 0–9)
 
 Selecting an option enters the corresponding `AppState`:
 
@@ -319,13 +319,11 @@ Selecting an option enters the corresponding `AppState`:
 | **2** | RELAY TEST | `RELAY_TEST_MENU` | Manual/automated sequencing of all 9 relays |
 | **3** | MOTOR TEST | `MOTOR_TEST_MENU` | Test JGB37 mixing motor speed & direction |
 | **4** | PID CONTROL | `PID_TEST_PICK` | Test temperature profiles, PID controller, and PID Thermal Tracking (80°C step test with live graph & SD logging) |
-| **5** | HEATER OUTPUT | `HEATER_TEST_MENU` | Test pre-heat and pasteurization heaters (no fermentation) |
-| **6** | SD CARD VERIFY | `SD_VERIFY_MENU` | Check SPI connection & read/write capabilities on SD card |
-| **7** | UART MONITOR | `UART_MONITOR_MENU` | Monitor incoming data struct from Secondary Controller |
-| **8** | SET RTC TIME | `RTC_SET_MENU` | Manually adjust DS3231 RTC hours/minutes |
-| **9** | TRANSFER TEST | `TRANSFER_TEST_MENU` | Test pump and transfer logic between chambers |
-| **10** | LOAD CELL | `LOAD_CELL_PAGE` | Simple live weight/raw reading monitor with TARE function |
-| **11** | RAPT PILL | `RAPT_TEST_MENU` | Log up to 10 incoming BLE telemetry updates live (ignores duplicates within 15 seconds) |
+| **5** | SD CARD VERIFY | `SD_VERIFY_MENU` | Check SPI connection & read/write capabilities on SD card |
+| **6** | UART MONITOR | `UART_MONITOR_MENU` | Monitor incoming data struct from Secondary Controller |
+| **7** | TRANSFER TEST | `TRANSFER_TEST_MENU` | Test pump and transfer logic between chambers |
+| **8** | RAPT PILL | `RAPT_TEST_MENU` | Log up to 10 incoming BLE telemetry updates live (ignores duplicates within 15 seconds) |
+| **9** | PH & FERM TEMP | `PH_FERM_MENU` | Live display for pH probe and liquid/ambient temperatures |
 
 ---
 
