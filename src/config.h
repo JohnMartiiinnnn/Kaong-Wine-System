@@ -122,8 +122,13 @@ enum AppState {
   CALIB_WIZARD,
   RAPT_TEST_MENU,
   PH_FERM_MENU,
-  PID_TRACKING_MENU
+  PID_TRACKING_MENU,
+  SETTINGS_MENU
 };
+
+extern bool settingsNeedsFullRedraw;
+extern int settingsSelection;
+extern bool settingsEditing;
 
 extern long rawHX711;
 

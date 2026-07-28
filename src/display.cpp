@@ -96,34 +96,27 @@ void drawNewBrewWizard() {
           skipPreheatHeater ? "DISABLED" : "ENABLED");
   tft.drawCentreString(buf, CENTER_X, 217, 2);
 
-  // Row 2: PROCEED
+  // Row 2: PROCEED (START BREW)
   bool canProceed = (currentWeight >= minVolumeReq);
-  uint16_t row2Bg =
-      canProceed ? ((wizardSelection == 2) ? 0x03E0 : 0x0400) : TFT_DARKGREY;
+  uint16_t row2Bg = canProceed
+                        ? ((wizardSelection == 2) ? 0x03E0 : 0x0400)
+                        : ((wizardSelection == 2) ? TFT_RED : 0x4208);
   uint16_t row2Fg = TFT_WHITE;
-  tft.drawRect(18, 268, 284, 49,
-               (wizardSelection == 2) ? TFT_BLACK : TFT_WHITE);
-  tft.fillRect(20, 270, 280, 45, row2Bg);
-  tft.drawRect(20, 270, 280, 45, TFT_DARKGREY);
+  tft.fillRect(20, 270, 280, 55, row2Bg);
+  tft.drawRect(20, 270, 280, 55, TFT_DARKGREY);
   tft.setTextColor(row2Fg, row2Bg);
-  tft.drawCentreString("PROCEED (START BREW)", CENTER_X, 282, 2);
-
-  // Row 3: BYPASS (TEST RUN)
-  uint16_t row3Bg = (wizardSelection == 3) ? TFT_ORANGE : 0x9000;
-  uint16_t row3Fg = TFT_WHITE;
-  tft.drawRect(18, 328, 284, 49,
-               (wizardSelection == 3) ? TFT_BLACK : TFT_WHITE);
-  tft.fillRect(20, 330, 280, 45, row3Bg);
-  tft.drawRect(20, 330, 280, 45, TFT_DARKGREY);
-  tft.setTextColor(row3Fg, row3Bg);
-  tft.drawCentreString("BYPASS (TEST RUN)", CENTER_X, 342, 2);
+  if (canProceed) {
+    tft.drawCentreString("PROCEED (START BREW)", CENTER_X, 287, 2);
+  } else {
+    tft.drawCentreString("LOCKED: MIN VOL NOT MET", CENTER_X, 287, 2);
+  }
 
   // Help Footer
   tft.fillRect(0, 420, 320, 60, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DOWN: NAV   LEFT/RIGHT: ADJUST   SELECT: RUN",
+  tft.drawCentreString("UP/DOWN: SELECT   L/R: ADJUST   SELECT: RUN/EDIT",
                        CENTER_X, 432, 1);
-  tft.drawCentreString("RETURN (LEFT on Row 2/3): CANCEL", CENTER_X, 452, 1);
+  tft.drawCentreString("RETURN (LEFT): CANCEL & BACK", CENTER_X, 452, 1);
 }
 
 static void formatStageTimer(uint32_t ms, char *out) {
@@ -336,8 +329,8 @@ void drawStartMenu() {
     tft.drawString("MAIN MENU", 10, 15, 4);
     menuNeedsFullRedraw = false;
   }
-  const char *options[] = {"NEW BREW", "CONTINUE BREW", "SYSTEM CHECK",
-                           "SENSOR VALUES"};
+  const char *opt0 = (activeBrewStage >= 0) ? "VIEW ACTIVE BREW" : "NEW BREW";
+  const char *options[] = {opt0, "SETTINGS", "SYSTEM CHECK", "SENSOR VALUES"};
   for (int i = 0; i < 4; i++) {
     uint16_t color = (menuSelection == i) ? 0x3566 : 0xD6BA;
     uint16_t txtColor = (menuSelection == i) ? TFT_WHITE : TFT_BLACK;
@@ -1489,21 +1482,80 @@ void drawRtcSetMenu() {
   sprintf(buf, "%02d", rtcSetMinute);
   tft.drawCentreString(buf, 240, 230, 4);
 
-  // Save button
-  uint16_t saveBg = rtcStatus ? 0x0400 : TFT_DARKGREY;
-  tft.fillRect(10, 302, 300, 55, saveBg);
-  tft.drawRect(10, 302, 300, 55, TFT_DARKGREY);
+  // Field 5: SAVE & EXIT button
+  uint16_t saveBg = (rtcSetField == 5) ? 0x03E0 : (rtcStatus ? 0x0400 : TFT_DARKGREY);
+  tft.fillRect(10, 302, 142, 55, saveBg);
+  tft.drawRect(10, 302, 142, 55, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, saveBg);
-  tft.drawCentreString("SELECT TO SAVE", CENTER_X, 310, 4);
-  tft.drawCentreString(rtcStatus ? "Writes Date & Time to DS3231"
-                                 : "RTC not available",
-                       CENTER_X, 335, 1);
+  tft.drawCentreString("SAVE & EXIT", 81, 318, 2);
+
+  // Field 6: CANCEL button
+  uint16_t cancelBg = (rtcSetField == 6) ? 0xF800 : 0x4208;
+  tft.fillRect(168, 302, 142, 55, cancelBg);
+  tft.drawRect(168, 302, 142, 55, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, cancelBg);
+  tft.drawCentreString("CANCEL", 239, 318, 2);
 
   // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DN: SWITCH FIELD   L/R: ADJUST VALUE", CENTER_X, 447, 1);
-  tft.drawCentreString("SELECT: SAVE TO RTC   RETURN: CANCEL", CENTER_X, 462, 1);
+  tft.drawCentreString("UP/DN: SELECT FIELD   L/R: ADJUST (+/-)", CENTER_X, 447, 1);
+  tft.drawCentreString("SELECT: CONFIRM / SAVE   RETURN: BACK", CENTER_X, 462, 1);
+}
+
+void drawSettingsMenu() {
+  static int prevSel = -1;
+
+  auto drawTile = [&](int i, bool sel) {
+    uint16_t bg = sel ? (settingsEditing ? 0x03E0 : 0x3566) : 0xD6BA;
+    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 60 + (i * 70), 300, 60, bg);
+    tft.drawRect(10, 60 + (i * 70), 300, 60, TFT_DARKGREY);
+    tft.setTextColor(fg, bg);
+
+    char buf[48];
+    if (i == 0) {
+      sprintf(buf, "MIN VOLUME: %.1f L", minVolumeReq);
+    } else if (i == 1) {
+      sprintf(buf, "PREHEAT HEATER: %s", skipPreheatHeater ? "DISABLED" : "ENABLED");
+    } else if (i == 2) {
+      sprintf(buf, "FERM FAN BASELINE: %d%%", pidFanPercent > 0 ? pidFanPercent : 20);
+    } else if (i == 3) {
+      strcpy(buf, "SET RTC DATE & TIME");
+    } else {
+      strcpy(buf, "TARE LOAD CELL");
+    }
+    tft.drawCentreString(buf, CENTER_X, 72 + (i * 70), 2);
+
+    if (i == 0 || i == 1 || i == 2) {
+      tft.drawCentreString(sel && settingsEditing ? "[ EDITING - L/R TO ADJUST ]"
+                                                 : "< L/R OR SELECT TO EDIT >",
+                           CENTER_X, 96 + (i * 70), 1);
+    } else {
+      tft.drawCentreString("< SELECT TO ENTER MENU >", CENTER_X, 96 + (i * 70), 1);
+    }
+  };
+
+  if (settingsNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("SETTINGS", 10, 15, 4);
+    for (int i = 0; i < 5; i++) {
+      drawTile(i, settingsSelection == i);
+    }
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DN: SELECT   L/R: ADJUST   SELECT: EDIT/ENTER",
+                         CENTER_X, 447, 1);
+    tft.drawCentreString("RETURN: BACK TO MAIN MENU", CENTER_X, 462, 1);
+    settingsNeedsFullRedraw = false;
+    prevSel = settingsSelection;
+  } else {
+    for (int i = 0; i < 5; i++) {
+      drawTile(i, settingsSelection == i);
+    }
+  }
 }
 
 void updateDashboardGraph() {

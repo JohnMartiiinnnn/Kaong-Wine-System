@@ -76,7 +76,9 @@ src/
 
 ### Software Logic State Machine
 *   `SYSTEM_INIT` → `START_MENU` (after splash screen).
-*   `NEW_BREW_WIZARD`: Volume check (configurable minimum volume target) and option to bypass/disable the preheat immersion heater.
+*   `NEW_BREW_WIZARD`: Minimum volume safety check (locked if volume requirement is not met) and option to disable preheat immersion heater.
+*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; configure minimum volume, preheat heater toggle, fermentation baseline fan speed, RTC date/time shortcut, and scale tare shortcut.
+*   `RTC_SET_MENU`: 7-field D-pad navigation (YEAR, MONTH, DAY, HOUR, MIN, SAVE & EXIT, CANCEL); RIGHT increases (+), LEFT decreases (-).
 *   `DASHBOARD_ACTIVE`: Three sub-views — Pre-Heating, Fermentation, Pasteurization.
 *   `COOLING_MENU`: Manual/Auto fan control.
 *   `MIXER_MENU`: Mixing impeller control — OFF / MANUAL (speed adjust) / AUTO (5 min ON, 355 min OFF).
@@ -347,8 +349,10 @@ Connect the TB6612FN motor driver as follows:
 ### UI Navigation
 ```
 MAIN MENU
-  └─ CONTINUE BREW  (or NEW BREW → start brew)
-       └─ DASHBOARD
+  ├─ NEW BREW (or VIEW ACTIVE BREW if brewing)
+  ├─ SETTINGS
+  ├─ SYSTEM CHECK
+  └─ SENSOR VALUES
             └─ Navigate to FERMENTATION tab (RIGHT/DOWN)
                  └─ SELECT  →  enter Fermentation module view
                       └─ SELECT  →  MIXER CONTROL menu
