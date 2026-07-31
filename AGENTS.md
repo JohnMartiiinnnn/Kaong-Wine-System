@@ -300,6 +300,8 @@ mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
 isFermFanOn = false;                                   // 3. Clear flag
 ```
 
+*Note on Relay Test Fan Driving:* When testing either fan in Relay Test mode, turning on the MCP relay alone is insufficient because Preheat Fan uses inverted PWM (`isFanOn = true; setFanSpeed(100);`) to output 0 duty cycle, while Fermentation Fan uses non-inverted PWM (`isFermFanOn = true; setFanSpeed(100);`) to output 255 duty cycle. All relay tests must use `setRelayTestChannel(idx, state)` to synchronize relays and PWM signals.
+
 ### Fermentation Chamber Sensor Routing
 Two separate temperature readouts are sent by the secondary controller via `incomingData`:
 *   `room2Temp`: BME280 (ambient air inside the fermentation enclosure). Use this for environment/cooling control.

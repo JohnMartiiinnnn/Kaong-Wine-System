@@ -290,6 +290,29 @@ void setMixerSpeed(int percent) {
   sendMotorCommand(percent, true);
 }
 
+// ---- Relay Test Helper ----
+void setRelayTestChannel(int idx, bool state) {
+  if (idx < 0 || idx >= 9)
+    return;
+  testRelayStates[idx] = state;
+  if (idx == 0) { // FERM FAN
+    isFermFanOn = state;
+    mcp.digitalWrite(FERM_FAN_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
+    mcp.digitalWrite(FERM_FAN2_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
+    setFanSpeed(state ? 100 : 0);
+  } else if (idx == 1) { // PUMP 1
+    setPump1(state);
+  } else if (idx == 2) { // PUMP 2
+    setPump2(state);
+  } else if (idx < 8) { // CH3..CH7 (general relays and status lights)
+    mcp.digitalWrite(RELAY_PINS[idx], state ? RELAY_ON : RELAY_OFF);
+  } else if (idx == 8) { // PRE FAN
+    isFanOn = state;
+    mcp.digitalWrite(FAN_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
+    setFanSpeed(state ? 100 : 0);
+  }
+}
+
 // ---- Flow Sensor ISRs ----
 void IRAM_ATTR flowISR1() {
   if (!sysPump1Active)
@@ -1028,21 +1051,12 @@ void loop() {
     } else if (currentAppState == RELAY_TEST_PICK) {
       relayTestAuto = (relayTestPickSelection == 0);
       for (int i = 0; i < 9; i++) {
-        testRelayStates[i] = false;
-        if (i == 1)
-          setPump1(false);
-        else if (i == 2)
-          setPump2(false);
-        else if (i < 8)
-          mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
-        else
-          mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        setRelayTestChannel(i, false);
       }
       relayTestSelection = 0;
       relayTestTimer = millis();
       if (relayTestAuto) {
-        testRelayStates[0] = true;
-        mcp.digitalWrite(RELAY_PINS[0], RELAY_ON);
+        setRelayTestChannel(0, true);
       }
       currentAppState = RELAY_TEST_MENU;
       relayTestNeedsFullRedraw = true;
@@ -1050,17 +1064,7 @@ void loop() {
     } else if (currentAppState == RELAY_TEST_MENU) {
       if (!relayTestAuto) {
         int idx = relayTestSelection;
-        testRelayStates[idx] = !testRelayStates[idx];
-        bool state = testRelayStates[idx];
-        if (idx == 1) {
-          setPump1(state);
-        } else if (idx == 2) {
-          setPump2(state);
-        } else if (idx < 8) {
-          mcp.digitalWrite(RELAY_PINS[idx], state ? RELAY_ON : RELAY_OFF);
-        } else {
-          mcp.digitalWrite(FAN_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
-        }
+        setRelayTestChannel(idx, !testRelayStates[idx]);
         drawRelayTestMenu();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
@@ -1755,15 +1759,7 @@ void loop() {
       drawSystemCheckMenu();
     } else if (currentAppState == RELAY_TEST_MENU) {
       for (int i = 0; i < 9; i++) {
-        testRelayStates[i] = false;
-        if (i == 1)
-          setPump1(false);
-        else if (i == 2)
-          setPump2(false);
-        else if (i < 8)
-          mcp.digitalWrite(RELAY_PINS[i], RELAY_OFF);
-        else
-          mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        setRelayTestChannel(i, false);
       }
       currentAppState = RELAY_TEST_PICK;
       relayTestPickNeedsFullRedraw = true;
@@ -1896,16 +1892,7 @@ void loop() {
       millis() - relayTestTimer > 1000) {
     // Turn off current relay
     int idx = relayTestSelection;
-    testRelayStates[idx] = false;
-    if (idx == 1) {
-      setPump1(false);
-    } else if (idx == 2) {
-      setPump2(false);
-    } else if (idx < 8) {
-      mcp.digitalWrite(RELAY_PINS[idx], RELAY_OFF);
-    } else {
-      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
-    }
+    setRelayTestChannel(idx, false);
 
     delay(50); // Buffer for electrical stabilization
 
@@ -1914,16 +1901,7 @@ void loop() {
 
     // Turn on the next relay
     idx = relayTestSelection;
-    testRelayStates[idx] = true;
-    if (idx == 1) {
-      setPump1(true);
-    } else if (idx == 2) {
-      setPump2(true);
-    } else if (idx < 8) {
-      mcp.digitalWrite(RELAY_PINS[idx], RELAY_ON);
-    } else {
-      mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
-    }
+    setRelayTestChannel(idx, true);
 
     relayTestTimer = millis();
     drawRelayTestMenu();
