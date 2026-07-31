@@ -46,7 +46,12 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 #define RELAY_OFF HIGH
 #define GRAVITY_OFFSET 0.009
 
+// ---- DRV8871 Yeast Dispenser Pinout & Calibration Parameters ----
+const int DRV8871_IN1_PIN_CFG = 4; // DRV8871 IN1 -> ESP32-C3 GPIO 4
+const int DRV8871_IN2_PIN_CFG = 5; // DRV8871 IN2 -> ESP32-C3 GPIO 5
+
 #include "PIDController.h"
+#include "YeastDispenser.h"
 
 // ---- Immersion Heater PID Parameters (Pre-Heat & Pasteurization) ----
 const float PREHEAT_PID_KP = 2.0f;
