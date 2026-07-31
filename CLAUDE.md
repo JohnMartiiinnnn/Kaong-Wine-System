@@ -448,3 +448,19 @@ Sensor calibration is handled over the board's inter-controller UART connection 
 | **GPB5** | `LIGHT_G` | Status light — Green |
 | **GPB6** | `LIGHT_Y` | Status light — Yellow |
 | **GPB7** | `LIGHT_R` | Status light — Red |
+
+---
+
+## 11. Automated Yeast Dispenser Integration (DRV8871 + ESP32-C3)
+
+### Hardware Connections & Power
+*   **Controller:** ESP32-C3 SuperMini (Secondary MCU).
+*   **Driver:** Texas Instruments DRV8871 H-Bridge.
+*   **Motor:** N20 6V DC Geared Motor (coil resistance ~32 Ω).
+*   **Power Supply:** 11.93V DC on `VM` and `GND`.
+*   **Pin Mapping:** `DRV8871 IN1` → **GPIO 4**, `DRV8871 IN2` → **GPIO 5**.
+*   **Duty Cap & Protection:** Maximum PWM duty cycle must be capped at 50% (`MAX_YEAST_MOTOR_DUTY = 128/255`) to limit peak output to ~6.0V.
+*   **PWM Mode:** 1 kHz frequency, Fast-Decay mode (`IN1=PWM, IN2=0`).
+*   **Active Braking:** Fires `IN1=HIGH, IN2=HIGH` for 200ms at cycle end to stop rotation instantly and prevent over-dispensing/drip.
+*   **Calibration Formula:** $\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}}$
+
