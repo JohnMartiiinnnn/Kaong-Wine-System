@@ -2396,7 +2396,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
   // Status Bar (Y=55 to 85) - Selectable Heater Output
   const char *hName = "NOT SET";
   if (pidTestChoice == 0) hName = "PRE-HEAT";
-  else if (pidTestChoice == 1) hName = "FERMENTATION (LIQUID)";
+  else if (pidTestChoice == 1) hName = "FERMENTATION";
   else if (pidTestChoice == 2) hName = "PASTEURIZATION";
 
   uint16_t statBg = pidTrackRunning ? 0x0400 : (pidTestChoice == -1 ? 0x9000 : 0x3566);
@@ -2418,43 +2418,70 @@ void drawPidTrackingMenu(bool valuesOnly) {
 
   // Current Temp / Setpoint based on selected heater chamber
   float curTemp = 0.0f;
+  float fermLiqTemp = -999.0f;
   if (pidTestChoice == 0) {
     curTemp = liquid2Status ? getPreheatTemp() : 0.0f;
   } else if (pidTestChoice == 1) {
-    curTemp = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
-                  ? getFermTemp()
-                  : ((incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f);
+    // Ambient Temp is the only temperature tracked and plotted in the graph
+    curTemp = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f;
+    if (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f) {
+      fermLiqTemp = getFermTemp();
+    }
   } else if (pidTestChoice == 2) {
     curTemp = liquid1Status ? getPastTemp() : 0.0f;
   }
-
-  // Row 1: Temp & Error
-  sprintf(buf, "TEMP: %.1f C / %.1f C", curTemp, pidTrackTargetTemp);
-  tft.drawString(buf, 20, 96, 2);
-
-  sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
-  tft.drawRightString(buf, 300, 96, 2);
-
-  // Row 2: Overshoot & Stability
-  sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
-  tft.drawString(buf, 20, 122, 2);
 
   uint16_t stabColor = TFT_BLACK;
   if (strcmp(pidTrackMetrics.stabilityStr, "STABLE") == 0) stabColor = 0x0400;
   else if (strcmp(pidTrackMetrics.stabilityStr, "SETTLING") == 0) stabColor = 0xE7E0;
   else if (strcmp(pidTrackMetrics.stabilityStr, "UNSTABLE") == 0) stabColor = TFT_RED;
 
-  tft.setTextColor(stabColor, TFT_WHITE);
-  sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
-  tft.drawRightString(buf, 300, 122, 2);
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  if (pidTestChoice == 1) {
+    // Fermentation Metrics Layout (Displays Ambient + Liquid Temp)
+    sprintf(buf, "AMB: %.1f C / %.1f C", curTemp, pidTrackTargetTemp);
+    tft.drawString(buf, 20, 96, 2);
 
-  // Row 3: Heater Power & Chamber Name
-  sprintf(buf, "HEATER POWER: %d%%", currentHeatingPercent);
-  tft.drawString(buf, 20, 148, 2);
+    sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
+    tft.drawRightString(buf, 300, 96, 2);
 
-  sprintf(buf, "TARGET: %s", hName);
-  tft.drawRightString(buf, 300, 148, 2);
+    if (fermLiqTemp > -999.0f)
+      sprintf(buf, "LIQUID: %.1f C", fermLiqTemp);
+    else
+      strcpy(buf, "LIQUID: ---");
+    tft.drawString(buf, 20, 122, 2);
+
+    tft.setTextColor(stabColor, TFT_WHITE);
+    sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
+    tft.drawRightString(buf, 300, 122, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+    sprintf(buf, "POWER: %d%%", currentHeatingPercent);
+    tft.drawString(buf, 20, 148, 2);
+
+    sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
+    tft.drawRightString(buf, 300, 148, 2);
+  } else {
+    // Pre-Heat & Pasteurization Metrics Layout
+    sprintf(buf, "TEMP: %.1f C / %.1f C", curTemp, pidTrackTargetTemp);
+    tft.drawString(buf, 20, 96, 2);
+
+    sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
+    tft.drawRightString(buf, 300, 96, 2);
+
+    sprintf(buf, "POWER: %d%%", currentHeatingPercent);
+    tft.drawString(buf, 20, 122, 2);
+
+    tft.setTextColor(stabColor, TFT_WHITE);
+    sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
+    tft.drawRightString(buf, 300, 122, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+    sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
+    tft.drawString(buf, 20, 148, 2);
+
+    sprintf(buf, "TARGET: %s", (pidTestChoice == 0 ? "PRE-HEAT" : "PAST"));
+    tft.drawRightString(buf, 300, 148, 2);
+  }
 
   // --- Professional Dynamic Auto-Ranging Line Graph ---
   const int gX = 40;     // Graph canvas left offset (leaving 40px for Y-axis labels)

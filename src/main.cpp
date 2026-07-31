@@ -1147,7 +1147,7 @@ void loop() {
           pidTrackSampleIntervalSec = 2;
           float initTemp = 25.0f;
           if (pidTestChoice == 0 && liquid2Status) initTemp = getPreheatTemp();
-          else if (pidTestChoice == 1) initTemp = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f) ? getFermTemp() : ((incomingData.sensor2Status > 0) ? incomingData.room2Temp : 25.0f);
+          else if (pidTestChoice == 1 && incomingData.sensor2Status > 0) initTemp = incomingData.room2Temp;
           else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
 
           if (pidTestChoice == 1) {
@@ -2124,7 +2124,7 @@ void loop() {
       if (pidTestChoice == 0) {
         curT = liquid2Status ? getPreheatTemp() : 25.0f;
       } else if (pidTestChoice == 1) {
-        curT = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f) ? getFermTemp() : ((incomingData.sensor2Status > 0) ? incomingData.room2Temp : 25.0f);
+        curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 25.0f;
       } else {
         curT = liquid1Status ? getPastTemp() : 25.0f;
       }
