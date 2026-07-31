@@ -2366,18 +2366,18 @@ void drawPidTrackingMenu(bool valuesOnly) {
     tft.setTextColor(TFT_WHITE);
     tft.drawString("PID THERMAL TRACKING", 10, 15, 4);
 
-    // Static Metrics Container (Y=90 to 205)
-    tft.drawRect(10, 90, 300, 115, TFT_DARKGREY);
+    // Static Metrics Container (Y=90 to 180)
+    tft.drawRect(10, 90, 300, 90, TFT_DARKGREY);
 
-    // Graph Area Border & Canvas Setup (Y=215 to 425)
-    tft.fillRect(15, 215, 290, 210, 0x2124); // Dark panel
-    tft.drawRect(15, 215, 290, 210, TFT_DARKGREY);
+    // Graph Area Border & Canvas Setup (Y=188 to 428)
+    tft.fillRect(15, 188, 290, 240, 0x2124); // Dark panel
+    tft.drawRect(15, 188, 290, 240, TFT_DARKGREY);
 
     // Graph Title & Active Log File
     tft.setTextColor(TFT_LIGHTGREY, 0x2124);
-    tft.drawString("TEMP TREND (AUTO-RANGE)", 22, 220, 1);
+    tft.drawString("TEMP TREND (AUTO-RANGE)", 22, 192, 1);
     if (pidLogFileName[0] != '\0') {
-      tft.drawRightString(pidLogFileName, 298, 220, 1);
+      tft.drawRightString(pidLogFileName, 298, 192, 1);
     }
 
     // Footer
@@ -2396,7 +2396,7 @@ void drawPidTrackingMenu(bool valuesOnly) {
   // Status Bar (Y=55 to 85) - Selectable Heater Output
   const char *hName = "NOT SET";
   if (pidTestChoice == 0) hName = "PRE-HEAT";
-  else if (pidTestChoice == 1) hName = "FERMENTATION (AMBIENT)";
+  else if (pidTestChoice == 1) hName = "FERMENTATION (LIQUID)";
   else if (pidTestChoice == 2) hName = "PASTEURIZATION";
 
   uint16_t statBg = pidTrackRunning ? 0x0400 : (pidTestChoice == -1 ? 0x9000 : 0x3566);
@@ -2412,8 +2412,8 @@ void drawPidTrackingMenu(bool valuesOnly) {
   }
   tft.drawCentreString(buf, CENTER_X, 62, 2);
 
-  // Metrics Grid (Y=90 to 205)
-  tft.fillRect(11, 91, 298, 113, TFT_WHITE);
+  // Metrics Grid (Y=90 to 180)
+  tft.fillRect(11, 91, 298, 88, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
   // Current Temp / Setpoint based on selected heater chamber
@@ -2421,7 +2421,9 @@ void drawPidTrackingMenu(bool valuesOnly) {
   if (pidTestChoice == 0) {
     curTemp = liquid2Status ? getPreheatTemp() : 0.0f;
   } else if (pidTestChoice == 1) {
-    curTemp = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f;
+    curTemp = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f)
+                  ? getFermTemp()
+                  : ((incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f);
   } else if (pidTestChoice == 2) {
     curTemp = liquid1Status ? getPastTemp() : 0.0f;
   }
@@ -2433,48 +2435,33 @@ void drawPidTrackingMenu(bool valuesOnly) {
   sprintf(buf, "ERR: %.2f C", pidTrackMetrics.steadyStateError);
   tft.drawRightString(buf, 300, 96, 2);
 
-  // Row 2: Rise Time & Settle Time
-  if (pidTrackMetrics.riseTimeSec >= 0) {
-    sprintf(buf, "RISE TIME: %ds", pidTrackMetrics.riseTimeSec);
-  } else {
-    sprintf(buf, "RISE TIME: ---");
-  }
-  tft.drawString(buf, 20, 122, 2);
-
-  if (pidTrackMetrics.settlingTimeSec >= 0) {
-    sprintf(buf, "SETTLE TIME: %ds", pidTrackMetrics.settlingTimeSec);
-  } else {
-    sprintf(buf, "SETTLE TIME: ---");
-  }
-  tft.drawRightString(buf, 300, 122, 2);
-
-  // Row 3: Overshoot & Stability
+  // Row 2: Overshoot & Stability
   sprintf(buf, "OVERSHOOT: +%.1f C", pidTrackMetrics.overshootDeg);
-  tft.drawString(buf, 20, 148, 2);
+  tft.drawString(buf, 20, 122, 2);
 
   uint16_t stabColor = TFT_BLACK;
   if (strcmp(pidTrackMetrics.stabilityStr, "STABLE") == 0) stabColor = 0x0400;
   else if (strcmp(pidTrackMetrics.stabilityStr, "SETTLING") == 0) stabColor = 0xE7E0;
   else if (strcmp(pidTrackMetrics.stabilityStr, "UNSTABLE") == 0) stabColor = TFT_RED;
-  
+
   tft.setTextColor(stabColor, TFT_WHITE);
   sprintf(buf, "STABILITY: %s", pidTrackMetrics.stabilityStr);
-  tft.drawRightString(buf, 300, 148, 2);
+  tft.drawRightString(buf, 300, 122, 2);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
 
-  // Row 4: Heater Power (under Overshoot)
+  // Row 3: Heater Power & Chamber Name
   sprintf(buf, "HEATER POWER: %d%%", currentHeatingPercent);
-  tft.drawString(buf, 20, 174, 2);
+  tft.drawString(buf, 20, 148, 2);
 
-  // Divider line inside metrics box
-  tft.drawFastHLine(15, 175, 290, TFT_LIGHTGREY);
+  sprintf(buf, "TARGET: %s", hName);
+  tft.drawRightString(buf, 300, 148, 2);
 
   // --- Professional Dynamic Auto-Ranging Line Graph ---
   const int gX = 40;     // Graph canvas left offset (leaving 40px for Y-axis labels)
-  const int gY = 216;    // Graph canvas top
+  const int gY = 205;    // Graph canvas top
   const int gW = 265;    // Graph width
-  const int gH = 205;    // Graph height
-  const int gBottom = gY + gH; // Y = 421
+  const int gH = 215;    // Graph height
+  const int gBottom = gY + gH; // Y = 420
 
   // 1. Calculate Dynamic Temperature Min/Max Range from starting temp & setpoint
   float startT = (pidTrackMetrics.startTemp > 0.0f) ? pidTrackMetrics.startTemp : ((curTemp > 0.0f) ? curTemp : pidTrackTargetTemp);
