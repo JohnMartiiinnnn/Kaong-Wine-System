@@ -632,32 +632,21 @@ void drawMotorTestMenu() {
 
   // Speed tile
   uint16_t speedColor = (motorTestSpeed == 0) ? TFT_DARKGREY : 0x03E0;
-  tft.fillRect(20, 70, 280, 130, speedColor);
-  tft.drawRect(20, 70, 280, 130, TFT_DARKGREY);
+  tft.fillRect(20, 70, 280, 140, speedColor);
+  tft.drawRect(20, 70, 280, 140, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, speedColor);
-  tft.drawCentreString("SPEED", CENTER_X, 85, 2);
+  tft.drawCentreString("SPEED", CENTER_X, 90, 2);
   char buf[16];
   sprintf(buf, "%d%%", motorTestSpeed);
-  tft.drawCentreString(buf, CENTER_X, 115, 7);
-
-  char telemetryBuf[64];
-  float rpmVal = 0.0f;
-  float currentA = incomingData.motorSenseVolts * (3.0f / 0.353f);
-  if (motorTestSpeed > 0 && incomingData.motorSenseVolts > 0.01f) {
-    rpmVal = 66.0f - 160.19f * (incomingData.motorSenseVolts - 0.035f);
-    if (rpmVal < 0.0f) rpmVal = 0.0f;
-    if (rpmVal > 66.0f) rpmVal = 66.0f;
-  }
-  sprintf(telemetryBuf, "%.2fA  RPM: %.1f", currentA, rpmVal);
-  tft.drawCentreString(telemetryBuf, CENTER_X, 168, 2);
+  tft.drawCentreString(buf, CENTER_X, 125, 7);
 
   // ON/OFF tile
   uint16_t onOffColor = motorTestOn ? 0x0400 : 0x4208;
-  tft.fillRect(20, 220, 280, 130, onOffColor);
-  tft.drawRect(20, 220, 280, 130, TFT_DARKGREY);
+  tft.fillRect(20, 230, 280, 140, onOffColor);
+  tft.drawRect(20, 230, 280, 140, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, onOffColor);
-  tft.drawCentreString("MOTOR", CENTER_X, 235, 2);
-  tft.drawCentreString(motorTestOn ? "ON" : "OFF", CENTER_X, 270, 4);
+  tft.drawCentreString("MOTOR", CENTER_X, 245, 2);
+  tft.drawCentreString(motorTestOn ? "ON" : "OFF", CENTER_X, 280, 4);
 }
 
 void drawValueTile(int x, int y, const char *label, String value,
@@ -855,20 +844,10 @@ void drawMixerMenu() {
   sprintf(buf, "%d%%", mixerSpeedPercent);
   tft.drawCentreString(buf, CENTER_X, 262, 4);
 
-  char telemetryBuf[64];
-  float rpmVal = 0.0f;
-  if (mixerSpeedPercent > 0 && incomingData.motorSenseVolts > 0.01f) {
-    rpmVal = 66.0f - 160.19f * (incomingData.motorSenseVolts - 0.035f);
-    if (rpmVal < 0.0f) rpmVal = 0.0f;
-    if (rpmVal > 66.0f) rpmVal = 66.0f;
-  }
-  sprintf(telemetryBuf, "V: %.3fV  RPM: %.1f", incomingData.motorSenseVolts, rpmVal);
-  tft.drawCentreString(telemetryBuf, CENTER_X, 292, 2);
-
   if (currentMixerMode == MIXER_MANUAL)
-    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 318, 1);
+    tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 305, 1);
   else
-    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 318, 1);
+    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 305, 1);
 
   if (currentMixerMode == MIXER_AUTO) {
     uint16_t statusColor = mixerRunning ? 0x0400 : 0x3566;

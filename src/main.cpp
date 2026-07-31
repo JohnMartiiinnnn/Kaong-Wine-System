@@ -124,6 +124,7 @@ bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
 bool motorTestOn = false;
+AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 int pidTestChoice = 0;
@@ -1336,6 +1337,7 @@ void loop() {
         rtcSetField = 0;
         drawRtcSetMenu();
       } else if (settingsSelection == 3) {
+        prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
         loadCellSelection = 0;
@@ -1641,6 +1643,7 @@ void loop() {
         rtcSetField = 0;
         drawRtcSetMenu();
       } else if (settingsSelection == 3) {
+        prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
         loadCellSelection = 0;
@@ -1695,9 +1698,14 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
+      currentAppState = prevLoadCellState;
+      if (prevLoadCellState == SETTINGS_MENU) {
+        settingsNeedsFullRedraw = true;
+        drawSettingsMenu();
+      } else {
+        systemCheckNeedsFullRedraw = true;
+        drawSystemCheckMenu();
+      }
     } else if (currentAppState == RAPT_TEST_MENU) {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
@@ -1971,25 +1979,6 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
-      // Stall Limit Protection for Mixing Motor:
-      // If voltage on A1 exceeds 0.353V (3.0A) for > 3 consecutive seconds, shut down motor.
-      static uint32_t lastStallExceededMs = 0;
-      if (incomingData.motorSenseVolts > 0.353f) {
-        if (lastStallExceededMs == 0) {
-          lastStallExceededMs = millis();
-        } else if (millis() - lastStallExceededMs > 3000UL) {
-          if (mixerSpeedPercent > 0 || motorTestSpeed > 0) {
-            setMixerSpeed(0);
-            motorTestSpeed = 0;
-            currentMixerMode = MIXER_OFF;
-            mixerRunning = false;
-            sendMotorCommand(0, true);
-            Serial.println("ALERT: MIXER MOTOR STALL DETECTED! CUTTING POWER!");
-          }
-        }
-      } else {
-        lastStallExceededMs = 0;
-      }
       // Check for new RAPT Pill telemetry update
       if (incomingData.pillGravity > 0.1f) {
         static float lastPillTemp = -999.0f;

@@ -134,6 +134,7 @@ enum AppState {
 extern bool settingsNeedsFullRedraw;
 extern int settingsSelection;
 extern bool settingsEditing;
+extern AppState prevLoadCellState;
 
 extern long rawHX711;
 
