@@ -146,5 +146,17 @@ The Secondary transmits over UART2 (115200 baud) to the Primary. Source: `Second
 | R_IS | ADS1115 Channel A1 | Right Current Sense (Tied with L_IS) |
 | L_IS | ADS1115 Channel A1 | Left Current Sense (Tied with R_IS) |
 
-> **Note:** `L_EN` and `R_EN` are typically shorted together with a jumper. You can leave the jumper attached and connect a single wire from either pin to 3.3V on the ESP32.
+### DRV8871 Motor Driver (Yeast Dispenser)
+
+| DRV8871 Pin | Secondary Connection | Role / Notes |
+|-------------|----------------------|--------------|
+| IN1 | GPIO 4 | Fast-Decay PWM IN1 |
+| IN2 | GPIO 5 | Fast-Decay PWM IN2 |
+| VM | 11.93 V DC Supply (+) | Motor Power Rail |
+| GND | Common Ground Rail | Shared GND with ESP32 & Supply (-) |
+| OUT1 | N20 Motor Terminal 1 | Output to 6V N20 Geared Motor |
+| OUT2 | N20 Motor Terminal 2 | Output to 6V N20 Geared Motor |
+
+> **Duty Cap:** Max duty cycle capped at 50% (`128/255`), limiting peak output voltage to ~6.0V DC.
+
 
