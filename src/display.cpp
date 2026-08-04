@@ -114,6 +114,162 @@ static void formatStageTimer(uint32_t ms, char *out) {
   }
 }
 
+void updateDashboardValues() {
+  if (currentAppState != DASHBOARD_ACTIVE) return;
+
+  char buf[48];
+  uint16_t valColor = TFT_WHITE;
+  uint16_t bgCard = 0x2124;
+
+  if (dashSelection == 0) { // PRE-HEATING VIEW
+    // Tile 1: Ambient Temp
+    String pa = bme1Status ? String(bme1.readTemperature(), 1) + " C" : "-- C";
+    tft.setTextColor(valColor, bgCard);
+    tft.setTextPadding(140);
+    tft.drawCentreString(pa, 81, 168, 4);
+
+    // Tile 2: Liquid Temp
+    String pl = (simTempOverride[0] > 0.0f) ? String(simTempOverride[0], 1) + " C" : (liquid2Status ? String(getPreheatTemp(), 1) + " C" : "-- C");
+    tft.drawCentreString(pl, 239, 158, 4);
+    tft.setTextPadding(140);
+    tft.drawCentreString("TGT: 80.0 C", 239, 192, 1);
+
+    // Tile 3: Mode & Power
+    const char *modeStr = "IDLE";
+    if (stageTransferring && activeBrewStage == 0) modeStr = "TRANSFERRING";
+    else if (preHeatSterilized && isFanOn) modeStr = "COOLING (100%)";
+    else if (preHeatHolding) modeStr = "HOLDING (80.0C)";
+    else if (currentHeatingPercent > 0) {
+      sprintf(buf, "HEATING (%d%%)", currentHeatingPercent);
+      modeStr = buf;
+    }
+    tft.setTextPadding(140);
+    tft.drawCentreString(modeStr, 81, 168, 2);
+
+    // Tile 4: Volume
+    String wStr = hx711Status ? String(currentWeight, 1) + " L" : "-- L";
+    tft.setTextPadding(140);
+    tft.drawCentreString(wStr, 239, 168, 4);
+
+    // Tile 5: Process Status
+    tft.setTextPadding(290);
+    const char *mTxt[] = {"OFF", "ON", "AUTO"};
+    sprintf(buf, "FAN: %s (%d%%) | SSR: %s", mTxt[currentFanMode], currentSpeedPercent, (currentHeatingPercent > 0) ? "ON" : "OFF");
+    tft.drawCentreString(buf, CENTER_X, 350, 2);
+    sprintf(buf, "STERILIZED: %s | HOLDING: %s", preHeatSterilized ? "YES" : "NO", preHeatHolding ? "YES" : "NO");
+    tft.drawCentreString(buf, CENTER_X, 382, 2);
+
+  } else if (dashSelection == 1) { // FERMENTATION VIEW
+    // Tile 1: Ambient Temp
+    String fa = (incomingData.sensor2Status > 0) ? String(incomingData.room2Temp, 1) + " C" : "-- C";
+    tft.setTextColor(valColor, bgCard);
+    tft.setTextPadding(140);
+    tft.drawCentreString(fa, 81, 168, 4);
+
+    // Tile 2: Liquid Temp
+    String fl = (simTempOverride[1] > 0.0f) ? String(simTempOverride[1], 1) + " C" : (incomingData.ds18Status == 1 ? String(getFermTemp(), 1) + " C" : "-- C");
+    tft.drawCentreString(fl, 239, 168, 4);
+
+    // Tile 3: Mode & Power
+    const char *fermMode = "IDLE";
+    if (isFermFanOn) {
+      sprintf(buf, "COOLING (%d%%)", currentSpeedPercent);
+      fermMode = buf;
+    } else if (currentHeatingPercent > 0) {
+      sprintf(buf, "HEATING (%d%%)", currentHeatingPercent);
+      fermMode = buf;
+    } else if (currentMixerMode != MIXER_OFF) {
+      sprintf(buf, "MIXER (%d%%)", mixerSpeedPercent);
+      fermMode = buf;
+    }
+    tft.setTextPadding(140);
+    tft.drawCentreString(fermMode, 81, 168, 2);
+
+    // Tile 4: Gravity & pH
+    if (incomingData.pillGravity != 0 && incomingData.pillGravity < 10.0) {
+      dtostrf(incomingData.pillGravity, 5, 3, buf);
+    } else {
+      strcpy(buf, "--");
+    }
+    char sgPhBuf[32];
+    sprintf(sgPhBuf, "SG: %s", buf);
+    tft.setTextPadding(140);
+    tft.drawCentreString(sgPhBuf, 239, 158, 2);
+
+    if (incomingData.adsStatus == 1) {
+      dtostrf(incomingData.phValue, 4, 2, buf);
+    } else {
+      strcpy(buf, "--");
+    }
+    sprintf(sgPhBuf, "pH: %s", buf);
+    tft.drawCentreString(sgPhBuf, 239, 184, 2);
+
+    // Tile 5: RAPT Pill Status
+    sprintf(buf, "RSSI: %d dBm", incomingData.pillRSSI);
+    tft.setTextPadding(140);
+    tft.drawCentreString(buf, 81, 350, 2);
+    sprintf(buf, "BAT: %d%%", incomingData.pillBattery);
+    tft.drawCentreString(buf, 81, 380, 2);
+
+    // Tile 6: Estimated ABV
+    if (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0) {
+      float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
+      if (abv < 0.0f) abv = 0.0f;
+      dtostrf(abv, 4, 2, buf);
+      strcat(buf, "%");
+    } else {
+      strcpy(buf, "-- %");
+    }
+    tft.setTextPadding(140);
+    tft.drawCentreString(buf, 239, 360, 4);
+
+  } else if (dashSelection == 2) { // PASTEURIZATION VIEW
+    // Tile 1: Ambient Temp
+    String pa = liquid1Status ? String(bme1.readTemperature(), 1) + " C" : "-- C";
+    tft.setTextColor(valColor, bgCard);
+    tft.setTextPadding(140);
+    tft.drawCentreString(pa, 81, 168, 4);
+
+    // Tile 2: Liquid Temp
+    String pt = (simTempOverride[2] > 0.0f) ? String(simTempOverride[2], 1) + " C" : (liquid1Status ? String(getPastTemp(), 1) + " C" : "-- C");
+    tft.drawCentreString(pt, 239, 158, 4);
+    tft.setTextPadding(140);
+    tft.drawCentreString("TGT: 80.0 C", 239, 192, 1);
+
+    // Tile 3: Mode & Power
+    const char *pastMode = "IDLE";
+    if (stageTransferring && activeBrewStage == 2) pastMode = "TRANSFERRING";
+    else if (pastSterilized && isFanOn) pastMode = "COOLING (100%)";
+    else if (pastHolding) pastMode = "HOLDING (80.0C)";
+    else if (currentHeatingPercent > 0) {
+      sprintf(buf, "HEATING (%d%%)", currentHeatingPercent);
+      pastMode = buf;
+    }
+    tft.setTextPadding(140);
+    tft.drawCentreString(pastMode, 81, 168, 2);
+
+    // Tile 4: Hold Timer
+    tft.setTextPadding(140);
+    if (pastHolding) {
+      uint32_t elapsed = (millis() - pastHoldStart) / 1000;
+      uint32_t rem = (elapsed < 900) ? (900 - elapsed) : 0;
+      sprintf(buf, "%02lu:%02lu REM", rem / 60, rem % 60);
+      tft.drawCentreString(buf, 239, 165, 2);
+    } else {
+
+      tft.drawCentreString("15 MIN TGT", 239, 165, 2);
+    }
+
+    // Tile 5: Control Status
+    tft.setTextPadding(290);
+    sprintf(buf, "STATUS: %s", pastSterilized ? "PASTEURIZED & STERILE" : (pastHolding ? "HOLDING 80C TARGET" : "HEATING TO 80C"));
+    tft.drawCentreString(buf, CENTER_X, 350, 2);
+    sprintf(buf, "FAN: %s (%d%%)", isFanOn ? "ON" : "OFF", isFanOn ? 100 : 0);
+    tft.drawCentreString(buf, CENTER_X, 385, 2);
+  }
+  tft.setTextPadding(0);
+}
+
 void drawDashboardLayout() {
   if (dashNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
@@ -125,146 +281,99 @@ void drawDashboardLayout() {
     char startBuf[64];
     sprintf(startBuf, "STARTED: %s", brewStartTime);
     tft.drawString(startBuf, 15, 60, 2);
-    tft.drawString("SD CARD:", 15, 80, 2);
+    tft.drawString("SD:", 190, 60, 2);
     uint16_t sdBg = sdStatus ? 0x0400 : TFT_RED;
     tft.setTextColor(TFT_WHITE, sdBg);
-    tft.drawString(sdStatus ? " READY " : " ERROR ", 75, 80, 2);
-    tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawString("LOG:", 190, 80, 2);
-    char lBuf[16];
-    sprintf(lBuf, " %s ", lastLogTime);
-    tft.drawString(lBuf, 230, 80, 2);
+    tft.drawString(sdStatus ? " READY " : " ERROR ", 225, 60, 2);
     dashNeedsFullRedraw = false;
   }
 
-  const char *titles[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
-  uint16_t colors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+  // ---- 1. ACTIVE SYSTEM BREW STAGE BADGE (Y: 52 - 80) ----
+  const char *stageNames[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
+  uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
 
-  if (!moduleViewActive) {
-    tft.fillRect(0, 106, 320, 184, TFT_WHITE);
-    for (int i = 0; i < 3; i++) {
-      int y = 110 + (i * 60);
-      bool sel = (i == dashSelection);
-      tft.fillRect(5, y, 310, 50, colors[i]);
-      tft.drawRect(5, y, 310, 50, TFT_DARKGREY);
-      tft.setTextColor(TFT_WHITE, colors[i]);
-      tft.drawCentreString(titles[i], CENTER_X, y + 15, 2);
-      if (sel) {
-        tft.drawString(">", 278, y + 15, 2);
-      }
-      if (i == activeBrewStage) {
-        tft.fillCircle(22, y + 25, 5, TFT_WHITE);
-      }
-      {
-        char timerBuf[16] = "";
-        if (i == activeBrewStage) {
-          formatStageTimer(millis() - stageStartMillis, timerBuf);
-        } else if (stageElapsedMs[i] > 0) {
-          formatStageTimer(stageElapsedMs[i], timerBuf);
-        }
-        tft.setTextColor(TFT_WHITE, colors[i]);
-        tft.setTextPadding(130);
-        tft.drawString(timerBuf, 35, y + 35, 1);
-        tft.setTextPadding(0);
-      }
-      if (simTempOverride[i] > 0.0f) {
-        char simBuf[16];
-        const char *tag =
-            simManual[i] ? "MAN" : (simDynamic[i] ? "DYN" : "SIM");
-        sprintf(simBuf, "[%s %.0fC]", tag, simTempOverride[i]);
-        tft.drawRightString(simBuf, 305, y + 35, 1);
-      } else if ((i == 0 && preHeatSterilized && isFanOn) ||
-                 (i == 2 && pastSterilized && isFanOn)) {
-        tft.drawRightString("[COOLING]", 305, y + 35, 1);
-      } else if (i == 0 && preHeatHolding) {
-        tft.drawRightString("[HOLDING]", 305, y + 35, 1);
-      } else if (i == 2 && pastHolding) {
-        tft.drawRightString("[HOLDING]", 305, y + 35, 1);
-      }
-    }
-    if (activeBrewStage == -1) {
-      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
-      tft.fillRect(0, 292, 320, 1, TFT_DARKGREY);
-      tft.setTextColor(0x0400, TFT_WHITE);
-      tft.drawCentreString("BREW COMPLETE", CENTER_X, 330, 4);
-      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-      tft.drawCentreString("SELECT: View Brew Results", CENTER_X, 390, 2);
-      tft.drawCentreString("LEFT: Return to Menu", CENTER_X, 412, 2);
-    } else if (stageTransferring) {
-      tft.fillRect(0, 290, 320, 190, TFT_WHITE);
-      tft.drawFastHLine(0, 292, 320, TFT_DARKGREY);
-      const char *toNames[] = {"", "FERMENTATION", "PASTEURIZATION"};
-      tft.setTextColor(TFT_NAVY, TFT_WHITE);
-      tft.drawCentreString("TRANSFERRING LIQUID TO", CENTER_X, 315, 2);
-      tft.drawCentreString(toNames[stageTransferTarget], CENTER_X, 340, 2);
-      int rem = 10 - (int)((millis() - transferStartMs) / 1000);
-      if (rem < 0)
-        rem = 0;
-      char cbuf[8];
-      sprintf(cbuf, "%d", rem);
-      tft.setTextColor(TFT_NAVY, TFT_WHITE);
-      tft.setTextPadding(160);
-      tft.drawCentreString(cbuf, CENTER_X, 368, 6);
-      tft.setTextPadding(0);
-      tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-      tft.drawCentreString("PLEASE WAIT", CENTER_X, 458, 1);
-    } else {
-      tft.fillRect(0, 290, 320, 2, TFT_WHITE);
-      updateDashboardGraph();
-    }
+  uint16_t activeBg = (activeBrewStage >= 0 && activeBrewStage <= 2) ? stageColors[activeBrewStage] : 0x4208;
+  tft.fillRect(5, 52, 310, 28, activeBg);
+  tft.drawRect(5, 52, 310, 28, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, activeBg);
+  tft.fillCircle(18, 66, 4, TFT_WHITE);
+
+  char activeBuf[48];
+  if (activeBrewStage >= 0 && activeBrewStage <= 2) {
+    sprintf(activeBuf, "ACTIVE SYSTEM PHASE: %s", stageNames[activeBrewStage]);
   } else {
-    int y = 110, h = 340;
-    tft.fillRect(5, y, 310, h, colors[dashSelection]);
-    tft.drawRect(5, y, 310, h, TFT_DARKGREY);
-    tft.setTextColor(TFT_WHITE);
-    tft.drawCentreString(titles[dashSelection], CENTER_X, y + 10, 4);
-    {
-      char timerBuf[16] = "";
-      if (dashSelection == activeBrewStage) {
-        formatStageTimer(millis() - stageStartMillis, timerBuf);
-      } else if (stageElapsedMs[dashSelection] > 0) {
-        formatStageTimer(stageElapsedMs[dashSelection], timerBuf);
-      }
-      tft.setTextPadding(130);
-      tft.drawString(timerBuf, 25, y + 38, 1);
-      tft.setTextPadding(0);
-    }
-    if (simTempOverride[dashSelection] > 0.0f) {
-      char simBuf[22];
-      sprintf(simBuf, "[%s: %.1f C]", simDynamic[dashSelection] ? "DYN" : "SIM",
-              simTempOverride[dashSelection]);
-      tft.drawRightString(simBuf, 295, y + 38, 1);
-    }
-    tft.drawFastHLine(20, y + 48, 280, TFT_WHITE);
-    if (dashSelection == 0) {
-      tft.drawCentreString("AMBIENT", 80, y + 55, 2);
-      tft.drawCentreString("LIQUID", 240, y + 55, 2);
-      tft.drawCentreString("COOLING", 80, y + 130, 2);
-      tft.drawCentreString("HEATING", 240, y + 130, 2);
-      tft.drawCentreString("FAN MODE", 80, y + 210, 2);
-      tft.drawCentreString("WEIGHT", 240, y + 210, 2);
-    } else if (dashSelection == 1) {
-      tft.drawCentreString("AMBIENT", 80, y + 60, 2);
-      tft.drawCentreString("LIQUID", 240, y + 60, 2);
-      tft.drawCentreString("S. GRAVITY", 80, y + 130, 2);
-      tft.drawCentreString("PH LEVEL", 240, y + 130, 2);
-      tft.drawCentreString("SIGNAL", 80, y + 210, 2);
-      tft.drawCentreString("BATTERY", 240, y + 210, 2);
-      tft.drawCentreString("MIXER", CENTER_X, y + 285, 2);
-      tft.drawCentreString("ABV", CENTER_X, y + 326, 2);
-    } else if (dashSelection == 2) {
-      tft.drawCentreString("PAST. TEMP", CENTER_X, y + 60, 2);
-      tft.drawCentreString("PROCESS STATUS", CENTER_X, y + 130, 2);
-    }
-    // Module view button hints
-    tft.fillRect(0, y + h, 320, 30, TFT_WHITE);
-    tft.fillRect(0, y + h, 320, 1, TFT_DARKGREY);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("LEFT: BACK    RIGHT: STAGE PARAMS", CENTER_X,
-                         y + h + 10, 1);
+    sprintf(activeBuf, "ACTIVE SYSTEM PHASE: BREW COMPLETE");
   }
-  lastDashSelection = dashSelection;
+  tft.drawCentreString(activeBuf, CENTER_X + 5, 58, 2);
+
+  // ---- 2. VIEWED PHASE HEADER TILE (Y: 84 - 128) ----
+  uint16_t viewColor = stageColors[dashSelection];
+  tft.fillRect(5, 84, 310, 44, viewColor);
+  tft.drawRect(5, 84, 310, 44, TFT_DARKGREY);
+  tft.setTextColor(TFT_WHITE, viewColor);
+
+  char viewTitle[48];
+  sprintf(viewTitle, "< %s PHASE >", stageNames[dashSelection]);
+  tft.drawCentreString(viewTitle, CENTER_X, 89, 2);
+
+  char statusTag[48] = "";
+  if (dashSelection == activeBrewStage) {
+    char timerBuf[16] = "";
+    formatStageTimer(millis() - stageStartMillis, timerBuf);
+    sprintf(statusTag, "[ACTIVE RUNNING - %s]", timerBuf);
+  } else if (stageElapsedMs[dashSelection] > 0) {
+    char timerBuf[16] = "";
+    formatStageTimer(stageElapsedMs[dashSelection], timerBuf);
+    sprintf(statusTag, "[VIEWING PARAMETERS - DONE %s]", timerBuf);
+  } else {
+    sprintf(statusTag, "[VIEWING PARAMETERS ONLY]");
+  }
+  tft.setTextColor((dashSelection == activeBrewStage) ? TFT_WHITE : TFT_YELLOW, viewColor);
+  tft.drawCentreString(statusTag, CENTER_X, 109, 1);
+
+  // ---- 3. PARAMETER GRID TILES (Y: 132 - 430) ----
+  tft.fillRect(0, 132, 320, 300, TFT_WHITE); // Clear grid body area
+
+  auto drawCard = [](int x, int y, int w, int h, const char *title, uint16_t hdrColor) {
+    tft.fillRect(x, y, w, h, 0x2124);
+    tft.drawRect(x, y, w, h, TFT_DARKGREY);
+    tft.fillRect(x, y, w, 22, hdrColor);
+    tft.setTextColor(TFT_WHITE, hdrColor);
+    tft.drawCentreString(title, x + (w / 2), y + 3, 2);
+  };
+
+  if (dashSelection == 0) { // PRE-HEATING VIEW
+    drawCard(5, 132, 152, 88, "AMBIENT TEMP", 0x3566);
+    drawCard(163, 132, 152, 88, "LIQUID TEMP", 0x3566);
+    drawCard(5, 224, 152, 88, "MODE & POWER", 0x3566);
+    drawCard(163, 224, 152, 88, "TANK VOLUME", 0x3566);
+    drawCard(5, 316, 310, 112, "PRE-HEAT PROCESS STATUS", 0x3566);
+  } else if (dashSelection == 1) { // FERMENTATION VIEW
+    drawCard(5, 132, 152, 88, "AMBIENT TEMP", 0x3566);
+    drawCard(163, 132, 152, 88, "LIQUID TEMP", 0x3566);
+    drawCard(5, 224, 152, 88, "MODE & POWER", 0x3566);
+    drawCard(163, 224, 152, 88, "HYDROMETER & pH", 0x3566);
+    drawCard(5, 316, 152, 112, "RAPT PILL STATUS", 0x3566);
+    drawCard(163, 316, 152, 112, "ESTIMATED ABV", 0x3566);
+  } else if (dashSelection == 2) { // PASTEURIZATION VIEW
+    drawCard(5, 132, 152, 88, "AMBIENT TEMP", 0x3566);
+    drawCard(163, 132, 152, 88, "LIQUID TEMP", 0x3566);
+    drawCard(5, 224, 152, 88, "MODE & POWER", 0x3566);
+    drawCard(163, 224, 152, 88, "HOLD TIMER", 0x3566);
+    drawCard(5, 316, 310, 112, "PASTEURIZATION CONTROL", 0x3566);
+  }
+
+  // ---- 4. FOOTER HINTS (Y: 434 - 480) ----
+  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+  tft.drawFastHLine(0, 434, 320, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawCentreString("LEFT/RIGHT: VIEW PHASE   SELECT: OPTIONS", CENTER_X, 444, 1);
+  tft.drawCentreString("RETURN: BACK", CENTER_X, 460, 1);
+
+  // Render values
+  updateDashboardValues();
 }
+
 
 void updateDashboardTimers() {
   if (moduleViewActive || activeBrewStage < 0)

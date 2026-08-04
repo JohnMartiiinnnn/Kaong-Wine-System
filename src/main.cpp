@@ -677,15 +677,8 @@ void loop() {
         }
         drawSettingsMenu();
       }
-    } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      if (cDown && !ljDown && activeBrewStage >= 0 &&
-          simManual[activeBrewStage]) {
-        simTempOverride[activeBrewStage] -= 5.0f;
-        if (simTempOverride[activeBrewStage] < 0.0f)
-          simTempOverride[activeBrewStage] = 0.0f;
-      } else {
-        dashSelection = (dashSelection + 1) % 3;
-      }
+    } else if (currentAppState == DASHBOARD_ACTIVE) {
+      dashSelection = (dashSelection + 1) % 3;
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent -= 10;
@@ -823,14 +816,8 @@ void loop() {
         settingsSelection = (settingsSelection + 3) % 4;
       }
       drawSettingsMenu();
-    } else if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      if (activeBrewStage >= 0 && simManual[activeBrewStage]) {
-        simTempOverride[activeBrewStage] += 5.0f;
-        if (simTempOverride[activeBrewStage] > 100.0f)
-          simTempOverride[activeBrewStage] = 100.0f;
-      } else {
-        dashSelection = (dashSelection + 2) % 3;
-      }
+    } else if (currentAppState == DASHBOARD_ACTIVE) {
+      dashSelection = (dashSelection + 2) % 3;
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent += 10;
@@ -1005,20 +992,23 @@ void loop() {
       moduleViewActive = false;
       drawDashboardLayout();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
-      if (!moduleViewActive && activeBrewStage == -1) {
+      if (activeBrewStage == -1) {
         currentAppState = BREW_SUMMARY_MENU;
         brewSummaryNeedsFullRedraw = true;
         drawBrewSummaryMenu();
-      } else if (!moduleViewActive) {
-        moduleViewActive = true;
-        dashNeedsFullRedraw = true;
-        drawDashboardLayout();
       } else if (dashSelection == 0) {
         currentAppState = COOLING_MENU;
         drawCoolingMenu();
       } else if (dashSelection == 1) {
         currentAppState = MIXER_MENU;
         drawMixerMenu();
+      } else if (dashSelection == 2) {
+        stageParamStage = 2;
+        stageParamSelection = 0;
+        stageParamEditing = false;
+        stageParamNeedsFullRedraw = true;
+        currentAppState = STAGE_PARAM_MENU;
+        drawStageParamMenu();
       }
     } else if (currentAppState == MIXER_MENU) {
       if (currentMixerMode == MIXER_OFF) {
@@ -1573,14 +1563,9 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE &&
-      moduleViewActive) {
-    stageParamStage = dashSelection;
-    stageParamSelection = 0;
-    stageParamEditing = false;
-    stageParamNeedsFullRedraw = true;
-    currentAppState = STAGE_PARAM_MENU;
-    drawStageParamMenu();
+  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE) {
+    dashSelection = (dashSelection + 1) % 3;
+    drawDashboardLayout();
   }
 
   if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
@@ -2636,113 +2621,10 @@ void loop() {
     if (currentAppState == CALIB_WIZARD)
       drawCalibWizard();
 
-    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive &&
-        activeBrewStage >= 0) {
-      updateDashboardTimers();
-      if (!stageTransferring) {
-        float gTemp = -999.0f;
-        if (simTempOverride[activeBrewStage] > 0.0f)
-          gTemp = simTempOverride[activeBrewStage];
-        else if (activeBrewStage == 0 && liquid2Status)
-          gTemp = getPreheatTemp();
-        else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
-          gTemp = getFermTemp();
-        else if (activeBrewStage == 2 && liquid1Status)
-          gTemp = getPastTemp();
-        if (gTemp > -100.0f) {
-          if (tempHistoryCount < TEMP_GRAPH_W) {
-            tempHistory[tempHistoryCount++] = gTemp;
-          } else {
-            memmove(tempHistory, tempHistory + 1,
-                    (TEMP_GRAPH_W - 1) * sizeof(float));
-            tempHistory[TEMP_GRAPH_W - 1] = gTemp;
-          }
-          updateDashboardGraph();
-        }
-      }
+    if (currentAppState == DASHBOARD_ACTIVE) {
+      updateDashboardValues();
     }
 
-    if (currentAppState == DASHBOARD_ACTIVE && moduleViewActive) {
-      int y = 110;
-      uint16_t colors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-
-      if (dashSelection == 0) {
-        tft.setTextColor(TFT_WHITE, colors[0]);
-        tft.setTextPadding(140);
-        String pa = bme1Status ? String(bme1.readTemperature(), 1) : "--";
-        String pl = (simTempOverride[0] > 0.0f)
-                        ? String(simTempOverride[0], 1)
-                        : (liquid2Status ? String(getPreheatTemp(), 1) : "--");
-        tft.drawCentreString(pa + "C", 80, y + 80, 4);
-        tft.drawCentreString(pl + "C", 240, y + 80, 4);
-        tft.drawCentreString(String(currentSpeedPercent) + "%", 80, y + 160, 4);
-        tft.drawCentreString(String(currentHeatingPercent) + "%", 240, y + 160,
-                             4);
-        const char *mTxt[] = {"OFF", "ON", "AUTO"};
-        tft.drawCentreString(mTxt[currentFanMode], 80, y + 230, 2);
-        String wStr = hx711Status ? String(currentWeight, 1) + " L" : "--";
-        tft.drawCentreString(wStr, 240, y + 230, 4);
-
-      } else if (dashSelection == 1) {
-        tft.setTextColor(TFT_WHITE, colors[1]);
-        tft.setTextPadding(140);
-        String fa = (incomingData.sensor2Status > 0)
-                        ? String(incomingData.room2Temp, 1)
-                        : "--";
-        String fl =
-            (simTempOverride[1] > 0.0f)
-                ? String(simTempOverride[1], 1)
-                : (incomingData.ds18Status == 1 ? String(getFermTemp(), 1)
-                                                : "--");
-        tft.drawCentreString(fa + "C", 80, y + 85, 4);
-        tft.drawCentreString(fl + "C", 240, y + 85, 4);
-        if (incomingData.pillGravity != 0 && incomingData.pillGravity < 10.0) {
-          dtostrf(incomingData.pillGravity, 5, 3, buf);
-          tft.drawCentreString(buf, 80, y + 155, 4);
-        } else {
-          tft.drawCentreString("--", 80, y + 155, 4);
-        }
-        if (incomingData.adsStatus == 1) {
-          dtostrf(incomingData.phValue, 4, 2, buf);
-          tft.drawCentreString(buf, 240, y + 155, 4);
-        } else {
-          tft.drawCentreString("--", 240, y + 155, 4);
-        }
-        sprintf(buf, "%d dBm", incomingData.pillRSSI);
-        tft.drawCentreString(buf, 80, y + 235, 4);
-        sprintf(buf, "%d%%", incomingData.pillBattery);
-        tft.drawCentreString(buf, 240, y + 235, 4);
-        tft.setTextPadding(280);
-        const char *mxTxt[] = {"OFF", "MANUAL", "AUTO"};
-        if (currentMixerMode == MIXER_AUTO) {
-          tft.drawCentreString(mixerRunning ? "AUTO: RUNNING" : "AUTO: STANDBY",
-                               CENTER_X, y + 310, 2);
-        } else {
-          sprintf(buf, "%s: %d%%", mxTxt[currentMixerMode], mixerSpeedPercent);
-          tft.drawCentreString(buf, CENTER_X, y + 310, 2);
-        }
-        if (originalGravity > 0 && incomingData.pillGravity > 0 &&
-            incomingData.pillGravity < 10.0) {
-          float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
-          if (abv < 0.0f)
-            abv = 0.0f;
-          dtostrf(abv, 4, 2, buf);
-          strcat(buf, "%");
-        } else {
-          strcpy(buf, "--");
-        }
-        tft.drawCentreString(buf, CENTER_X, y + 344, 2);
-
-      } else if (dashSelection == 2) {
-        tft.setTextColor(TFT_WHITE, colors[2]);
-        tft.setTextPadding(280);
-        String pt = (simTempOverride[2] > 0.0f)
-                        ? String(simTempOverride[2], 1)
-                        : (liquid1Status ? String(getPastTemp(), 1) : "--");
-        tft.drawCentreString(pt + "C", CENTER_X, y + 85, 4);
-        tft.drawCentreString("READY", CENTER_X, y + 155, 4);
-      }
-    }
   }
 }
 
