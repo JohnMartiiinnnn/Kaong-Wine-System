@@ -141,6 +141,7 @@ class MyAdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
 };
 
 void setup() {
+  initYeastDispenser(); // Call immediately on boot so GPIO 4 & 5 are driven OUTPUT LOW
   Serial.begin(115200);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
@@ -393,6 +394,12 @@ void loop() {
       } else if (cmd.yeastCmd == 5) {
         Serial.printf("  [Yeast CMD] Reverse Duration: %u ms\n", cmd.yeastVal);
         dispenseYeastReverseDuration(cmd.yeastVal);
+      } else if (cmd.yeastCmd == 6) {
+        bool on = (cmd.yeastVal >> 16) & 0x01;
+        bool cw = (cmd.yeastVal >> 8) & 0x01;
+        uint8_t speed = cmd.yeastVal & 0xFF;
+        Serial.printf("  [Yeast CMD] Manual/Test: ON=%d, CW=%d, Speed=%d%%\n", on, cw, speed);
+        setYeastManualControl(on, speed, cw);
       }
     } else {
       Serial.println("  Error: Checksum or signature mismatch!");

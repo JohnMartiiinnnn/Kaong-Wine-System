@@ -39,4 +39,5 @@ void drawCalibWizard();
 void drawRaptTestPage(bool valuesOnly = false);
 void drawPhFermMenu(bool valuesOnly = false);
 void drawPidTrackingMenu(bool valuesOnly = false);
+void drawDispenserTestMenu();
 void drawSettingsMenu();

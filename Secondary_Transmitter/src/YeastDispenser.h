@@ -3,11 +3,11 @@
 
 // ---- DRV8871 H-Bridge Yeast Dispenser Pinout & Config ----
 #ifndef DRV8871_IN1_PIN
-#define DRV8871_IN1_PIN 4
+#define DRV8871_IN1_PIN 5
 #endif
 
 #ifndef DRV8871_IN2_PIN
-#define DRV8871_IN2_PIN 5
+#define DRV8871_IN2_PIN 4
 #endif
 
 #ifndef MAX_YEAST_MOTOR_DUTY
@@ -51,6 +51,7 @@ void dispenseYeastDuration(uint32_t durationMs);
 void dispenseYeastReverseDuration(uint32_t durationMs);
 void dispenseYeastGrams(float grams);
 void stopYeastDispenser();
+void setYeastManualControl(bool on, uint8_t speedPercent, bool cw);
 void runYeastDiagnostic();
 void setMsPerGramYeast(float msPerGram);
 float getMsPerGramYeast();

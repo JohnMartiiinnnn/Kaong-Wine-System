@@ -47,8 +47,8 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 #define GRAVITY_OFFSET 0.009
 
 // ---- DRV8871 Yeast Dispenser Pinout & Calibration Parameters ----
-const int DRV8871_IN1_PIN_CFG = 4; // DRV8871 IN1 -> ESP32-C3 GPIO 4
-const int DRV8871_IN2_PIN_CFG = 5; // DRV8871 IN2 -> ESP32-C3 GPIO 5
+const int DRV8871_IN1_PIN_CFG = 5; // DRV8871 IN1 -> ESP32-C3 GPIO 5 (D5)
+const int DRV8871_IN2_PIN_CFG = 4; // DRV8871 IN2 -> ESP32-C3 GPIO 4 (D4)
 
 #include "PIDController.h"
 #include "YeastDispenser.h"
@@ -128,6 +128,7 @@ enum AppState {
   RAPT_TEST_MENU,
   PH_FERM_MENU,
   PID_TRACKING_MENU,
+  DISPENSER_TEST_MENU,
   SETTINGS_MENU
 };
 
@@ -277,6 +278,12 @@ extern bool motorTestNeedsFullRedraw;
 extern int  motorTestSpeed;
 extern bool motorTestCW;
 extern bool motorTestOn;
+extern bool dispenserTestNeedsFullRedraw;
+extern int  dispenserTestSelection;
+extern bool dispenserTestEditing;
+extern bool dispenserTestOn;
+extern int  dispenserTestSpeed;
+extern bool dispenserTestCW;
 extern bool pidTestNeedsFullRedraw;
 extern int pidTestChoice;
 extern float pidTestHeatTarget;

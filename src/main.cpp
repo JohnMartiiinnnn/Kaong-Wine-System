@@ -126,6 +126,19 @@ bool motorTestNeedsFullRedraw = true;
 int motorTestSpeed = 0;
 bool motorTestCW = true;
 bool motorTestOn = false;
+bool dispenserTestNeedsFullRedraw = true;
+int  dispenserTestSelection = 0;
+bool dispenserTestEditing = false;
+bool dispenserTestOn = false;
+int  dispenserTestSpeed = 50;
+bool dispenserTestCW = true;
+
+void sendDispenserTestCommand() {
+  uint32_t yval = ((uint32_t)(dispenserTestOn ? 1 : 0) << 16) |
+                  (1UL << 8) |
+                  (uint32_t)dispenserTestSpeed;
+  sendMotorCommand(0, true, 6, yval);
+}
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -714,8 +727,17 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 10;
+      systemCheckSelection = (systemCheckSelection + 1) % 11;
       drawSystemCheckMenu();
+    } else if (currentAppState == DISPENSER_TEST_MENU) {
+      if (dispenserTestSelection == 1 && dispenserTestEditing) {
+        dispenserTestSpeed += 10;
+        if (dispenserTestSpeed > 100) dispenserTestSpeed = 100;
+        sendDispenserTestCommand();
+      } else {
+        dispenserTestSelection = (dispenserTestSelection + 1) % 2;
+      }
+      drawDispenserTestMenu();
     } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
       pidTrackTargetTemp -= 5.0f;
       if (pidTrackTargetTemp < 20.0f) pidTrackTargetTemp = 20.0f;
@@ -854,8 +876,17 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 9) % 10;
+      systemCheckSelection = (systemCheckSelection + 10) % 11;
       drawSystemCheckMenu();
+    } else if (currentAppState == DISPENSER_TEST_MENU) {
+      if (dispenserTestSelection == 1 && dispenserTestEditing) {
+        dispenserTestSpeed -= 10;
+        if (dispenserTestSpeed < 0) dispenserTestSpeed = 0;
+        sendDispenserTestCommand();
+      } else {
+        dispenserTestSelection = (dispenserTestSelection + 1) % 2;
+      }
+      drawDispenserTestMenu();
     } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
       pidTrackTargetTemp += 1.0f;
       if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 100.0f;
@@ -1128,7 +1159,25 @@ void loop() {
         currentAppState = PH_FERM_MENU;
         phFermNeedsFullRedraw = true;
         drawPhFermMenu();
+      } else if (systemCheckSelection == 10) {
+        dispenserTestNeedsFullRedraw = true;
+        dispenserTestSelection = 0;
+        dispenserTestEditing = false;
+        dispenserTestOn = false;
+        dispenserTestSpeed = 50;
+        dispenserTestCW = true;
+        sendDispenserTestCommand();
+        currentAppState = DISPENSER_TEST_MENU;
+        drawDispenserTestMenu();
       }
+    } else if (currentAppState == DISPENSER_TEST_MENU) {
+      if (dispenserTestSelection == 0) {
+        dispenserTestOn = !dispenserTestOn;
+        sendDispenserTestCommand();
+      } else if (dispenserTestSelection == 1) {
+        dispenserTestEditing = !dispenserTestEditing;
+      }
+      drawDispenserTestMenu();
     } else if (currentAppState == PID_TRACKING_MENU) {
       if (!pidTrackRunning) {
         if (pidTestChoice == -1) {
@@ -1773,6 +1822,17 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
+    } else if (currentAppState == DISPENSER_TEST_MENU) {
+      if (dispenserTestEditing) {
+        dispenserTestEditing = false;
+        drawDispenserTestMenu();
+      } else {
+        dispenserTestOn = false;
+        sendDispenserTestCommand();
+        currentAppState = SYSTEM_CHECK_MENU;
+        systemCheckNeedsFullRedraw = true;
+        drawSystemCheckMenu();
+      }
     } else if (currentAppState == PID_TRACKING_MENU) {
       pidTrackRunning = false;
       currentHeatingPercent = 0;
@@ -2613,6 +2673,9 @@ void loop() {
 
     if (currentAppState == MOTOR_TEST_MENU)
       drawMotorTestMenu();
+
+    if (currentAppState == DISPENSER_TEST_MENU)
+      drawDispenserTestMenu();
 
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();

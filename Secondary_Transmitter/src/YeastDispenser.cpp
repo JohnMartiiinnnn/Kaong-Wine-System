@@ -5,6 +5,10 @@ bool isYeastDispensing = false;
 bool yeastDispenseErrorFlag = false;
 
 void initYeastDispenser() {
+  pinMode(DRV8871_IN1_PIN, OUTPUT);
+  pinMode(DRV8871_IN2_PIN, OUTPUT);
+  digitalWrite(DRV8871_IN1_PIN, LOW);
+  digitalWrite(DRV8871_IN2_PIN, LOW);
 #if defined(ESP32)
   ledcSetup(YEAST_PWM_CH_IN1, YEAST_PWM_FREQ, YEAST_PWM_RESOLUTION);
   ledcSetup(YEAST_PWM_CH_IN2, YEAST_PWM_FREQ, YEAST_PWM_RESOLUTION);
@@ -12,11 +16,6 @@ void initYeastDispenser() {
   ledcAttachPin(DRV8871_IN2_PIN, YEAST_PWM_CH_IN2);
   ledcWrite(YEAST_PWM_CH_IN1, 0);
   ledcWrite(YEAST_PWM_CH_IN2, 0);
-#else
-  pinMode(DRV8871_IN1_PIN, OUTPUT);
-  pinMode(DRV8871_IN2_PIN, OUTPUT);
-  digitalWrite(DRV8871_IN1_PIN, LOW);
-  digitalWrite(DRV8871_IN2_PIN, LOW);
 #endif
   isYeastDispensing = false;
   yeastDispenseErrorFlag = false;
@@ -39,6 +38,32 @@ void stopYeastDispenser() {
   digitalWrite(DRV8871_IN2_PIN, LOW);
 #endif
   isYeastDispensing = false;
+}
+
+void setYeastManualControl(bool on, uint8_t speedPercent, bool cw) {
+  if (!on || speedPercent == 0) {
+    stopYeastDispenser();
+    return;
+  }
+  isYeastDispensing = true;
+  uint8_t duty = map(constrain((int)speedPercent, 0, 100), 0, 100, 0, MAX_YEAST_MOTOR_DUTY);
+#if defined(ESP32)
+  if (cw) {
+    ledcWrite(YEAST_PWM_CH_IN1, duty);
+    ledcWrite(YEAST_PWM_CH_IN2, 0);
+  } else {
+    ledcWrite(YEAST_PWM_CH_IN1, 0);
+    ledcWrite(YEAST_PWM_CH_IN2, duty);
+  }
+#else
+  if (cw) {
+    analogWrite(DRV8871_IN1_PIN, duty);
+    digitalWrite(DRV8871_IN2_PIN, LOW);
+  } else {
+    digitalWrite(DRV8871_IN1_PIN, LOW);
+    analogWrite(DRV8871_IN2_PIN, duty);
+  }
+#endif
 }
 
 void dispenseYeastDuration(uint32_t durationMs) {
