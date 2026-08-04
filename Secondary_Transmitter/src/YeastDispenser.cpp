@@ -50,13 +50,14 @@ void dispenseYeastDuration(uint32_t durationMs) {
 
   isYeastDispensing = true;
 
-  // Fast-Decay Mode: IN1 = PWM (capped at 50% / 128 duty), IN2 = LOW
+  // Fast-Decay PWM Mode: IN1 = 255 (HIGH), IN2 = Inverted PWM (255 - MAX_YEAST_MOTOR_DUTY)
+  // Provides active low-side MOSFET current recirculation for maximum low-speed torque
 #if defined(ESP32)
-  ledcWrite(YEAST_PWM_CH_IN2, 0);
-  ledcWrite(YEAST_PWM_CH_IN1, MAX_YEAST_MOTOR_DUTY);
+  ledcWrite(YEAST_PWM_CH_IN1, 255);
+  ledcWrite(YEAST_PWM_CH_IN2, 255 - MAX_YEAST_MOTOR_DUTY);
 #else
-  digitalWrite(DRV8871_IN2_PIN, LOW);
-  analogWrite(DRV8871_IN1_PIN, MAX_YEAST_MOTOR_DUTY);
+  digitalWrite(DRV8871_IN1_PIN, HIGH);
+  analogWrite(DRV8871_IN2_PIN, 255 - MAX_YEAST_MOTOR_DUTY);
 #endif
 
   delay(durationMs);
@@ -64,6 +65,43 @@ void dispenseYeastDuration(uint32_t durationMs) {
   // Active Brake at the end of dispensing cycle
   stopYeastDispenser();
 }
+
+void dispenseYeastReverseDuration(uint32_t durationMs) {
+  if (durationMs == 0) return;
+  if (durationMs > YEAST_DISPENSE_TIMEOUT_MS) {
+    durationMs = YEAST_DISPENSE_TIMEOUT_MS;
+    yeastDispenseErrorFlag = true;
+  }
+
+  isYeastDispensing = true;
+
+  // Reverse Fast-Decay PWM Mode: IN2 = 255 (HIGH), IN1 = Inverted PWM (255 - MAX_YEAST_MOTOR_DUTY)
+#if defined(ESP32)
+  ledcWrite(YEAST_PWM_CH_IN2, 255);
+  ledcWrite(YEAST_PWM_CH_IN1, 255 - MAX_YEAST_MOTOR_DUTY);
+#else
+  digitalWrite(DRV8871_IN2_PIN, HIGH);
+  analogWrite(DRV8871_IN1_PIN, 255 - MAX_YEAST_MOTOR_DUTY);
+#endif
+
+  delay(durationMs);
+
+  stopYeastDispenser();
+}
+
+void runYeastDiagnostic() {
+  Serial.println("\n[YEAST] Starting DRV8871 Hardware Diagnostic...");
+  Serial.println("[YEAST] Driving FORWARD for 3000ms...");
+  dispenseYeastDuration(3000);
+  delay(500);
+
+  Serial.println("[YEAST] Driving REVERSE for 3000ms...");
+  dispenseYeastReverseDuration(3000);
+  delay(500);
+
+  Serial.println("[YEAST] Hardware Diagnostic Complete.\n");
+}
+
 
 void dispenseYeastGrams(float grams) {
   if (grams <= 0.0f) return;

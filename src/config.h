@@ -144,10 +144,13 @@ const uint32_t MIXER_OFF_MS = 355UL * 60 * 1000;
 // ---- Motor Command Struct (Main -> Secondary via UART) ----
 typedef struct __attribute__((packed)) {
   uint32_t signature; // 0xC0DEBABE
-  uint8_t  motorSpeed; // 0-100
+  uint8_t  motorSpeed; // 0-100 (Mixing Impeller)
   uint8_t  motorCW;    // 1=CW, 0=CCW
+  uint8_t  yeastCmd;   // 0=Idle, 1=DispenseDuration, 2=DispenseGrams, 3=Stop, 4=Diagnostic, 5=ReverseDuration
+  uint32_t yeastVal;   // durationMs or (uint32_t)(grams * 1000)
   uint8_t  checksum;
 } motor_cmd_t;
+
 
 // ---- UART Data Struct (shared with Secondary) ----
 typedef struct __attribute__((packed)) {
@@ -397,4 +400,8 @@ extern long     calibRawTareValue;
 float getPreheatTemp();
 float getPastTemp();
 float getFermTemp();
+
+// ---- Motor & Yeast Dispenser Command Sender ----
+void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd = 0, uint32_t yeastVal = 0);
+
 

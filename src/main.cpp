@@ -268,17 +268,20 @@ void setFanSpeed(int percent) {
 }
 
 // ---- Motor Command Sender ----
-void sendMotorCommand(int speed, bool cw) {
+void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd, uint32_t yeastVal) {
   motor_cmd_t cmd;
   cmd.signature = 0xC0DEBABE;
   cmd.motorSpeed = (uint8_t)speed;
   cmd.motorCW = cw ? 1 : 0;
+  cmd.yeastCmd = yeastCmd;
+  cmd.yeastVal = yeastVal;
   cmd.checksum = 0;
   const uint8_t *p = (const uint8_t *)&cmd;
   for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
     cmd.checksum ^= p[i];
   Serial2.write((uint8_t *)&cmd, sizeof(cmd));
 }
+
 
 // ---- Mixer Speed Helper ----
 void setMixerSpeed(int percent) {

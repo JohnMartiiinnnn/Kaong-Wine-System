@@ -8,6 +8,7 @@
 #include <OneWire.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include "YeastDispenser.h"
 
 /*
  * WIRING FOR SECONDARY ESP32:
@@ -30,10 +31,13 @@ const int ONE_WIRE_BUS = 13;
 // Motor command struct (matches main ESP32)
 typedef struct __attribute__((packed)) {
   uint32_t signature; // 0xC0DEBABE
-  uint8_t motorSpeed;
-  uint8_t motorCW;
+  uint8_t motorSpeed; // 0-100 (Mixing Impeller)
+  uint8_t motorCW;    // 1=CW, 0=CCW
+  uint8_t yeastCmd;   // 0=Idle, 1=DispenseDuration, 2=DispenseGrams, 3=Stop, 4=Diagnostic, 5=ReverseDuration
+  uint32_t yeastVal;  // durationMs or (uint32_t)(grams * 1000)
   uint8_t checksum;
 } motor_cmd_t;
+
 
 // Structure to send data (Updated to include framing and checksum)
 typedef struct __attribute__((packed)) {
@@ -225,7 +229,11 @@ void setup() {
   ledcWrite(LPWM_CH, 0);
   ledcWrite(RPWM_CH, 0);
 
+  // 7. Yeast Dispenser Setup (DRV8871 H-Bridge)
+  initYeastDispenser();
+
   // Send initial status immediately
+
   txData.signature = 0xDEADBEEF;
   txData.checksum = calculateChecksum(txData);
   Serial2.write((uint8_t *)&txData, sizeof(txData));
@@ -367,9 +375,29 @@ void loop() {
         ledcWrite(LPWM_CH, 0);
         ledcWrite(RPWM_CH, pwmSpeed);
       }
+
+      // Handle Yeast Dispenser Commands
+      if (cmd.yeastCmd == 1) {
+        Serial.printf("  [Yeast CMD] Dispense Duration: %u ms\n", cmd.yeastVal);
+        dispenseYeastDuration(cmd.yeastVal);
+      } else if (cmd.yeastCmd == 2) {
+        float g = (float)cmd.yeastVal / 1000.0f;
+        Serial.printf("  [Yeast CMD] Dispense Grams: %.2f g\n", g);
+        dispenseYeastGrams(g);
+      } else if (cmd.yeastCmd == 3) {
+        Serial.println("  [Yeast CMD] Stop Dispenser");
+        stopYeastDispenser();
+      } else if (cmd.yeastCmd == 4) {
+        Serial.println("  [Yeast CMD] Run Hardware Diagnostic");
+        runYeastDiagnostic();
+      } else if (cmd.yeastCmd == 5) {
+        Serial.printf("  [Yeast CMD] Reverse Duration: %u ms\n", cmd.yeastVal);
+        dispenseYeastReverseDuration(cmd.yeastVal);
+      }
     } else {
       Serial.println("  Error: Checksum or signature mismatch!");
     }
+
   }
 
   delay(10); // Yield to prevent Task Watchdog reset

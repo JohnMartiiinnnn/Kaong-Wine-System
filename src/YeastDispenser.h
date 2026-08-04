@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "config.h"
 
 // ---- DRV8871 H-Bridge Yeast Dispenser Pinout & Config ----
 #ifndef DRV8871_IN1_PIN
@@ -51,8 +52,11 @@ extern bool yeastDispenseErrorFlag;
 // ---- Function Declarations ----
 void initYeastDispenser();
 void dispenseYeastDuration(uint32_t durationMs);
+void dispenseYeastReverseDuration(uint32_t durationMs);
 void dispenseYeastGrams(float grams);
 void stopYeastDispenser();
+void runYeastDiagnostic();
 void setMsPerGramYeast(float msPerGram);
 float getMsPerGramYeast();
 float calculateMsPerGram(float testDurationMs, float weighedGrams);
+

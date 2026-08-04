@@ -23,21 +23,7 @@ void initYeastDispenser() {
 }
 
 void stopYeastDispenser() {
-  // Active Brake Pulse: IN1=HIGH, IN2=HIGH for 200ms to stop overrun/drip
-#if defined(ESP32)
-  ledcWrite(YEAST_PWM_CH_IN1, 255);
-  ledcWrite(YEAST_PWM_CH_IN2, 255);
-  delay(YEAST_BRAKE_DURATION_MS);
-  // Coast / Idle: IN1=0, IN2=0
-  ledcWrite(YEAST_PWM_CH_IN1, 0);
-  ledcWrite(YEAST_PWM_CH_IN2, 0);
-#else
-  digitalWrite(DRV8871_IN1_PIN, HIGH);
-  digitalWrite(DRV8871_IN2_PIN, HIGH);
-  delay(YEAST_BRAKE_DURATION_MS);
-  digitalWrite(DRV8871_IN1_PIN, LOW);
-  digitalWrite(DRV8871_IN2_PIN, LOW);
-#endif
+  sendMotorCommand(mixerSpeedPercent, true, 3, 0); // yeastCmd 3 = Stop
   isYeastDispensing = false;
 }
 
@@ -49,21 +35,24 @@ void dispenseYeastDuration(uint32_t durationMs) {
   }
 
   isYeastDispensing = true;
-
-  // Fast-Decay Mode: IN1 = PWM (capped at 50% / 128 duty), IN2 = LOW
-#if defined(ESP32)
-  ledcWrite(YEAST_PWM_CH_IN2, 0);
-  ledcWrite(YEAST_PWM_CH_IN1, MAX_YEAST_MOTOR_DUTY);
-#else
-  digitalWrite(DRV8871_IN2_PIN, LOW);
-  analogWrite(DRV8871_IN1_PIN, MAX_YEAST_MOTOR_DUTY);
-#endif
-
-  delay(durationMs);
-
-  // Execute Active Brake at the end of dispensing cycle
-  stopYeastDispenser();
+  sendMotorCommand(mixerSpeedPercent, true, 1, durationMs); // yeastCmd 1 = DispenseDuration
 }
+
+void dispenseYeastReverseDuration(uint32_t durationMs) {
+  if (durationMs == 0) return;
+  if (durationMs > YEAST_DISPENSE_TIMEOUT_MS) {
+    durationMs = YEAST_DISPENSE_TIMEOUT_MS;
+    yeastDispenseErrorFlag = true;
+  }
+
+  isYeastDispensing = true;
+  sendMotorCommand(mixerSpeedPercent, true, 5, durationMs); // yeastCmd 5 = ReverseDuration
+}
+
+void runYeastDiagnostic() {
+  sendMotorCommand(mixerSpeedPercent, true, 4, 0); // yeastCmd 4 = Diagnostic
+}
+
 
 void dispenseYeastGrams(float grams) {
   if (grams <= 0.0f) return;

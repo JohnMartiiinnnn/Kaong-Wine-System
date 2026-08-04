@@ -48,8 +48,11 @@ extern bool yeastDispenseErrorFlag;
 
 void initYeastDispenser();
 void dispenseYeastDuration(uint32_t durationMs);
+void dispenseYeastReverseDuration(uint32_t durationMs);
 void dispenseYeastGrams(float grams);
 void stopYeastDispenser();
+void runYeastDiagnostic();
 void setMsPerGramYeast(float msPerGram);
 float getMsPerGramYeast();
 float calculateMsPerGram(float testDurationMs, float weighedGrams);
+
