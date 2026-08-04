@@ -659,7 +659,7 @@ void loop() {
   }
 
   // Navigation: Right / Down
-  if ((cRight && !ljRight) || (cDown && !ljDown)) {
+  if (cDown && !ljDown) {
     if (currentAppState == START_MENU) {
       menuSelection = (menuSelection + 1) % 4;
       drawStartMenu();
@@ -1002,9 +1002,6 @@ void loop() {
         currentAppState = BREW_SUMMARY_MENU;
         brewSummaryNeedsFullRedraw = true;
         drawBrewSummaryMenu();
-      } else if (dashSelection == 0) {
-        currentAppState = COOLING_MENU;
-        drawCoolingMenu();
       } else if (dashSelection == 1) {
         currentAppState = MIXER_MENU;
         drawMixerMenu();
