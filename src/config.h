@@ -250,6 +250,8 @@ extern bool dashNeedsFullRedraw;
 extern int dashSelection;
 extern bool moduleViewActive;
 extern int lastDashSelection;
+extern uint32_t lastPhaseViewNavMs;
+
 extern bool monitorNeedsFullRedraw;
 extern bool calNeedsFullRedraw;
 extern int calSelection;

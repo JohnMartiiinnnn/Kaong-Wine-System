@@ -98,6 +98,8 @@ bool dashNeedsFullRedraw = true;
 int dashSelection = 0;
 bool moduleViewActive = false;
 int lastDashSelection = -1;
+uint32_t lastPhaseViewNavMs = 0;
+
 bool monitorNeedsFullRedraw = true;
 bool calNeedsFullRedraw = true;
 int calSelection = 0;
@@ -679,6 +681,7 @@ void loop() {
       }
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       dashSelection = (dashSelection + 1) % 3;
+      lastPhaseViewNavMs = millis();
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent -= 10;
@@ -818,6 +821,7 @@ void loop() {
       drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       dashSelection = (dashSelection + 2) % 3;
+      lastPhaseViewNavMs = millis();
       drawDashboardLayout();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent += 10;
@@ -1565,6 +1569,7 @@ void loop() {
 
   if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE) {
     dashSelection = (dashSelection + 1) % 3;
+    lastPhaseViewNavMs = millis();
     drawDashboardLayout();
   }
 
@@ -2623,6 +2628,36 @@ void loop() {
 
     if (currentAppState == DASHBOARD_ACTIVE) {
       updateDashboardValues();
+
+      if (activeBrewStage >= 0 && dashSelection != activeBrewStage) {
+        if (millis() - lastPhaseViewNavMs >= 5000UL) {
+          dashSelection = activeBrewStage;
+          dashNeedsFullRedraw = true;
+          drawDashboardLayout();
+        }
+      }
+
+      if (activeBrewStage >= 0 && !stageTransferring) {
+        float gTemp = -999.0f;
+        if (simTempOverride[activeBrewStage] > 0.0f)
+          gTemp = simTempOverride[activeBrewStage];
+        else if (activeBrewStage == 0 && liquid2Status)
+          gTemp = getPreheatTemp();
+        else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+          gTemp = getFermTemp();
+        else if (activeBrewStage == 2 && liquid1Status)
+          gTemp = getPastTemp();
+        if (gTemp > -100.0f) {
+          if (tempHistoryCount < TEMP_GRAPH_W) {
+            tempHistory[tempHistoryCount++] = gTemp;
+          } else {
+            memmove(tempHistory, tempHistory + 1,
+                    (TEMP_GRAPH_W - 1) * sizeof(float));
+            tempHistory[TEMP_GRAPH_W - 1] = gTemp;
+          }
+          updateDashboardGraph();
+        }
+      }
     }
 
   }
