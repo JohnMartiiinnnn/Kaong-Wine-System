@@ -224,6 +224,8 @@ int tempHistoryCount = 0;
 bool stageTransferring = false;
 int stageTransferTarget = -1;
 uint32_t transferStartMs = 0;
+float transferStartWeight = 10.0f;
+
 bool skipPreheatHeater = false;
 float minVolumeReq = 10.0f;
 bool wizardEditing = false;
@@ -1509,6 +1511,8 @@ void loop() {
             stageTransferring = true;
             stageTransferTarget = activeBrewStage + 1;
             transferStartMs = millis();
+            transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
+
             mcp.digitalWrite(LIGHT_R, RELAY_OFF);
             mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
             mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -2446,6 +2450,8 @@ void loop() {
           stageTransferring = true;
           stageTransferTarget = activeBrewStage + 1;
           transferStartMs = millis();
+          transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
+
           mcp.digitalWrite(LIGHT_R, RELAY_OFF);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
