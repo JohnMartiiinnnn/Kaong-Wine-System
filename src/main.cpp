@@ -91,11 +91,16 @@ bool menuNeedsFullRedraw = true;
 int menuSelection = 0;
 bool wizardNeedsFullRedraw = true;
 int wizardSelection = 0;
+bool bypassWeightCheck = false;
 bool settingsNeedsFullRedraw = true;
 int settingsSelection = 0;
 bool settingsEditing = false;
 bool dashNeedsFullRedraw = true;
 int dashSelection = 0;
+bool dashGraphSelected = false;
+int dashGraphPlotType = 0;
+bool graphPickNeedsFullRedraw = true;
+int graphPickSelection = 0;
 bool moduleViewActive = false;
 int lastDashSelection = -1;
 uint32_t lastPhaseViewNavMs = 0;
@@ -474,9 +479,6 @@ void setup() {
       delay(100);
   }
 
-  ArduinoOTA.setHostname("winebrew-main");
-  ArduinoOTA.begin();
-
   if (MDNS.begin("winebrew"))
     MDNS.addService("http", "tcp", 80);
   server.on("/", HTTP_GET, handleRoot);
@@ -490,7 +492,6 @@ void setup() {
 
 // ---- Main Loop ----
 void loop() {
-  ArduinoOTA.handle();
   server.handleClient();
 
   // ---- Calibration Wizard LED UI ----
@@ -678,7 +679,7 @@ void loop() {
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (cDown && !ljDown && !wizardEditing) {
-        wizardSelection = (wizardSelection + 1) % 3;
+        wizardSelection = (wizardSelection + 1) % 2;
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
@@ -695,9 +696,13 @@ void loop() {
         drawSettingsMenu();
       }
     } else if (currentAppState == DASHBOARD_ACTIVE) {
-      dashSelection = (dashSelection + 1) % 3;
-      lastPhaseViewNavMs = millis();
+      dashGraphSelected = !dashGraphSelected;
+      dashNeedsFullRedraw = true;
       drawDashboardLayout();
+    } else if (currentAppState == GRAPH_PICK_MENU) {
+      int maxChoices = (dashSelection == 1) ? 3 : 1;
+      graphPickSelection = (graphPickSelection + 1) % maxChoices;
+      drawGraphPickMenu();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent -= 10;
       if (currentSpeedPercent < 0)
@@ -829,7 +834,7 @@ void loop() {
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (!wizardEditing) {
-        wizardSelection = (wizardSelection + 2) % 3;
+        wizardSelection = (wizardSelection + 1) % 2;
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
@@ -844,9 +849,13 @@ void loop() {
       }
       drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
-      dashSelection = (dashSelection + 2) % 3;
-      lastPhaseViewNavMs = millis();
+      dashGraphSelected = !dashGraphSelected;
+      dashNeedsFullRedraw = true;
       drawDashboardLayout();
+    } else if (currentAppState == GRAPH_PICK_MENU) {
+      int maxChoices = (dashSelection == 1) ? 3 : 1;
+      graphPickSelection = (graphPickSelection - 1 + maxChoices) % maxChoices;
+      drawGraphPickMenu();
     } else if (currentAppState == COOLING_MENU) {
       currentSpeedPercent += 10;
       if (currentSpeedPercent > 100)
@@ -989,39 +998,47 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (currentWeight >= minVolumeReq) {
-        if (rtcStatus) {
-          DateTime now = rtc.now();
-          sprintf(brewStartTime, "%02d/%02d %02d:%02d", now.day(), now.month(),
-                  now.hour(), now.minute());
+      if (wizardSelection == 0) {
+        bypassWeightCheck = !bypassWeightCheck;
+        drawNewBrewWizard();
+      } else if (wizardSelection == 1) {
+        if (bypassWeightCheck || currentWeight >= minVolumeReq) {
+          if (rtcStatus) {
+            DateTime now = rtc.now();
+            int h12 = now.hour() % 12;
+            if (h12 == 0) h12 = 12;
+            const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+            sprintf(brewStartTime, "%02d/%02d %d:%02d%s", now.day(), now.month(),
+                    h12, now.minute(), ampm);
+          }
+          originalGravity = 0.0f;
+          ogSampleSum = 0.0f;
+          ogSampleCount = 0;
+          ogCapturing = true;
+          activeBrewStage = 0;
+          stageStartMillis = millis();
+          tempHistoryCount = 0;
+          mcp.digitalWrite(LIGHT_R, RELAY_ON);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          preHeatSterilized = skipPreheatHeater;
+          preHeatCooled = skipPreheatHeater;
+          preHeatHolding = false;
+          pastSterilized = false;
+          pastHolding = false;
+          phAlertActive = false;
+          simTempOverride[0] = 0.0f;
+          simTempOverride[1] = 0.0f;
+          simTempOverride[2] = 0.0f;
+          simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
+          simManual[0] = simManual[1] = simManual[2] = false;
+          stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
+          stageParamEditing = false;
+          currentAppState = DASHBOARD_ACTIVE;
+          dashNeedsFullRedraw = true;
+          moduleViewActive = false;
+          drawDashboardLayout();
         }
-        originalGravity = 0.0f;
-        ogSampleSum = 0.0f;
-        ogSampleCount = 0;
-        ogCapturing = true;
-        activeBrewStage = 0;
-        stageStartMillis = millis();
-        tempHistoryCount = 0;
-        mcp.digitalWrite(LIGHT_R, RELAY_ON);
-        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-        preHeatSterilized = skipPreheatHeater;
-        preHeatCooled = skipPreheatHeater;
-        preHeatHolding = false;
-        pastSterilized = false;
-        pastHolding = false;
-        phAlertActive = false;
-        simTempOverride[0] = 0.0f;
-        simTempOverride[1] = 0.0f;
-        simTempOverride[2] = 0.0f;
-        simDynamic[0] = simDynamic[1] = simDynamic[2] = false;
-        simManual[0] = simManual[1] = simManual[2] = false;
-        stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
-        stageParamEditing = false;
-        currentAppState = DASHBOARD_ACTIVE;
-        dashNeedsFullRedraw = true;
-        moduleViewActive = false;
-        drawDashboardLayout();
       }
     } else if (currentAppState == BREW_SUMMARY_MENU) {
       currentAppState = DASHBOARD_ACTIVE;
@@ -1033,17 +1050,17 @@ void loop() {
         currentAppState = BREW_SUMMARY_MENU;
         brewSummaryNeedsFullRedraw = true;
         drawBrewSummaryMenu();
-      } else if (dashSelection == 1) {
-        currentAppState = MIXER_MENU;
-        drawMixerMenu();
-      } else if (dashSelection == 2) {
-        stageParamStage = 2;
-        stageParamSelection = 0;
-        stageParamEditing = false;
-        stageParamNeedsFullRedraw = true;
-        currentAppState = STAGE_PARAM_MENU;
-        drawStageParamMenu();
+      } else if (dashGraphSelected) {
+        currentAppState = GRAPH_PICK_MENU;
+        graphPickNeedsFullRedraw = true;
+        graphPickSelection = dashGraphPlotType;
+        drawGraphPickMenu();
       }
+    } else if (currentAppState == GRAPH_PICK_MENU) {
+      dashGraphPlotType = graphPickSelection;
+      currentAppState = DASHBOARD_ACTIVE;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
     } else if (currentAppState == MIXER_MENU) {
       if (currentMixerMode == MIXER_OFF) {
         currentMixerMode = MIXER_MANUAL;
@@ -1577,6 +1594,17 @@ void loop() {
     }
   }
 
+  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE) {
+    if (millis() - lastPhaseViewNavMs > 350UL) {
+      dashSelection = (dashSelection + 1) % 3;
+      dashGraphSelected = false;
+      dashGraphPlotType = 0;
+      lastPhaseViewNavMs = millis();
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+    }
+  }
+
   if (cRight && !ljRight && currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
     pidTestChoice++;
     if (pidTestChoice > 2) pidTestChoice = -1; // Cycle: -1 (NOT SET) -> 0 (PRE-HEAT) -> 1 (FERM) -> 2 (PAST) -> -1
@@ -1617,11 +1645,7 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == DASHBOARD_ACTIVE) {
-    dashSelection = (dashSelection + 1) % 3;
-    lastPhaseViewNavMs = millis();
-    drawDashboardLayout();
-  }
+  // Removed duplicate cRight DASHBOARD_ACTIVE block to fix double-stepping phase jump
 
   if (cRight && !ljRight && currentAppState == STAGE_PARAM_MENU) {
     if (stageParamSelection == 0 && simTempOverride[stageParamStage] > 0.0f) {
@@ -1701,6 +1725,10 @@ void loop() {
       currentAppState = START_MENU;
       menuNeedsFullRedraw = true;
       drawStartMenu();
+    } else if (currentAppState == GRAPH_PICK_MENU) {
+      currentAppState = DASHBOARD_ACTIVE;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       if (moduleViewActive) {
         moduleViewActive = false;
@@ -1998,16 +2026,7 @@ void loop() {
   // Update SD status indicator on dashboard
   if (sdStatus != lsd) {
     lsd = sdStatus;
-    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
-      tft.setTextPadding(0);
-      uint16_t bg = sdStatus ? 0x0400 : TFT_RED;
-      tft.setTextColor(TFT_WHITE, bg);
-      tft.drawString(sdStatus ? " READY " : " ERROR ", 75, 80, 2);
-      tft.setTextColor(TFT_BLACK, TFT_WHITE);
-      tft.drawString("LOG:", 190, 80, 2);
-      sprintf(buf, " %s ", lastLogTime);
-      tft.drawString(buf, 230, 80, 2);
-    }
+    drawDashboardHeaderInfo();
   }
 
   // Log every 60s
@@ -2616,7 +2635,10 @@ void loop() {
 
     if (rtcStatus && currentAppState != SENSOR_MONITOR) {
       DateTime n = rtc.now();
-      sprintf(buf, "%02d:%02d", n.hour(), n.minute());
+      int h12 = n.hour() % 12;
+      if (h12 == 0) h12 = 12;
+      const char* ampm = (n.hour() >= 12) ? "PM" : "AM";
+      sprintf(buf, "%d:%02d", h12, n.minute());
       uint16_t hdrBg;
       switch (currentAppState) {
       case START_MENU:
@@ -2646,8 +2668,10 @@ void loop() {
         hdrBg = 0x03E0;
         break;
       }
+      tft.setTextPadding(0);
       tft.setTextColor(TFT_YELLOW, hdrBg);
-      tft.drawRightString(buf, 310, 15, 4);
+      tft.drawRightString(buf, 285, 15, 4);
+      tft.drawString(ampm, 290, 24, 1);
     }
 
     if (currentAppState == SENSOR_MONITOR)

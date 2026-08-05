@@ -18,7 +18,10 @@ void logDataToSD() {
     return;
   if (!fileExists)
     dataFile.println("Date,Time,LocalTemp,LocalLiquid1,LocalLiquid2,RemoteTemp,RemoteLiquid,Gravity,pH,ABV");
-  sprintf(lastLogTime, "%02d:%02d", now.hour(), now.minute());
+  int h12 = now.hour() % 12;
+  if (h12 == 0) h12 = 12;
+  const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+  sprintf(lastLogTime, "%d:%02d%s", h12, now.minute(), ampm);
   dataFile.print(now.year(), DEC);   dataFile.print('/');
   dataFile.print(now.month(), DEC);  dataFile.print('/');
   dataFile.print(now.day(), DEC);    dataFile.print(',');

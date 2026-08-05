@@ -14,7 +14,6 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <WebServer.h>
-#include <ArduinoOTA.h>
 #include <WiFi.h>
 #include <Wire.h>
 
@@ -129,7 +128,8 @@ enum AppState {
   PH_FERM_MENU,
   PID_TRACKING_MENU,
   DISPENSER_TEST_MENU,
-  SETTINGS_MENU
+  SETTINGS_MENU,
+  GRAPH_PICK_MENU
 };
 
 extern bool settingsNeedsFullRedraw;
@@ -247,8 +247,13 @@ extern bool menuNeedsFullRedraw;
 extern int menuSelection;
 extern bool wizardNeedsFullRedraw;
 extern int wizardSelection;
+extern bool bypassWeightCheck;
 extern bool dashNeedsFullRedraw;
 extern int dashSelection;
+extern bool dashGraphSelected;
+extern int dashGraphPlotType;
+extern bool graphPickNeedsFullRedraw;
+extern int graphPickSelection;
 extern bool moduleViewActive;
 extern int lastDashSelection;
 extern uint32_t lastPhaseViewNavMs;
