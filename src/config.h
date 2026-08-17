@@ -140,8 +140,13 @@ extern AppState prevLoadCellState;
 
 extern long rawHX711;
 
-const uint32_t MIXER_ON_MS  = 5UL * 60 * 1000;
-const uint32_t MIXER_OFF_MS = 355UL * 60 * 1000;
+const uint32_t MIXER_ON_MS     = 5UL * 60 * 1000;
+const uint32_t MIXER_OFF_MS    = 355UL * 60 * 1000;
+const uint32_t PREHEAT_HOLD_MS = 15UL * 60 * 1000;  // 15 min sterilization hold at 80°C
+const uint32_t PAST_HOLD_MS    = 15UL * 60 * 1000;  // 15 min pasteurization hold
+
+extern float    yeastPitchGrams;
+extern uint32_t fermDurationMs;
 
 // ---- Motor Command Struct (Main -> Secondary via UART) ----
 typedef struct __attribute__((packed)) {

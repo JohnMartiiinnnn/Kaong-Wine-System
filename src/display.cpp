@@ -58,68 +58,83 @@ void drawNewBrewWizard() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("NEW BREW SETUP", 10, 15, 4);
+    // Static labels for info bar
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawString("WEIGHT:", 8, 57, 2);
+    tft.drawString("MIN REQ:", 168, 57, 2);
+    tft.drawFastHLine(0, 93, 320, TFT_DARKGREY);
     wizardNeedsFullRedraw = false;
   }
 
-  char buf[64];
+  char buf[48];
 
-  // Tile 1: Current weight box (y=65, h=65)
-  tft.fillRect(20, 65, 280, 65, 0xD6BA);
-  tft.drawRect(20, 65, 280, 65, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("CURRENT WEIGHT", CENTER_X, 72, 2);
-  if (hx711Status)
-    sprintf(buf, "%.1f L", currentWeight);
-  else
-    strcpy(buf, "FAILED");
-  tft.drawCentreString(buf, CENTER_X, 95, 4);
-
-  // Tile 2: Minimum Required Volume (y=140, h=65)
-  tft.fillRect(20, 140, 280, 65, 0xCE79);
-  tft.drawRect(20, 140, 280, 65, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xCE79);
-  tft.drawCentreString("MINIMUM REQUIRED", CENTER_X, 147, 2);
+  // Info bar: current weight / min required (display only)
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.setTextPadding(90);
+  if (hx711Status) sprintf(buf, "%.1f L", currentWeight); else strcpy(buf, "FAILED");
+  tft.drawString(buf, 60, 57, 4);
   sprintf(buf, "%.1f L", minVolumeReq);
-  tft.drawCentreString(buf, CENTER_X, 170, 4);
+  tft.drawString(buf, 240, 57, 4);
+  tft.setTextPadding(0);
 
-  // Tile 3: Weight Check Bypass Toggle (y=215, h=65)
-  bool isBypassSel = (wizardSelection == 0);
+  // Helper: draw a selectable row
+  auto drawRow = [&](int sel, int y, int h, const char *label, const char *value) {
+    bool isSel  = (wizardSelection == sel);
+    bool isEdit = isSel && wizardEditing;
+    uint16_t bg = isEdit ? 0x03E0 : (isSel ? 0x3566 : 0xD6BA);
+    uint16_t fg = (isSel || isEdit) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, y, 300, h, bg);
+    tft.setTextColor(fg, bg);
+    tft.drawString(label, 18, y + 5, 2);
+    tft.setTextPadding(130);
+    tft.drawRightString(value, 302, y + (h / 2) - 8, 4);
+    tft.setTextPadding(0);
+    if (isEdit) {
+      tft.drawRect(10, y, 300, h, TFT_WHITE);
+      tft.drawRect(11, y + 1, 298, h - 2, TFT_WHITE);
+    } else {
+      tft.drawRect(10, y, 300, h, TFT_DARKGREY);
+    }
+  };
+
+  // Row 0: Fermentation duration
+  uint32_t fermHours = fermDurationMs / 3600000UL;
+  sprintf(buf, "%luh", (unsigned long)fermHours);
+  drawRow(0, 98, 50, "FERM DURATION", buf);
+
+  // Row 1: Yeast pitch
+  sprintf(buf, "%.1f g", yeastPitchGrams);
+  drawRow(1, 152, 50, "YEAST PITCH", buf);
+
+  // Row 2: Weight check bypass toggle
+  bool isBypassSel = (wizardSelection == 2);
   uint16_t bypassBg = isBypassSel ? 0x3566 : (bypassWeightCheck ? 0x03E0 : 0xD6BA);
   uint16_t bypassFg = (isBypassSel || bypassWeightCheck) ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(20, 215, 280, 65, bypassBg);
+  tft.fillRect(10, 206, 300, 50, bypassBg);
   tft.setTextColor(bypassFg, bypassBg);
-  tft.drawCentreString("TESTING BYPASS (WEIGHT CHECK)", CENTER_X, 222, 2);
-  tft.drawCentreString(bypassWeightCheck ? "[ ENABLED ]" : "[ DISABLED ]", CENTER_X, 245, 4);
-  if (isBypassSel) {
-    tft.drawRect(20, 215, 280, 65, TFT_WHITE);
-    tft.drawRect(21, 216, 278, 63, TFT_WHITE);
-  } else {
-    tft.drawRect(20, 215, 280, 65, TFT_DARKGREY);
-  }
+  tft.drawString("WEIGHT BYPASS", 18, 211, 2);
+  tft.setTextPadding(130);
+  tft.drawRightString(bypassWeightCheck ? "ON" : "OFF", 302, 218, 4);
+  tft.setTextPadding(0);
+  if (isBypassSel) { tft.drawRect(10, 206, 300, 50, TFT_WHITE); tft.drawRect(11, 207, 298, 48, TFT_WHITE); }
+  else tft.drawRect(10, 206, 300, 50, TFT_DARKGREY);
 
-  // Tile 4: PROCEED Button / Safety Lock (y=290, h=65)
-  bool isProceedSel = (wizardSelection == 1);
+  // Row 3: PROCEED button
+  bool isProceedSel = (wizardSelection == 3);
   bool canProceed = bypassWeightCheck || (currentWeight >= minVolumeReq);
-  uint16_t rowBg = canProceed ? (isProceedSel ? 0x03E0 : 0x0400) : (isProceedSel ? 0xF800 : 0x4208);
-  tft.fillRect(20, 290, 280, 65, rowBg);
-  tft.setTextColor(TFT_WHITE, rowBg);
-  if (canProceed) {
-    tft.drawCentreString(bypassWeightCheck ? "PROCEED (BYPASSED)" : "PROCEED (START BREW)", CENTER_X, 310, 2);
-  } else {
-    tft.drawCentreString("LOCKED: MIN VOL NOT MET", CENTER_X, 310, 2);
-  }
-  if (isProceedSel) {
-    tft.drawRect(20, 290, 280, 65, TFT_WHITE);
-    tft.drawRect(21, 291, 278, 63, TFT_WHITE);
-  } else {
-    tft.drawRect(20, 290, 280, 65, TFT_DARKGREY);
-  }
+  uint16_t procBg = canProceed ? (isProceedSel ? 0x03E0 : 0x0400) : (isProceedSel ? 0xF800 : 0x4208);
+  tft.fillRect(10, 262, 300, 130, procBg);
+  tft.setTextColor(TFT_WHITE, procBg);
+  tft.drawCentreString(canProceed ? "START BREW" : "LOCKED: MIN VOL NOT MET", CENTER_X, 290, 4);
+  tft.drawCentreString(canProceed ? "(SELECT TO CONFIRM)" : "(ENABLE BYPASS TO CONTINUE)", CENTER_X, 320, 2);
+  if (isProceedSel) { tft.drawRect(10, 262, 300, 130, TFT_WHITE); tft.drawRect(11, 263, 298, 128, TFT_WHITE); }
+  else tft.drawRect(10, 262, 300, 130, TFT_DARKGREY);
 
-  // Help Footer
+  // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DN: NAV   SELECT: TOGGLE / START", CENTER_X, 447, 1);
-  tft.drawCentreString("RETURN (LEFT): CANCEL & BACK", CENTER_X, 462, 1);
+  tft.drawCentreString("UP/DN: NAV   SELECT: EDIT/TOGGLE/START", CENTER_X, 447, 1);
+  tft.drawCentreString("RETURN: EXIT EDIT / CANCEL", CENTER_X, 462, 1);
 }
 
 static void formatStageTimer(uint32_t ms, char *out) {
@@ -311,7 +326,8 @@ void updateDashboardValues() {
 
     } else if (pastHolding) {
       uint32_t elapsed = (millis() - pastHoldStart) / 1000;
-      uint32_t rem = (elapsed < 900) ? (900 - elapsed) : 0;
+      uint32_t holdSec = PAST_HOLD_MS / 1000;
+      uint32_t rem = (elapsed < holdSec) ? (holdSec - elapsed) : 0;
       tft.drawCentreString("HOLDING", 239, 190, 2);
       sprintf(subBuf, "%02lu:%02lu Rem", rem / 60, rem % 60);
       tft.drawCentreString(subBuf, 239, 206, 1);

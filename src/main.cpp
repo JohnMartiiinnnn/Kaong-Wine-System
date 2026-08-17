@@ -181,9 +181,11 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {80.0f, 28.5f, 72.0f};
+float stageTargetTemp[3] = {80.0f, 28.0f, 72.0f};
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
+float    yeastPitchGrams = 5.0f;
+uint32_t fermDurationMs  = 48UL * 3600 * 1000;
 int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
 bool stageParamEditing = false;
@@ -680,8 +682,13 @@ void loop() {
       menuSelection = (menuSelection + 1) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (cDown && !ljDown && !wizardEditing) {
-        wizardSelection = (wizardSelection + 1) % 2;
+      if (cDown && !ljDown) {
+        if (wizardEditing) {
+          if (wizardSelection == 0) fermDurationMs = (fermDurationMs > 3600000UL) ? fermDurationMs - 3600000UL : 3600000UL;
+          else if (wizardSelection == 1) yeastPitchGrams = max(0.5f, yeastPitchGrams - 0.5f);
+        } else {
+          wizardSelection = (wizardSelection + 1) % 4;
+        }
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
@@ -839,10 +846,13 @@ void loop() {
       menuSelection = (menuSelection + 3) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (!wizardEditing) {
-        wizardSelection = (wizardSelection + 1) % 2;
-        drawNewBrewWizard();
+      if (wizardEditing) {
+        if (wizardSelection == 0) { fermDurationMs += 3600000UL; if (fermDurationMs > 168UL * 3600000) fermDurationMs = 168UL * 3600000; }
+        else if (wizardSelection == 1) yeastPitchGrams = min(20.0f, yeastPitchGrams + 0.5f);
+      } else {
+        wizardSelection = (wizardSelection + 3) % 4;
       }
+      drawNewBrewWizard();
     } else if (currentAppState == SETTINGS_MENU) {
       if (settingsEditing) {
         if (settingsSelection == 0) {
@@ -1008,10 +1018,13 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (wizardSelection == 0) {
+      if (wizardSelection == 0 || wizardSelection == 1) {
+        wizardEditing = !wizardEditing;
+        drawNewBrewWizard();
+      } else if (wizardSelection == 2) {
         bypassWeightCheck = !bypassWeightCheck;
         drawNewBrewWizard();
-      } else if (wizardSelection == 1) {
+      } else if (wizardSelection == 3) {
         if (bypassWeightCheck || currentWeight >= minVolumeReq) {
           if (rtcStatus) {
             DateTime now = rtc.now();
@@ -1613,13 +1626,10 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD) {
-    if (wizardSelection == 0 && wizardEditing) {
-      minVolumeReq += 1.0f;
-      if (minVolumeReq > 50.0f)
-        minVolumeReq = 50.0f;
-      drawNewBrewWizard();
-    }
+  if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD && wizardEditing) {
+    if (wizardSelection == 0) { fermDurationMs += 6UL * 3600000; if (fermDurationMs > 168UL * 3600000) fermDurationMs = 168UL * 3600000; }
+    else if (wizardSelection == 1) yeastPitchGrams = min(20.0f, yeastPitchGrams + 1.0f);
+    drawNewBrewWizard();
   }
 
   // Calibration factor adjust via Right/Left while on factor row
@@ -1723,9 +1733,14 @@ void loop() {
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
-      currentAppState = START_MENU;
-      menuNeedsFullRedraw = true;
-      drawStartMenu();
+      if (wizardEditing) {
+        wizardEditing = false;
+        drawNewBrewWizard();
+      } else {
+        currentAppState = START_MENU;
+        menuNeedsFullRedraw = true;
+        drawStartMenu();
+      }
     } else if (currentAppState == GRAPH_PICK_MENU) {
       currentAppState = DASHBOARD_ACTIVE;
       dashNeedsFullRedraw = true;
@@ -2333,6 +2348,16 @@ void loop() {
         mcp.digitalWrite(LIGHT_R, RELAY_OFF);
         mcp.digitalWrite(LIGHT_Y, RELAY_ON);
         mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+        // Auto-dispatch yeast at configured pitch rate
+        if (yeastPitchGrams > 0.0f)
+          sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
+        // Auto-start mixer in AUTO mode (5 min ON / 355 min OFF)
+        currentMixerMode = MIXER_AUTO;
+        mixerRunning = true;
+        mixerOnTimer = millis();
+        mixerCycleTimer = 0;
+        mixerSpeedPercent = 100;
+        setMixerSpeed(100);
       } else if (activeBrewStage == 2) {
         mcp.digitalWrite(LIGHT_R, RELAY_OFF);
         mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
@@ -2393,7 +2418,7 @@ void loop() {
                 preHeatHolding = true;
                 preHeatHoldStart = millis();
               }
-              if (millis() - preHeatHoldStart >= 15000UL) {
+              if (millis() - preHeatHoldStart >= PREHEAT_HOLD_MS) {
                 preHeatSterilized = true;
                 preHeatHolding = false;
                 currentHeatingPercent = 0;
@@ -2437,8 +2462,8 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
           static uint32_t fermStageOvershootStartMs = 0;
-          float fermLow  = stageTargetTemp[1] - 1.5f;
-          float fermHigh = stageTargetTemp[1] + 1.5f;
+          float fermLow  = stageTargetTemp[1] - 1.5f;  // heat on below 26.5°C
+          float fermHigh = stageTargetTemp[1];          // cool on at 28°C (PNS max)
 
           if (liquidTemp < fermLow) {
             currentHeatingPercent = 50;
@@ -2459,13 +2484,15 @@ void loop() {
           }
         }
 
-        // Fermentation completion: pH at/below target OR gravity at/below target
+        // Fermentation completion: pH at/below target, gravity at/below target, or time elapsed
         bool fermComplete = false;
         if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
             incomingData.phValue <= fermTargetPH)
           fermComplete = true;
         if (incomingData.pillGravity > 0.5f && incomingData.pillGravity < 2.0f &&
             incomingData.pillGravity <= fermTargetGravity)
+          fermComplete = true;
+        if (millis() - stageStartMillis >= fermDurationMs)
           fermComplete = true;
         if (fermComplete && !phAlertActive) {
           phAlertActive = true;
@@ -2499,7 +2526,7 @@ void loop() {
                 pastHolding = true;
                 pastHoldStart = millis();
               }
-              if (millis() - pastHoldStart >= 15000UL) {
+              if (millis() - pastHoldStart >= PAST_HOLD_MS) {
                 pastSterilized = true;
                 pastHolding = false;
                 currentHeatingPercent = 0;
