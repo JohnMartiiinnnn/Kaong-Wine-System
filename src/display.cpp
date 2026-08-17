@@ -199,12 +199,12 @@ void updateDashboardValues() {
 
     } else if (preHeatHolding) {
       tft.drawCentreString("HOLDING", 239, 190, 2);
-      sprintf(subBuf, "%.1fC / 80.0C", curT);
+      sprintf(subBuf, "%.1fC / %.1fC", curT, stageTargetTemp[0]);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else if (currentHeatingPercent > 0) {
       tft.drawCentreString("HEATING", 239, 190, 2);
-      sprintf(subBuf, "%.1fC / 80.0C", curT);
+      sprintf(subBuf, "%.1fC / %.1fC", curT, stageTargetTemp[0]);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else {
@@ -266,7 +266,7 @@ void updateDashboardValues() {
 
     } else {
       tft.drawCentreString("FERMENTING", 239, 228, 2);
-      sprintf(subBuf, "%.1fC / 27.0C", fermT);
+      sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);
       tft.drawCentreString(subBuf, 239, 243, 1);
     }
 
@@ -318,7 +318,7 @@ void updateDashboardValues() {
 
     } else if (currentHeatingPercent > 0) {
       tft.drawCentreString("HEATING", 239, 190, 2);
-      sprintf(subBuf, "%.1fC / 72.0C", curT);
+      sprintf(subBuf, "%.1fC / %.1fC", curT, stageTargetTemp[2]);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else {

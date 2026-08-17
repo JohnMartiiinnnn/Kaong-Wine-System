@@ -181,7 +181,7 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {30.0f, 28.5f, 80.0f};
+float stageTargetTemp[3] = {80.0f, 28.5f, 72.0f};
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 int stageParamSelection = 0;
@@ -2350,22 +2350,30 @@ void loop() {
     // ---- Closed-Loop Brew Stage Control ----
     if (activeBrewStage >= 0 && activeBrewStage <= 2 && !stageTransferring) {
       static int lastCtrlStage = -1;
+      static uint32_t brewPidLastMs = 0;
       if (activeBrewStage != lastCtrlStage) {
         preheatPid.reset();
         pastPid.reset();
+        brewPidLastMs = 0;
         lastCtrlStage = activeBrewStage;
       }
 
       float liquidTemp = -999.0f;
       if (simTempOverride[activeBrewStage] > 0.0f) {
         liquidTemp = simTempOverride[activeBrewStage];
-      } else if (activeBrewStage == 0 && liquid2Status) {
+      } else if (activeBrewStage == 0 && (liquid1Status || liquid2Status)) {
         liquidTemp = getPreheatTemp();
       } else if (activeBrewStage == 1 && incomingData.sensor2Status > 0) {
         liquidTemp = incomingData.room2Temp;
       } else if (activeBrewStage == 2 && liquid1Status) {
         liquidTemp = getPastTemp();
       }
+
+      // Rate-limit PID compute to 1-second intervals
+      uint32_t brewNow = millis();
+      bool pidTick = (brewNow - brewPidLastMs >= 1000);
+      float brewDt = (!pidTick || brewPidLastMs == 0) ? 1.0f : (brewNow - brewPidLastMs) / 1000.0f;
+      if (pidTick) brewPidLastMs = brewNow;
 
       if (activeBrewStage == 0) {
         if (!preHeatSterilized) {
@@ -2375,12 +2383,12 @@ void loop() {
             currentHeatingPercent = 0;
             preheatPid.reset();
           } else if (liquidTemp > -100.0f) {
-            float pidOut = preheatPid.compute(80.0f, liquidTemp, 1.0f);
-            currentHeatingPercent = (int)pidOut;
-            if (simManual[0])
-              currentHeatingPercent = 0;
-
-            if (liquidTemp >= 80.0f) {
+            if (pidTick) {
+              float pidOut = preheatPid.compute(stageTargetTemp[0], liquidTemp, brewDt);
+              currentHeatingPercent = (int)pidOut;
+              if (simManual[0]) currentHeatingPercent = 0;
+            }
+            if (liquidTemp >= stageTargetTemp[0]) {
               if (!preHeatHolding) {
                 preHeatHolding = true;
                 preHeatHoldStart = millis();
@@ -2407,6 +2415,17 @@ void loop() {
               isFanOn = false;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
               setFanSpeed(0);
+              // Auto-advance: pre-heat sterilized and cooled → transfer to fermentation
+              if (!stageTransferring) {
+                stageElapsedMs[0] = millis() - stageStartMillis;
+                stageTransferring = true;
+                stageTransferTarget = 1;
+                transferStartMs = millis();
+                transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
+                mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+                mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+                mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+              }
             }
           }
         }
@@ -2418,42 +2437,64 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
           static uint32_t fermStageOvershootStartMs = 0;
-          float targetTemp = 30.0f;
+          float fermLow  = stageTargetTemp[1] - 1.5f;
+          float fermHigh = stageTargetTemp[1] + 1.5f;
 
-          if (liquidTemp < 27.0f) {
-            currentHeatingPercent = 50; // 50% duty cycle (1.5s ON / 1.5s OFF per 3s cycle) for effective quartz heating
+          if (liquidTemp < fermLow) {
+            currentHeatingPercent = 50;
             fermStageOvershootStartMs = 0;
-            setFanSpeed(20); // 20% baseline power during active heating
-          } else if (liquidTemp > targetTemp) {
+            setFanSpeed(20);
+          } else if (liquidTemp > fermHigh) {
             currentHeatingPercent = 0;
-            if (fermStageOvershootStartMs == 0) {
-              fermStageOvershootStartMs = millis();
-            }
+            if (fermStageOvershootStartMs == 0) fermStageOvershootStartMs = millis();
             uint32_t overSec = (millis() - fermStageOvershootStartMs) / 1000;
-            float overDeg = liquidTemp - targetTemp;
+            float overDeg = liquidTemp - fermHigh;
             int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);
           } else {
             currentHeatingPercent = 0;
             fermStageOvershootStartMs = 0;
-            setFanSpeed(20); // 20% baseline power within setpoint range
+            setFanSpeed(20);
           }
         }
+
+        // Fermentation completion: pH at/below target OR gravity at/below target
+        bool fermComplete = false;
         if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
-            incomingData.phValue <= fermTargetPH && !phAlertActive) {
+            incomingData.phValue <= fermTargetPH)
+          fermComplete = true;
+        if (incomingData.pillGravity > 0.5f && incomingData.pillGravity < 2.0f &&
+            incomingData.pillGravity <= fermTargetGravity)
+          fermComplete = true;
+        if (fermComplete && !phAlertActive) {
           phAlertActive = true;
+          if (!stageTransferring) {
+            stageElapsedMs[1] = millis() - stageStartMillis;
+            currentHeatingPercent = 0;
+            isFermFanOn = false;
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+            setFanSpeed(0);
+            stageTransferring = true;
+            stageTransferTarget = 2;
+            transferStartMs = millis();
+            transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
+            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          }
         }
 
       } else if (activeBrewStage == 2) {
         if (!pastSterilized) {
           if (liquidTemp > -100.0f) {
-            float pidOut = pastPid.compute(80.0f, liquidTemp, 1.0f);
-            currentHeatingPercent = (int)pidOut;
-            if (simManual[2])
-              currentHeatingPercent = 0;
-
-            if (liquidTemp >= 80.0f) {
+            if (pidTick) {
+              float pidOut = pastPid.compute(stageTargetTemp[2], liquidTemp, brewDt);
+              currentHeatingPercent = (int)pidOut;
+              if (simManual[2]) currentHeatingPercent = 0;
+            }
+            if (liquidTemp >= stageTargetTemp[2]) {
               if (!pastHolding) {
                 pastHolding = true;
                 pastHoldStart = millis();
@@ -2463,7 +2504,13 @@ void loop() {
                 pastHolding = false;
                 currentHeatingPercent = 0;
                 pastPid.reset();
+                // Brew complete
+                stageElapsedMs[2] = millis() - stageStartMillis;
+                activeBrewStage = -1;
+                mcp.digitalWrite(LIGHT_R, RELAY_ON);
+                mcp.digitalWrite(LIGHT_Y, RELAY_ON);
                 mcp.digitalWrite(LIGHT_G, RELAY_ON);
+                dashNeedsFullRedraw = true;
               }
             } else {
               pastHolding = false;
