@@ -2693,11 +2693,12 @@ void drawPidTrackingMenu(bool valuesOnly) {
     tft.drawRightString(buf, 308, 98, 2);
   }
 
-  // Read live temperatures
-  float curT = 0.0f;
-  if (ch == 0) curT = liquid2Status ? getPreheatTemp() : 0.0f;
-  else if (ch == 1) curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 0.0f;
-  else curT = liquid1Status ? getPastTemp() : 0.0f;
+  // Read live temperatures (-127 = DEVICE_DISCONNECTED sentinel; shown as "--")
+  float curT = -127.0f;
+  if (ch == 0) curT = (liquid1Status || liquid2Status) ? getPreheatTemp() : -127.0f;
+  else if (ch == 1) curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : -127.0f;
+  else curT = liquid1Status ? getPastTemp() : -127.0f;
+  bool curTValid = (curT > -100.0f);
 
   // Stability color
   uint16_t stabColor = TFT_BLACK;
@@ -2708,13 +2709,15 @@ void drawPidTrackingMenu(bool valuesOnly) {
 
   if (ch == 1) {
     tft.fillRect(7, 141, 148, 24, bgCard);
-    sprintf(buf, "%.1f C", curT);
-    tft.setTextColor(TFT_BLACK, bgCard);
+    if (curTValid) sprintf(buf, "%.1f C", curT); else strcpy(buf, "--");
+    tft.setTextColor(curTValid ? TFT_BLACK : TFT_RED, bgCard);
     tft.drawCentreString(buf, 81, 142, 4);
 
     tft.fillRect(165, 141, 148, 24, bgCard);
-    float liqT = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f) ? getFermTemp() : 0.0f;
-    if (liqT > 0.0f) sprintf(buf, "%.1f C", liqT); else strcpy(buf, "-- C");
+    float liqT = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -100.0f) ? getFermTemp() : -127.0f;
+    bool liqTValid = (liqT > -100.0f);
+    if (liqTValid) sprintf(buf, "%.1f C", liqT); else strcpy(buf, "--");
+    tft.setTextColor(liqTValid ? TFT_BLACK : TFT_RED, bgCard);
     tft.drawCentreString(buf, 239, 142, 4);
 
     tft.fillRect(7, 185, 148, 24, bgCard);
@@ -2740,12 +2743,13 @@ void drawPidTrackingMenu(bool valuesOnly) {
 
   } else {
     tft.fillRect(7, 142, 148, 28, bgCard);
-    sprintf(buf, "%.1f C", curT);
-    tft.setTextColor(TFT_BLACK, bgCard);
+    if (curTValid) sprintf(buf, "%.1f C", curT); else strcpy(buf, "--");
+    tft.setTextColor(curTValid ? TFT_BLACK : TFT_RED, bgCard);
     tft.drawCentreString(buf, 81, 144, 4);
 
     tft.fillRect(165, 142, 148, 28, bgCard);
     sprintf(buf, "%.1f C", pidTestHeatTarget);
+    tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(buf, 239, 144, 4);
 
     tft.fillRect(7, 191, 148, 28, bgCard);

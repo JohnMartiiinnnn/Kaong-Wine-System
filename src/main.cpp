@@ -2197,13 +2197,19 @@ void loop() {
     if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
       static uint32_t pidTrackLastPidCalcMs = 0;
 
-      float curT = 25.0f;
-      if (pidTestChoice == 0) {
-        curT = liquid2Status ? getPreheatTemp() : 25.0f;
-      } else if (pidTestChoice == 1) {
-        curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : 25.0f;
-      } else {
-        curT = liquid1Status ? getPastTemp() : 25.0f;
+      float curT = -127.0f;
+      if (pidTestChoice == 0)
+        curT = (liquid1Status || liquid2Status) ? getPreheatTemp() : -127.0f;
+      else if (pidTestChoice == 1)
+        curT = (incomingData.sensor2Status > 0) ? incomingData.room2Temp : -127.0f;
+      else
+        curT = liquid1Status ? getPastTemp() : -127.0f;
+
+      if (curT <= -100.0f) {
+        // Sensor unavailable — hold output at 0 and skip PID until we have a valid reading
+        currentHeatingPercent = 0;
+        ledcWrite(pwmChannel, 0);
+        return;
       }
 
       float error = pidTrackTargetTemp - curT;
