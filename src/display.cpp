@@ -2913,6 +2913,7 @@ void drawPidChamberPick() {
 }
 
 void drawPidConfigMenu() {
+  static bool prevEditing = false;
   char buf[32];
   const char *chamberNames[] = {"PRE-HEAT", "FERMENTATION", "PASTEURIZATION"};
   const char *chamberName = (pidTestChoice >= 0 && pidTestChoice < 3) ? chamberNames[pidTestChoice] : "UNKNOWN";
@@ -2949,17 +2950,25 @@ void drawPidConfigMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("PID CONTROL", 10, 15, 4);
-
     tft.fillRect(0, 52, 320, 28, 0x4208);
     tft.setTextColor(TFT_WHITE, 0x4208);
     tft.drawCentreString(chamberName, CENTER_X, 60, 2);
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DN: NAVIGATE   SELECT: EDIT / START   RETURN: BACK", CENTER_X, 458, 1);
+    pidConfigNeedsFullRedraw = false;
+    prevEditing = false;
+  }
 
-    sprintf(buf, "%.1f C", pidTestHeatTarget);
-    drawRow(0, "HEAT SETPOINT", buf, pidTestTargetSelection == 0, pidConfigEditing && pidTestTargetSelection == 0);
-    sprintf(buf, "%.1f C", pidTestCoolTarget);
-    drawRow(1, "COOL SETPOINT", buf, pidTestTargetSelection == 1, pidConfigEditing && pidTestTargetSelection == 1);
-    drawStartRow(pidTestTargetSelection == 2);
+  // Always redraw the 3 row tiles — no full body wipe, so no screen flash
+  sprintf(buf, "%.1f C", pidTestHeatTarget);
+  drawRow(0, "HEAT SETPOINT", buf, pidTestTargetSelection == 0, pidConfigEditing && pidTestTargetSelection == 0);
+  sprintf(buf, "%.1f C", pidTestCoolTarget);
+  drawRow(1, "COOL SETPOINT", buf, pidTestTargetSelection == 1, pidConfigEditing && pidTestTargetSelection == 1);
+  drawStartRow(pidTestTargetSelection == 2);
 
+  // Update footer only when editing state changes
+  if (prevEditing != pidConfigEditing) {
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
     if (pidConfigEditing) {
@@ -2967,8 +2976,7 @@ void drawPidConfigMenu() {
     } else {
       tft.drawCentreString("UP/DN: NAVIGATE   SELECT: EDIT / START   RETURN: BACK", CENTER_X, 458, 1);
     }
-
-    pidConfigNeedsFullRedraw = false;
+    prevEditing = pidConfigEditing;
   }
 }
 

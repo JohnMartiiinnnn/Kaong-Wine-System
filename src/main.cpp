@@ -370,10 +370,8 @@ void setup() {
   digitalWrite(2, LOW);
   pinMode(PWM_PIN, OUTPUT);
   digitalWrite(PWM_PIN, HIGH);
-#ifndef WOKWI_SIM
   pinMode(MOTOR_PWM_PIN, OUTPUT);
   digitalWrite(MOTOR_PWM_PIN, LOW);
-#endif
 
   Serial.begin(115200);
   pinMode(15, OUTPUT);
@@ -469,20 +467,11 @@ void setup() {
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
   setFanSpeed(0);
-#ifndef WOKWI_SIM
   ledcSetup(MOTOR_PWM_CHANNEL, MOTOR_PWM_FREQ, pwmResolution);
   ledcAttachPin(MOTOR_PWM_PIN, MOTOR_PWM_CHANNEL);
-#endif
   setMixerSpeed(0);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
-#ifdef WOKWI_SIM
-  // Direct GPIO buttons: RIGHT=32, LEFT=35, UP=39, DOWN=34, SELECT=36
-  // 32 & 34 already INPUT_PULLUP from flow sensor setup above.
-  pinMode(35, INPUT_PULLUP);
-  pinMode(39, INPUT_PULLUP);
-  pinMode(36, INPUT_PULLUP);
-#else
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
   WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
@@ -497,7 +486,6 @@ void setup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
   server.begin();
-#endif
 
   delay(2000);
   currentAppState = START_MENU;
@@ -506,9 +494,7 @@ void setup() {
 
 // ---- Main Loop ----
 void loop() {
-#ifndef WOKWI_SIM
   server.handleClient();
-#endif
 
   // ---- Calibration Wizard LED UI ----
   if (currentAppState == CALIB_WIZARD) {
@@ -555,19 +541,11 @@ void loop() {
   char buf[64];
 
   // Button reads
-#ifdef WOKWI_SIM
-  bool rawRight  = (digitalRead(32) == LOW);
-  bool rawLeft   = (digitalRead(35) == LOW);
-  bool rawUp     = (digitalRead(39) == LOW);
-  bool rawDown   = (digitalRead(34) == LOW);
-  bool rawSelect = (digitalRead(36) == LOW);
-#else
   bool rawRight = (mcp.digitalRead(BTN_RIGHT_PIN) == LOW);
   bool rawLeft = (mcp.digitalRead(BTN_LEFT_PIN) == LOW);
   bool rawUp = (mcp.digitalRead(BTN_UP_PIN) == LOW);
   bool rawDown = (mcp.digitalRead(BTN_DOWN_PIN) == LOW);
   bool rawSelect = (mcp.digitalRead(BTN_SELECT_PIN) == LOW);
-#endif
 
   static int countRi_high = 0, countRi_low = 0;
   static int countLe_high = 0, countLe_low = 0;
@@ -777,7 +755,6 @@ void loop() {
       } else {
         pidTestTargetSelection = (pidTestTargetSelection + 1) % 3;
       }
-      pidConfigNeedsFullRedraw = true;
       drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
@@ -935,7 +912,6 @@ void loop() {
       } else {
         pidTestTargetSelection = (pidTestTargetSelection + 2) % 3;
       }
-      pidConfigNeedsFullRedraw = true;
       drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
