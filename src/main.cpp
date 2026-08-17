@@ -147,6 +147,8 @@ void sendDispenserTestCommand() {
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
+bool pidConfigNeedsFullRedraw = true;
+bool pidConfigEditing = false;
 int pidTestChoice = 0;
 float pidTestHeatTarget = 40.0f;
 float pidTestCoolTarget = 28.5f;
@@ -368,8 +370,10 @@ void setup() {
   digitalWrite(2, LOW);
   pinMode(PWM_PIN, OUTPUT);
   digitalWrite(PWM_PIN, HIGH);
+#ifndef WOKWI_SIM
   pinMode(MOTOR_PWM_PIN, OUTPUT);
   digitalWrite(MOTOR_PWM_PIN, LOW);
+#endif
 
   Serial.begin(115200);
   pinMode(15, OUTPUT);
@@ -465,11 +469,20 @@ void setup() {
   ledcSetup(pwmChannel, pwmFreq, pwmResolution);
   ledcAttachPin(PWM_PIN, pwmChannel);
   setFanSpeed(0);
+#ifndef WOKWI_SIM
   ledcSetup(MOTOR_PWM_CHANNEL, MOTOR_PWM_FREQ, pwmResolution);
   ledcAttachPin(MOTOR_PWM_PIN, MOTOR_PWM_CHANNEL);
+#endif
   setMixerSpeed(0);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
+#ifdef WOKWI_SIM
+  // Direct GPIO buttons: RIGHT=32, LEFT=35, UP=39, DOWN=34, SELECT=36
+  // 32 & 34 already INPUT_PULLUP from flow sensor setup above.
+  pinMode(35, INPUT_PULLUP);
+  pinMode(39, INPUT_PULLUP);
+  pinMode(36, INPUT_PULLUP);
+#else
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
   WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
@@ -484,6 +497,7 @@ void setup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
   server.begin();
+#endif
 
   delay(2000);
   currentAppState = START_MENU;
@@ -492,7 +506,9 @@ void setup() {
 
 // ---- Main Loop ----
 void loop() {
+#ifndef WOKWI_SIM
   server.handleClient();
+#endif
 
   // ---- Calibration Wizard LED UI ----
   if (currentAppState == CALIB_WIZARD) {
@@ -539,11 +555,19 @@ void loop() {
   char buf[64];
 
   // Button reads
+#ifdef WOKWI_SIM
+  bool rawRight  = (digitalRead(32) == LOW);
+  bool rawLeft   = (digitalRead(35) == LOW);
+  bool rawUp     = (digitalRead(39) == LOW);
+  bool rawDown   = (digitalRead(34) == LOW);
+  bool rawSelect = (digitalRead(36) == LOW);
+#else
   bool rawRight = (mcp.digitalRead(BTN_RIGHT_PIN) == LOW);
   bool rawLeft = (mcp.digitalRead(BTN_LEFT_PIN) == LOW);
   bool rawUp = (mcp.digitalRead(BTN_UP_PIN) == LOW);
   bool rawDown = (mcp.digitalRead(BTN_DOWN_PIN) == LOW);
   bool rawSelect = (mcp.digitalRead(BTN_SELECT_PIN) == LOW);
+#endif
 
   static int countRi_high = 0, countRi_low = 0;
   static int countLe_high = 0, countLe_low = 0;
@@ -743,13 +767,18 @@ void loop() {
         dispenserTestSelection = (dispenserTestSelection + 1) % 2;
       }
       drawDispenserTestMenu();
-    } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
-      pidTrackTargetTemp -= 5.0f;
-      if (pidTrackTargetTemp < 20.0f) pidTrackTargetTemp = 20.0f;
-      pidTrackMetrics.targetTemp = pidTrackTargetTemp;
-      pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
-      pidTrackNeedsFullRedraw = true;
-      drawPidTrackingMenu();
+    } else if (currentAppState == PID_CHAMBER_PICK) {
+      pidTestChoice = (pidTestChoice + 1) % 3;
+      drawPidChamberPick();
+    } else if (currentAppState == PID_CONFIG_MENU) {
+      if (pidConfigEditing) {
+        if (pidTestTargetSelection == 0) { pidTestHeatTarget -= 1.0f; if (pidTestHeatTarget < 20.0f) pidTestHeatTarget = 20.0f; }
+        else if (pidTestTargetSelection == 1) { pidTestCoolTarget -= 1.0f; if (pidTestCoolTarget < 10.0f) pidTestCoolTarget = 10.0f; }
+      } else {
+        pidTestTargetSelection = (pidTestTargetSelection + 1) % 3;
+      }
+      pidConfigNeedsFullRedraw = true;
+      drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -896,13 +925,18 @@ void loop() {
         dispenserTestSelection = (dispenserTestSelection + 1) % 2;
       }
       drawDispenserTestMenu();
-    } else if (currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
-      pidTrackTargetTemp += 1.0f;
-      if (pidTrackTargetTemp > 100.0f) pidTrackTargetTemp = 100.0f;
-      pidTrackMetrics.targetTemp = pidTrackTargetTemp;
-      pidTrackMetrics.steadyStateError = fabs(pidTrackMetrics.startTemp - pidTrackTargetTemp);
-      pidTrackNeedsFullRedraw = true;
-      drawPidTrackingMenu();
+    } else if (currentAppState == PID_CHAMBER_PICK) {
+      pidTestChoice = (pidTestChoice + 2) % 3;
+      drawPidChamberPick();
+    } else if (currentAppState == PID_CONFIG_MENU) {
+      if (pidConfigEditing) {
+        if (pidTestTargetSelection == 0) { pidTestHeatTarget += 1.0f; if (pidTestHeatTarget > 100.0f) pidTestHeatTarget = 100.0f; }
+        else if (pidTestTargetSelection == 1) { pidTestCoolTarget += 1.0f; if (pidTestCoolTarget > 100.0f) pidTestCoolTarget = 100.0f; }
+      } else {
+        pidTestTargetSelection = (pidTestTargetSelection + 2) % 3;
+      }
+      pidConfigNeedsFullRedraw = true;
+      drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
       fanTestFanChoice = (fanTestFanChoice + 1) % 2;
       drawFanTestPick();
@@ -1137,22 +1171,10 @@ void loop() {
         currentAppState = MOTOR_TEST_MENU;
         drawMotorTestMenu();
       } else if (systemCheckSelection == 4) {
-        currentAppState = PID_TRACKING_MENU;
-        pidTrackNeedsFullRedraw = true;
-        pidTrackRunning = false;
-        pidTrackHistoryCount = 0;
-        pidTrackSampleIntervalSec = 2;
-        pidTestChoice = -1; // Default to "Heater Output: Not Set"
-        float initTemp = 25.0f;
-        pidTrackMetrics.startTemp = initTemp;
-        pidTrackMetrics.targetTemp = 80.0f;
-        pidTrackMetrics.peakTemp = initTemp;
-        pidTrackMetrics.steadyStateError = fabs(initTemp - 80.0f);
-        pidTrackMetrics.riseTimeSec = -1;
-        pidTrackMetrics.settlingTimeSec = -1;
-        pidTrackMetrics.overshootDeg = 0.0f;
-        strcpy(pidTrackMetrics.stabilityStr, "IDLE");
-        drawPidTrackingMenu();
+        pidTestChoice = 0;
+        pidTestNeedsFullRedraw = true;
+        currentAppState = PID_CHAMBER_PICK;
+        drawPidChamberPick();
       } else if (systemCheckSelection == 5) {
         sdVerifyResult = -1;
         sdVerifyNeedsFullRedraw = true;
@@ -1195,51 +1217,54 @@ void loop() {
         dispenserTestEditing = !dispenserTestEditing;
       }
       drawDispenserTestMenu();
-    } else if (currentAppState == PID_TRACKING_MENU) {
-      if (!pidTrackRunning) {
-        if (pidTestChoice == -1) {
-          // Cannot start test until user chooses a valid heater output
-          strcpy(pidTrackMetrics.stabilityStr, "NO HEATER");
-          pidTrackNeedsFullRedraw = true;
-          drawPidTrackingMenu();
+    } else if (currentAppState == PID_CHAMBER_PICK) {
+      if (pidTestChoice == 0) { pidTestHeatTarget = 80.0f; pidTestCoolTarget = 75.0f; }
+      else if (pidTestChoice == 1) { pidTestHeatTarget = 27.0f; pidTestCoolTarget = 29.0f; }
+      else { pidTestHeatTarget = 72.0f; pidTestCoolTarget = 68.0f; }
+      pidTestTargetSelection = 0;
+      pidConfigEditing = false;
+      pidConfigNeedsFullRedraw = true;
+      currentAppState = PID_CONFIG_MENU;
+      drawPidConfigMenu();
+    } else if (currentAppState == PID_CONFIG_MENU) {
+      if (pidConfigEditing) {
+        pidConfigEditing = false;
+        pidConfigNeedsFullRedraw = true;
+        drawPidConfigMenu();
+      } else if (pidTestTargetSelection == 2) {
+        pidTrackTargetTemp = pidTestHeatTarget;
+        pidTrackRunning = true;
+        pidTrackStartMs = millis();
+        pidTrackLastSampleMs = 0;
+        pidTrackHistoryCount = 0;
+        pidTrackSampleIntervalSec = 2;
+        float initTemp = 25.0f;
+        if (pidTestChoice == 0 && liquid2Status) initTemp = getPreheatTemp();
+        else if (pidTestChoice == 1 && incomingData.sensor2Status > 0) initTemp = incomingData.room2Temp;
+        else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
+        if (pidTestChoice == 1) {
+          trackingPid.setGains(QUARTZ_PID_KP, QUARTZ_PID_KI, QUARTZ_PID_KD);
+          trackingPid.setRampBand(QUARTZ_RAMP_BAND);
+          isFermFanOn = true;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+          setFanSpeed(20);
+        } else if (pidTestChoice == 2) {
+          trackingPid.setGains(PAST_PID_KP, PAST_PID_KI, PAST_PID_KD);
+          trackingPid.setRampBand(PAST_RAMP_BAND);
         } else {
-          pidTrackRunning = true;
-          pidTrackStartMs = millis();
-          pidTrackLastSampleMs = 0;
-          pidTrackHistoryCount = 0;
-          pidTrackSampleIntervalSec = 2;
-          float initTemp = 25.0f;
-          if (pidTestChoice == 0 && liquid2Status) initTemp = getPreheatTemp();
-          else if (pidTestChoice == 1 && incomingData.sensor2Status > 0) initTemp = incomingData.room2Temp;
-          else if (pidTestChoice == 2 && liquid1Status) initTemp = getPastTemp();
-
-          if (pidTestChoice == 1) {
-            // Fermentation Quartz Heater: Configure Quartz PID parameters & 20% baseline fan speed
-            trackingPid.setGains(QUARTZ_PID_KP, QUARTZ_PID_KI, QUARTZ_PID_KD);
-            trackingPid.setRampBand(QUARTZ_RAMP_BAND);
-            isFermFanOn = true;
-            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
-            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
-            setFanSpeed(20);
-          } else if (pidTestChoice == 2) {
-            trackingPid.setGains(PAST_PID_KP, PAST_PID_KI, PAST_PID_KD);
-            trackingPid.setRampBand(PAST_RAMP_BAND);
-          } else {
-            trackingPid.setGains(PREHEAT_PID_KP, PREHEAT_PID_KI, PREHEAT_PID_KD);
-            trackingPid.setRampBand(PREHEAT_RAMP_BAND);
-          }
-
-          pidTrackMetrics.startTemp = initTemp;
-          pidTrackMetrics.targetTemp = pidTrackTargetTemp;
-          pidTrackMetrics.peakTemp = initTemp;
-          pidTrackMetrics.steadyStateError = fabs(initTemp - pidTrackTargetTemp);
-          pidTrackMetrics.riseTimeSec = -1;
-          pidTrackMetrics.settlingTimeSec = -1;
-          pidTrackMetrics.overshootDeg = 0.0f;
-          strcpy(pidTrackMetrics.stabilityStr, "TESTING");
-          trackingPid.reset();
-
-        // Create unique separate log filename for this test run
+          trackingPid.setGains(PREHEAT_PID_KP, PREHEAT_PID_KI, PREHEAT_PID_KD);
+          trackingPid.setRampBand(PREHEAT_RAMP_BAND);
+        }
+        pidTrackMetrics.startTemp = initTemp;
+        pidTrackMetrics.targetTemp = pidTrackTargetTemp;
+        pidTrackMetrics.peakTemp = initTemp;
+        pidTrackMetrics.steadyStateError = fabs(initTemp - pidTrackTargetTemp);
+        pidTrackMetrics.riseTimeSec = -1;
+        pidTrackMetrics.settlingTimeSec = -1;
+        pidTrackMetrics.overshootDeg = 0.0f;
+        strcpy(pidTrackMetrics.stabilityStr, "TESTING");
+        trackingPid.reset();
         if (rtcStatus) {
           DateTime now = rtc.now();
           sprintf(pidLogFileName, "/pid_%02d%02d_%02d%02d.csv", now.month(), now.day(), now.hour(), now.minute());
@@ -1251,7 +1276,6 @@ void loop() {
             runNum++;
           }
         }
-
         if (sdStatus) {
           File f = SD.open(pidLogFileName, FILE_WRITE);
           if (f) {
@@ -1259,8 +1283,16 @@ void loop() {
             f.close();
           }
         }
-      }
+        pidTrackNeedsFullRedraw = true;
+        currentAppState = PID_TRACKING_MENU;
+        drawPidTrackingMenu();
       } else {
+        pidConfigEditing = true;
+        pidConfigNeedsFullRedraw = true;
+        drawPidConfigMenu();
+      }
+    } else if (currentAppState == PID_TRACKING_MENU) {
+      if (pidTrackRunning) {
         pidTrackRunning = false;
         currentHeatingPercent = 0;
         digitalWrite(SSR_PREHEAT, LOW);
@@ -1605,13 +1637,6 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == PID_TRACKING_MENU && !pidTrackRunning) {
-    pidTestChoice++;
-    if (pidTestChoice > 2) pidTestChoice = -1; // Cycle: -1 (NOT SET) -> 0 (PRE-HEAT) -> 1 (FERM) -> 2 (PAST) -> -1
-    pidTrackNeedsFullRedraw = true;
-    drawPidTrackingMenu();
-  }
-
   if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD) {
     if (wizardSelection == 0 && wizardEditing) {
       minVolumeReq += 1.0f;
@@ -1861,6 +1886,20 @@ void loop() {
         systemCheckNeedsFullRedraw = true;
         drawSystemCheckMenu();
       }
+    } else if (currentAppState == PID_CHAMBER_PICK) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == PID_CONFIG_MENU) {
+      if (pidConfigEditing) {
+        pidConfigEditing = false;
+        pidConfigNeedsFullRedraw = true;
+        drawPidConfigMenu();
+      } else {
+        pidTestNeedsFullRedraw = true;
+        currentAppState = PID_CHAMBER_PICK;
+        drawPidChamberPick();
+      }
     } else if (currentAppState == PID_TRACKING_MENU) {
       pidTrackRunning = false;
       currentHeatingPercent = 0;
@@ -1873,9 +1912,9 @@ void loop() {
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
       mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
+      pidConfigNeedsFullRedraw = true;
+      currentAppState = PID_CONFIG_MENU;
+      drawPidConfigMenu();
     } else if (currentAppState == STAGE_PARAM_MENU) {
       if (stageParamEditing) {
         if (stageParamSelection == 1)
@@ -2209,12 +2248,12 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
           static uint32_t fermTrackOvershootStartMs = 0;
-          if (curT > pidTrackTargetTemp) {
+          if (curT > pidTestCoolTarget) {
             if (fermTrackOvershootStartMs == 0) {
               fermTrackOvershootStartMs = millis();
             }
             uint32_t overSec = (millis() - fermTrackOvershootStartMs) / 1000;
-            float overDeg = curT - pidTrackTargetTemp;
+            float overDeg = curT - pidTestCoolTarget;
             int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);

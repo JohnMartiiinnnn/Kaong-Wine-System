@@ -43,3 +43,5 @@ void drawPidTrackingMenu(bool valuesOnly = false);
 void drawDispenserTestMenu();
 void drawSettingsMenu();
 void drawGraphPickMenu();
+void drawPidChamberPick();
+void drawPidConfigMenu();

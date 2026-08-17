@@ -85,8 +85,7 @@ const int SD_CS_PIN = 5;
 const int pwmFreq = 25000;
 const int pwmChannel = 0;
 const int pwmResolution = 8;
-// TODO: No free output GPIO exists on Primary ESP32 — resolve pin before production use.
-const int MOTOR_PWM_PIN     = -1;
+const int MOTOR_PWM_PIN     = 0; // TB6612FN PWMA — boot pin, safe to use after boot
 const int MOTOR_PWM_CHANNEL = 1;
 const int MOTOR_PWM_FREQ    = 1000;
 const int HX711_DT_PIN = 36;
@@ -129,7 +128,9 @@ enum AppState {
   PID_TRACKING_MENU,
   DISPENSER_TEST_MENU,
   SETTINGS_MENU,
-  GRAPH_PICK_MENU
+  GRAPH_PICK_MENU,
+  PID_CHAMBER_PICK,
+  PID_CONFIG_MENU
 };
 
 extern bool settingsNeedsFullRedraw;
@@ -290,6 +291,8 @@ extern bool dispenserTestOn;
 extern int  dispenserTestSpeed;
 extern bool dispenserTestCW;
 extern bool pidTestNeedsFullRedraw;
+extern bool pidConfigNeedsFullRedraw;
+extern bool pidConfigEditing;
 extern int pidTestChoice;
 extern float pidTestHeatTarget;
 extern float pidTestCoolTarget;
