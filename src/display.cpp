@@ -2604,12 +2604,31 @@ void drawPidTrackingMenu(bool valuesOnly) {
   const int GW  = 270;
   const int GH  = 430 - GPY;
 
+  auto drawPidSubInfo = [&]() {
+    tft.fillRect(0, 50, 320, 38, TFT_WHITE);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    char logBuf[48];
+    sprintf(logBuf, "LOG FILE: %s", pidLogFileName[0] ? pidLogFileName : "--");
+    tft.drawString(logBuf, 10, 54, 2);
+    tft.drawString("SD:", 10, 70, 2);
+    uint16_t sdBadge = sdStatus ? 0x0400 : TFT_RED;
+    tft.setTextColor(TFT_WHITE, sdBadge);
+    tft.drawString(sdStatus ? " READY " : " ERR ", 40, 70, 2);
+    tft.setTextColor(TFT_BLACK, TFT_WHITE);
+    tft.drawString("LOG:", 170, 70, 2);
+    char lBuf[16];
+    sprintf(lBuf, " %s ", lastLogTime[0] ? lastLogTime : "--:--");
+    tft.drawString(lBuf, 210, 70, 2);
+    tft.drawFastHLine(0, 88, 320, TFT_DARKGREY);
+  };
+
   if (!valuesOnly || pidTrackNeedsFullRedraw) {
     // Header (navy, matching dashboard)
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("PID THERMAL TRACKING", 10, 15, 4);
+    drawPidSubInfo();
 
     // Phase selector tile
     tft.fillRect(5, 90, 310, 34, viewColor);
@@ -2662,6 +2681,8 @@ void drawPidTrackingMenu(bool valuesOnly) {
   }
 
   // ---- Dynamic value updates (every call) ----
+
+  drawPidSubInfo();
 
   // Phase tile: elapsed runtime on right
   tft.fillRect(245, 95, 65, 20, viewColor);
