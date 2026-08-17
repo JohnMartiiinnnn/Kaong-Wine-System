@@ -135,15 +135,8 @@ bool dispenserTestNeedsFullRedraw = true;
 int  dispenserTestSelection = 0;
 bool dispenserTestEditing = false;
 bool dispenserTestOn = false;
-int  dispenserTestSpeed = 50;
-bool dispenserTestCW = true;
-
-void sendDispenserTestCommand() {
-  uint32_t yval = ((uint32_t)(dispenserTestOn ? 1 : 0) << 16) |
-                  (1UL << 8) |
-                  (uint32_t)dispenserTestSpeed;
-  sendMotorCommand(0, true, 6, yval);
-}
+int  dispenserTestDurationSec = 5;
+uint32_t dispenserTestStartMs = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -683,12 +676,7 @@ void loop() {
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (cDown && !ljDown) {
-        if (wizardEditing) {
-          if (wizardSelection == 0) fermDurationMs = (fermDurationMs > 3600000UL) ? fermDurationMs - 3600000UL : 3600000UL;
-          else if (wizardSelection == 1) yeastPitchGrams = max(0.5f, yeastPitchGrams - 0.5f);
-        } else {
-          wizardSelection = (wizardSelection + 1) % 4;
-        }
+        wizardSelection = (wizardSelection + 1) % 2;
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
@@ -706,7 +694,6 @@ void loop() {
       }
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       dashGraphSelected = !dashGraphSelected;
-      dashNeedsFullRedraw = true;
       drawDashboardLayout();
     } else if (currentAppState == GRAPH_PICK_MENU) {
       int maxChoices = (dashSelection == 1) ? 3 : 1;
@@ -745,9 +732,8 @@ void loop() {
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
-        dispenserTestSpeed += 10;
-        if (dispenserTestSpeed > 100) dispenserTestSpeed = 100;
-        sendDispenserTestCommand();
+        dispenserTestDurationSec++;
+        if (dispenserTestDurationSec > 60) dispenserTestDurationSec = 60;
       } else {
         dispenserTestSelection = (dispenserTestSelection + 1) % 2;
       }
@@ -846,12 +832,7 @@ void loop() {
       menuSelection = (menuSelection + 3) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (wizardEditing) {
-        if (wizardSelection == 0) { fermDurationMs += 3600000UL; if (fermDurationMs > 168UL * 3600000) fermDurationMs = 168UL * 3600000; }
-        else if (wizardSelection == 1) yeastPitchGrams = min(20.0f, yeastPitchGrams + 0.5f);
-      } else {
-        wizardSelection = (wizardSelection + 3) % 4;
-      }
+      wizardSelection = (wizardSelection + 1) % 2;
       drawNewBrewWizard();
     } else if (currentAppState == SETTINGS_MENU) {
       if (settingsEditing) {
@@ -866,7 +847,6 @@ void loop() {
       drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       dashGraphSelected = !dashGraphSelected;
-      dashNeedsFullRedraw = true;
       drawDashboardLayout();
     } else if (currentAppState == GRAPH_PICK_MENU) {
       int maxChoices = (dashSelection == 1) ? 3 : 1;
@@ -905,9 +885,8 @@ void loop() {
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
-        dispenserTestSpeed -= 10;
-        if (dispenserTestSpeed < 0) dispenserTestSpeed = 0;
-        sendDispenserTestCommand();
+        dispenserTestDurationSec--;
+        if (dispenserTestDurationSec < 1) dispenserTestDurationSec = 1;
       } else {
         dispenserTestSelection = (dispenserTestSelection + 1) % 2;
       }
@@ -1018,13 +997,10 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      if (wizardSelection == 0 || wizardSelection == 1) {
-        wizardEditing = !wizardEditing;
-        drawNewBrewWizard();
-      } else if (wizardSelection == 2) {
+      if (wizardSelection == 0) {
         bypassWeightCheck = !bypassWeightCheck;
         drawNewBrewWizard();
-      } else if (wizardSelection == 3) {
+      } else if (wizardSelection == 1) {
         if (bypassWeightCheck || currentWeight >= minVolumeReq) {
           if (rtcStatus) {
             DateTime now = rtc.now();
@@ -1192,16 +1168,22 @@ void loop() {
         dispenserTestSelection = 0;
         dispenserTestEditing = false;
         dispenserTestOn = false;
-        dispenserTestSpeed = 50;
-        dispenserTestCW = true;
-        sendDispenserTestCommand();
+        dispenserTestDurationSec = 5;
+        dispenserTestStartMs = 0;
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
       }
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 0) {
-        dispenserTestOn = !dispenserTestOn;
-        sendDispenserTestCommand();
+        if (!dispenserTestOn) {
+          dispenserTestOn = true;
+          dispenserTestStartMs = millis();
+          sendMotorCommand(0, true, 1, (uint32_t)dispenserTestDurationSec * 1000);
+        } else {
+          dispenserTestOn = false;
+          dispenserTestStartMs = 0;
+          sendMotorCommand(0, true, 3, 0);
+        }
       } else if (dispenserTestSelection == 1) {
         dispenserTestEditing = !dispenserTestEditing;
       }
@@ -1626,12 +1608,6 @@ void loop() {
     }
   }
 
-  if (cRight && !ljRight && currentAppState == NEW_BREW_WIZARD && wizardEditing) {
-    if (wizardSelection == 0) { fermDurationMs += 6UL * 3600000; if (fermDurationMs > 168UL * 3600000) fermDurationMs = 168UL * 3600000; }
-    else if (wizardSelection == 1) yeastPitchGrams = min(20.0f, yeastPitchGrams + 1.0f);
-    drawNewBrewWizard();
-  }
-
   // Calibration factor adjust via Right/Left while on factor row
   if (cRight && !ljRight && currentAppState == CALIBRATION_MODE &&
       calSelection == 1 && wizardEditing) {
@@ -1733,10 +1709,7 @@ void loop() {
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
-      if (wizardEditing) {
-        wizardEditing = false;
-        drawNewBrewWizard();
-      } else {
+      {
         currentAppState = START_MENU;
         menuNeedsFullRedraw = true;
         drawStartMenu();
@@ -1871,8 +1844,11 @@ void loop() {
         dispenserTestEditing = false;
         drawDispenserTestMenu();
       } else {
-        dispenserTestOn = false;
-        sendDispenserTestCommand();
+        if (dispenserTestOn) {
+          dispenserTestOn = false;
+          dispenserTestStartMs = 0;
+          sendMotorCommand(0, true, 3, 0);
+        }
         currentAppState = SYSTEM_CHECK_MENU;
         systemCheckNeedsFullRedraw = true;
         drawSystemCheckMenu();
@@ -2182,7 +2158,7 @@ void loop() {
   // scale.read()
   if (currentAppState == NEW_BREW_WIZARD && millis() - lw > 250) {
     lw = millis();
-    drawNewBrewWizard();
+    drawNewBrewWizard(true);
   }
 
   // Auto-mixing scheduler
@@ -2793,8 +2769,13 @@ void loop() {
     if (currentAppState == MOTOR_TEST_MENU)
       drawMotorTestMenu();
 
-    if (currentAppState == DISPENSER_TEST_MENU)
+    if (currentAppState == DISPENSER_TEST_MENU) {
+      if (dispenserTestOn && millis() - dispenserTestStartMs >= (uint32_t)dispenserTestDurationSec * 1000) {
+        dispenserTestOn = false;
+        dispenserTestStartMs = 0;
+      }
       drawDispenserTestMenu();
+    }
 
     if (currentAppState == STAGE_PARAM_MENU)
       drawStageParamMenu();

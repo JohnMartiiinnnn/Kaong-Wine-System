@@ -5,7 +5,7 @@ void drawSplashScreen();
 void drawReturnConfirmation();
 void drawCoolingMenu();
 void drawMixerMenu();
-void drawNewBrewWizard();
+void drawNewBrewWizard(bool valuesOnly = false);
 void drawDashboardLayout();
 void drawDashboardHeaderInfo();
 void updateDashboardValues();

@@ -52,89 +52,83 @@ void drawCoolingMenu() {
   tft.drawCentreString("SELECT: CYCLE MODE   RETURN: BACK", CENTER_X, 458, 1);
 }
 
-void drawNewBrewWizard() {
+void drawNewBrewWizard(bool valuesOnly) {
+  char buf[48];
+  bool canProceed = bypassWeightCheck || (currentWeight >= minVolumeReq);
+
+  // Helper: draw the live WEIGHT info tile (redrawn every 250ms)
+  auto drawWeightTile = [&]() {
+    tft.fillRect(5, 55, 152, 65, 0xD6BA);
+    tft.drawRect(5, 55, 152, 65, TFT_DARKGREY);
+    tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+    tft.drawCentreString("WEIGHT", 81, 59, 1);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
+    if (hx711Status) sprintf(buf, "%.1f L", currentWeight); else strcpy(buf, "--");
+    tft.drawCentreString(buf, 81, 77, 4);
+  };
+
+  // Helper: draw START BREW tile
+  auto drawStartTile = [&]() {
+    bool isProceedSel = (wizardSelection == 1);
+    uint16_t procBg = canProceed ? (isProceedSel ? 0x3566 : 0x0400) : (isProceedSel ? 0xF800 : 0x4208);
+    tft.fillRect(10, 188, 300, 241, procBg);
+    tft.setTextColor(TFT_WHITE, procBg);
+    if (canProceed) {
+      tft.drawCentreString("START BREW", CENTER_X, 277, 4);
+      tft.drawCentreString("SELECT TO CONFIRM", CENTER_X, 315, 2);
+    } else {
+      tft.drawCentreString("LOCKED", CENTER_X, 277, 4);
+      tft.drawCentreString("MIN VOLUME NOT MET", CENTER_X, 315, 2);
+      tft.drawCentreString("ENABLE WEIGHT BYPASS", CENTER_X, 335, 2);
+    }
+    if (isProceedSel) { tft.drawRect(10, 188, 300, 241, TFT_WHITE); tft.drawRect(11, 189, 298, 239, TFT_WHITE); }
+    else tft.drawRect(10, 188, 300, 241, TFT_DARKGREY);
+  };
+
+  if (valuesOnly) {
+    drawWeightTile();
+    drawStartTile();
+    return;
+  }
+
   if (wizardNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("NEW BREW SETUP", 10, 15, 4);
-    // Static labels for info bar
+    // Footer (static)
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawString("WEIGHT:", 8, 57, 2);
-    tft.drawString("MIN REQ:", 168, 57, 2);
-    tft.drawFastHLine(0, 93, 320, TFT_DARKGREY);
+    tft.drawCentreString("UP/DN: NAVIGATE   SELECT: TOGGLE / START", CENTER_X, 447, 1);
+    tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
     wizardNeedsFullRedraw = false;
   }
 
-  char buf[48];
-
-  // Info bar: current weight / min required (display only)
-  tft.setTextColor(TFT_BLACK, TFT_WHITE);
-  tft.setTextPadding(90);
-  if (hx711Status) sprintf(buf, "%.1f L", currentWeight); else strcpy(buf, "FAILED");
-  tft.drawString(buf, 60, 57, 4);
+  // Info tiles: WEIGHT (live) | MIN REQ (static)
+  drawWeightTile();
+  tft.fillRect(163, 55, 152, 65, 0xD6BA);
+  tft.drawRect(163, 55, 152, 65, TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
+  tft.drawCentreString("MIN REQ", 239, 59, 1);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   sprintf(buf, "%.1f L", minVolumeReq);
-  tft.drawString(buf, 240, 57, 4);
-  tft.setTextPadding(0);
+  tft.drawCentreString(buf, 239, 77, 4);
 
-  // Helper: draw a selectable row
-  auto drawRow = [&](int sel, int y, int h, const char *label, const char *value) {
-    bool isSel  = (wizardSelection == sel);
-    bool isEdit = isSel && wizardEditing;
-    uint16_t bg = isEdit ? 0x03E0 : (isSel ? 0x3566 : 0xD6BA);
-    uint16_t fg = (isSel || isEdit) ? TFT_WHITE : TFT_BLACK;
-    tft.fillRect(10, y, 300, h, bg);
-    tft.setTextColor(fg, bg);
-    tft.drawString(label, 18, y + 5, 2);
-    tft.setTextPadding(130);
-    tft.drawRightString(value, 302, y + (h / 2) - 8, 4);
-    tft.setTextPadding(0);
-    if (isEdit) {
-      tft.drawRect(10, y, 300, h, TFT_WHITE);
-      tft.drawRect(11, y + 1, 298, h - 2, TFT_WHITE);
-    } else {
-      tft.drawRect(10, y, 300, h, TFT_DARKGREY);
-    }
-  };
-
-  // Row 0: Fermentation duration
-  uint32_t fermHours = fermDurationMs / 3600000UL;
-  sprintf(buf, "%luh", (unsigned long)fermHours);
-  drawRow(0, 98, 50, "FERM DURATION", buf);
-
-  // Row 1: Yeast pitch
-  sprintf(buf, "%.1f g", yeastPitchGrams);
-  drawRow(1, 152, 50, "YEAST PITCH", buf);
-
-  // Row 2: Weight check bypass toggle
-  bool isBypassSel = (wizardSelection == 2);
+  // Row 0: Weight bypass toggle (wizardSelection == 0)
+  bool isBypassSel = (wizardSelection == 0);
   uint16_t bypassBg = isBypassSel ? 0x3566 : (bypassWeightCheck ? 0x03E0 : 0xD6BA);
   uint16_t bypassFg = (isBypassSel || bypassWeightCheck) ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(10, 206, 300, 50, bypassBg);
+  tft.fillRect(10, 124, 300, 60, bypassBg);
   tft.setTextColor(bypassFg, bypassBg);
-  tft.drawString("WEIGHT BYPASS", 18, 211, 2);
-  tft.setTextPadding(130);
-  tft.drawRightString(bypassWeightCheck ? "ON" : "OFF", 302, 218, 4);
+  tft.drawString("WEIGHT BYPASS", 18, 133, 2);
+  tft.setTextPadding(90);
+  tft.drawRightString(bypassWeightCheck ? "ON" : "OFF", 302, 136, 4);
   tft.setTextPadding(0);
-  if (isBypassSel) { tft.drawRect(10, 206, 300, 50, TFT_WHITE); tft.drawRect(11, 207, 298, 48, TFT_WHITE); }
-  else tft.drawRect(10, 206, 300, 50, TFT_DARKGREY);
+  if (isBypassSel) { tft.drawRect(10, 124, 300, 60, TFT_WHITE); tft.drawRect(11, 125, 298, 58, TFT_WHITE); }
+  else tft.drawRect(10, 124, 300, 60, TFT_DARKGREY);
 
-  // Row 3: PROCEED button
-  bool isProceedSel = (wizardSelection == 3);
-  bool canProceed = bypassWeightCheck || (currentWeight >= minVolumeReq);
-  uint16_t procBg = canProceed ? (isProceedSel ? 0x03E0 : 0x0400) : (isProceedSel ? 0xF800 : 0x4208);
-  tft.fillRect(10, 262, 300, 130, procBg);
-  tft.setTextColor(TFT_WHITE, procBg);
-  tft.drawCentreString(canProceed ? "START BREW" : "LOCKED: MIN VOL NOT MET", CENTER_X, 290, 4);
-  tft.drawCentreString(canProceed ? "(SELECT TO CONFIRM)" : "(ENABLE BYPASS TO CONTINUE)", CENTER_X, 320, 2);
-  if (isProceedSel) { tft.drawRect(10, 262, 300, 130, TFT_WHITE); tft.drawRect(11, 263, 298, 128, TFT_WHITE); }
-  else tft.drawRect(10, 262, 300, 130, TFT_DARKGREY);
-
-  // Footer
-  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("UP/DN: NAV   SELECT: EDIT/TOGGLE/START", CENTER_X, 447, 1);
-  tft.drawCentreString("RETURN: EXIT EDIT / CANCEL", CENTER_X, 462, 1);
+  // Row 1: START BREW button
+  drawStartTile();
 }
 
 static void formatStageTimer(uint32_t ms, char *out) {
@@ -373,79 +367,72 @@ void drawDashboardHeaderInfo() {
 }
 
 void drawDashboardLayout() {
-  if (dashNeedsFullRedraw) {
+  static int prevDashSel = -1;
+  bool doFullRedraw = dashNeedsFullRedraw;
+
+  if (doFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("DASHBOARD", 10, 15, 4);
     tft.setTextPadding(0);
-
     drawDashboardHeaderInfo();
     dashNeedsFullRedraw = false;
   }
 
-  // ---- 1. PHASE SELECTOR HEADER TILE (Y: 90 - 124) ----
+  // ---- 1. PHASE SELECTOR HEADER TILE (Y: 90-124) — always redraw ----
   const char *stageNames[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
   uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-
   uint16_t viewColor = stageColors[dashSelection];
   tft.fillRect(5, 90, 310, 34, viewColor);
   tft.drawRect(5, 90, 310, 34, TFT_DARKGREY);
-
-  // Left circle indicator
   if (dashSelection == activeBrewStage) {
     tft.fillCircle(20, 107, 5, TFT_WHITE);
   } else {
     tft.drawCircle(20, 107, 5, TFT_WHITE);
   }
-
-  // Center Phase Title
   tft.setTextColor(TFT_WHITE, viewColor);
   tft.drawCentreString(stageNames[dashSelection], CENTER_X, 98, 4);
 
-  // ---- 2. PARAMETER TILES ----
-  // Clear dashboard body area (Y=126 to 443)
-  tft.fillRect(0, 126, 320, 317, TFT_WHITE);
+  // barY drives both parameter tile layout and graph bar position
+  int barY = (dashSelection == 1) ? 259 : 225;
 
-  auto drawUnifiedTile = [](int x, int y, int w, int h, const char *title, bool alignLeft = false) {
-    tft.fillRect(x, y, w, h, 0xD6BA); // Light Gray fill
-    tft.drawRect(x, y, w, h, TFT_DARKGREY); // Dark Grey border
-    tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.drawCentreString(title, x + (w / 2), y + 3, 1);
-  };
-
-  int barY = 225;
-  if (dashSelection == 0) { // PRE-HEATING VIEW
-    drawUnifiedTile(5, 127, 152, 45, "AMBIENT TEMP");
-    drawUnifiedTile(163, 127, 152, 45, "LIQUID TEMP");
-    drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
-    drawUnifiedTile(163, 176, 152, 45, "STATUS", true);
-    barY = 225;
-  } else if (dashSelection == 1) { // FERMENTATION VIEW
-    drawUnifiedTile(5, 127, 152, 40, "AMBIENT TEMP");
-    drawUnifiedTile(163, 127, 152, 40, "LIQUID TEMP");
-    drawUnifiedTile(5, 171, 152, 40, "EST. VOL.");
-    drawUnifiedTile(163, 171, 152, 40, "pH LEVEL");
-    drawUnifiedTile(5, 215, 152, 40, "S. GRAVITY", true);
-    drawUnifiedTile(163, 215, 152, 40, "STATUS", true);
-    barY = 259;
-  } else if (dashSelection == 2) { // PASTEURIZATION VIEW
-    drawUnifiedTile(5, 127, 152, 45, "AMBIENT TEMP");
-    drawUnifiedTile(163, 127, 152, 45, "LIQUID TEMP");
-    drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
-    drawUnifiedTile(163, 176, 152, 45, "STATUS", true);
-    barY = 225;
+  // ---- 2. PARAMETER TILES — only on full redraw or phase change ----
+  if (doFullRedraw || prevDashSel != dashSelection) {
+    tft.fillRect(0, 126, 320, 317, TFT_WHITE);
+    auto drawUnifiedTile = [](int x, int y, int w, int h, const char *title, bool alignLeft = false) {
+      tft.fillRect(x, y, w, h, 0xD6BA);
+      tft.drawRect(x, y, w, h, TFT_DARKGREY);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
+      tft.drawCentreString(title, x + (w / 2), y + 3, 1);
+    };
+    if (dashSelection == 0) {
+      drawUnifiedTile(5, 127, 152, 45, "AMBIENT TEMP");
+      drawUnifiedTile(163, 127, 152, 45, "LIQUID TEMP");
+      drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
+      drawUnifiedTile(163, 176, 152, 45, "STATUS", true);
+    } else if (dashSelection == 1) {
+      drawUnifiedTile(5, 127, 152, 40, "AMBIENT TEMP");
+      drawUnifiedTile(163, 127, 152, 40, "LIQUID TEMP");
+      drawUnifiedTile(5, 171, 152, 40, "EST. VOL.");
+      drawUnifiedTile(163, 171, 152, 40, "pH LEVEL");
+      drawUnifiedTile(5, 215, 152, 40, "S. GRAVITY", true);
+      drawUnifiedTile(163, 215, 152, 40, "STATUS", true);
+    } else if (dashSelection == 2) {
+      drawUnifiedTile(5, 127, 152, 45, "AMBIENT TEMP");
+      drawUnifiedTile(163, 127, 152, 45, "LIQUID TEMP");
+      drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
+      drawUnifiedTile(163, 176, 152, 45, "STATUS", true);
+    }
+    prevDashSel = dashSelection;
   }
 
-  // ---- 3. GRAPH DISPLAY SELECTOR BAR ----
-  // Turns GREEN (0x03E0) when DOWN button highlights it!
+  // ---- 3. GRAPH BAR — always redraw (small, no flash) ----
   uint16_t graphBarBg = dashGraphSelected ? 0x03E0 : 0xD6BA;
   uint16_t graphBarFg = dashGraphSelected ? TFT_WHITE : TFT_BLACK;
-
   tft.fillRect(5, barY, 310, 25, graphBarBg);
   tft.drawRect(5, barY, 310, 25, TFT_DARKGREY);
   tft.setTextColor(graphBarFg, graphBarBg);
-
   const char *plotNames[] = {"TEMPERATURE", "pH LEVEL", "SPECIFIC GRAVITY"};
   char barBuf[48];
   sprintf(barBuf, "GRAPH: [ %s ]", plotNames[dashGraphPlotType]);
@@ -453,11 +440,13 @@ void drawDashboardLayout() {
 
   updateDashboardValues();
 
-  // ---- 4. FOOTER HINTS (Y: 444 - 480) ----
-  tft.fillRect(0, 444, 320, 36, TFT_WHITE);
-  tft.drawFastHLine(0, 444, 320, TFT_DARKGREY);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("RIGHT: NEXT PHASE   DOWN: SELECT GRAPH   ENTER: MENU", CENTER_X, 458, 1);
+  // ---- 4. FOOTER — only on full redraw ----
+  if (doFullRedraw) {
+    tft.fillRect(0, 444, 320, 36, TFT_WHITE);
+    tft.drawFastHLine(0, 444, 320, TFT_DARKGREY);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("RIGHT: NEXT PHASE   DOWN: SELECT GRAPH   ENTER: MENU", CENTER_X, 458, 1);
+  }
 }
 
 
@@ -878,11 +867,19 @@ void drawDispenserTestMenu() {
 
     char valBuf[32];
     if (row == 0) {
-      tft.drawCentreString("DISPENSER POWER", CENTER_X, y + 25, 2);
-      tft.drawCentreString(dispenserTestOn ? "ON" : "OFF", CENTER_X, y + 65, 4);
+      tft.drawCentreString("DISPENSER", CENTER_X, y + 25, 2);
+      if (dispenserTestOn) {
+        uint32_t elapsed = millis() - dispenserTestStartMs;
+        uint32_t totalMs = (uint32_t)dispenserTestDurationSec * 1000;
+        int remSec = (int)((totalMs > elapsed ? totalMs - elapsed : 0) / 1000) + 1;
+        sprintf(valBuf, "%ds", remSec);
+        tft.drawCentreString(valBuf, CENTER_X, y + 65, 4);
+      } else {
+        tft.drawCentreString("STOPPED", CENTER_X, y + 65, 4);
+      }
     } else if (row == 1) {
-      tft.drawCentreString("DISPENSER SPEED", CENTER_X, y + 25, 2);
-      sprintf(valBuf, "%d%%", dispenserTestSpeed);
+      tft.drawCentreString("DURATION", CENTER_X, y + 25, 2);
+      sprintf(valBuf, "%ds", dispenserTestDurationSec);
       tft.drawCentreString(valBuf, CENTER_X, y + 65, 4);
     }
   };
@@ -899,7 +896,7 @@ void drawDispenserTestMenu() {
 
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: NAV/ADJUST   SELECT: TOGGLE/EDIT", CENTER_X, 447, 1);
+    tft.drawCentreString("UP/DOWN: NAV/ADJUST   SELECT: START/STOP/EDIT", CENTER_X, 447, 1);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
 
     dispenserTestNeedsFullRedraw = false;
