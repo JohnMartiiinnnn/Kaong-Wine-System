@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <Wire.h>
 #include "YeastDispenser.h"
+#include "dashboard_server.h"
 
 /*
  * WIRING FOR SECONDARY ESP32:
@@ -38,30 +39,11 @@ typedef struct __attribute__((packed)) {
   uint8_t checksum;
 } motor_cmd_t;
 
-
-// Structure to send data (Updated to include framing and checksum)
-typedef struct __attribute__((packed)) {
-  uint32_t signature; // 0xDEADBEEF for synchronization
-  float pillTemp;
-  float pillGravity;
-  float room2Temp;
-  float room2Pres;
-  float phValue;
-  float room2LiquidTemp;
-  float motorSenseVolts; // Volts on BTS7960 current sense
-  uint8_t sensor2Status; // 0: Not Found, 1: BME280, 2: BMP280
-  uint8_t adsStatus;     // 0: Not Found, 1: Connected
-  uint8_t ds18Status;    // 0: Not Found, 1: Connected
-  uint8_t bleStatus;     // 0: Failed, 1: Initialized
-  uint8_t pillBattery;   // 0-100%
-  int16_t pillRSSI;      // Signal Strength
-  uint8_t checksum;      // For data integrity
-} struct_message;
-static_assert(sizeof(struct_message) == 40,
-              "struct_message size must be 40 bytes");
-
 struct_message txData;
-static portMUX_TYPE txDataMux = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE txDataMux = portMUX_INITIALIZER_UNLOCKED;
+
+bool isUartConnected = false;
+uint32_t lastUartRxMs = 0;
 
 // Simple XOR checksum calculation
 uint8_t calculateChecksum(const struct_message &msg) {
@@ -233,8 +215,10 @@ void setup() {
   // 7. Yeast Dispenser Setup (DRV8871 H-Bridge)
   initYeastDispenser();
 
-  // Send initial status immediately
+  // 8. Initialize Dashboard Server & Routes
+  initDashboardServer();
 
+  // Send initial status immediately
   txData.signature = 0xDEADBEEF;
   txData.checksum = calculateChecksum(txData);
   Serial2.write((uint8_t *)&txData, sizeof(txData));
@@ -362,6 +346,8 @@ void loop() {
                   cmd.motorSpeed, cmd.motorCW, cmd.checksum, cs);
 
     if (cmd.signature == 0xC0DEBABE && cs == cmd.checksum) {
+      lastUartRxMs = millis();
+      isUartConnected = true;
       int pwmSpeed = map(cmd.motorSpeed, 0, 100, 0, 255);
       Serial.printf("  Setting PWM: LPWM=%s, RPWM=%s, val=%d\n",
                     cmd.motorCW ? "ON" : "OFF", cmd.motorCW ? "OFF" : "ON",
@@ -406,6 +392,18 @@ void loop() {
     }
 
   }
+
+  // 8. Standalone AP & Captive Portal Management
+  // If no UART packet received for > 5000ms, start AP mode
+  if (millis() - lastUartRxMs > 5000) {
+    isUartConnected = false;
+    if (!isSecondaryAPRunning()) {
+      startSecondaryAP();
+    }
+  }
+
+  // 9. Process Web Server & DNS Captive Portal requests
+  handleDashboardServer();
 
   delay(10); // Yield to prevent Task Watchdog reset
 }

@@ -2058,6 +2058,9 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
+      // Reply with heartbeat to Secondary ESP32
+      sendMotorCommand(mixerSpeedPercent, true);
+
       // Check for new RAPT Pill telemetry update
       if (incomingData.pillGravity > 0.1f) {
         static float lastPillTemp = -999.0f;
