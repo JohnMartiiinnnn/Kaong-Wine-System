@@ -351,6 +351,7 @@ void drawDashboardHeaderInfo() {
   char startBuf[64];
   sprintf(startBuf, "STARTED: %s", brewStartTime);
   tft.drawString(startBuf, 10, 54, 2);
+  drawWifiBadge(238, 54);
 
   tft.drawString("SD:", 10, 70, 2);
   uint16_t sdBg = sdStatus ? 0x0400 : TFT_RED;
@@ -488,6 +489,16 @@ void updateDashboardTimers() {
   }
 }
 
+void drawWifiBadge(int x, int y) {
+  bool isConnected = (WiFi.status() == WL_CONNECTED);
+  uint16_t bg = isConnected ? 0x0400 : 0x4208;
+  const char *label = isConnected ? "WiFi OK" : "AP ONLY";
+  tft.fillRect(x, y, 74, 20, bg);
+  tft.drawRect(x, y, 74, 20, TFT_WHITE);
+  tft.setTextColor(TFT_WHITE, bg);
+  tft.drawCentreString(label, x + 37, y + 3, 2);
+}
+
 void drawStartMenu() {
   if (menuNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
@@ -496,6 +507,9 @@ void drawStartMenu() {
     tft.drawString("MAIN MENU", 10, 15, 4);
     menuNeedsFullRedraw = false;
   }
+  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+  tft.drawString("SoftAP: WineBrew", 20, 62, 2);
+  drawWifiBadge(225, 58);
   const char *opt0 = (activeBrewStage >= 0) ? "VIEW ACTIVE BREW" : "NEW BREW";
   const char *options[] = {opt0, "SETTINGS", "SYSTEM CHECK", "SENSOR VALUES"};
   for (int i = 0; i < 4; i++) {

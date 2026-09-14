@@ -469,12 +469,7 @@ void setup() {
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
-  WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
-  {
-    uint32_t t = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - t < 8000)
-      delay(100);
-  }
+  WiFi.begin("Living-Room-WiFi", "BulasoFam27&");
 
   if (MDNS.begin("winebrew"))
     MDNS.addService("http", "tcp", 80);
@@ -482,7 +477,7 @@ void setup() {
   server.on("/data", HTTP_GET, handleData);
   server.begin();
 
-  delay(2000);
+  delay(600);
   currentAppState = START_MENU;
   drawStartMenu();
 }
@@ -2774,6 +2769,22 @@ void loop() {
       tft.setTextColor(TFT_YELLOW, hdrBg);
       tft.drawRightString(buf, 285, 15, 4);
       tft.drawString(ampm, 290, 24, 1);
+    }
+
+    if (currentAppState == START_MENU) {
+      static wl_status_t lastStartWifiSt = WL_IDLE_STATUS;
+      if (WiFi.status() != lastStartWifiSt) {
+        lastStartWifiSt = WiFi.status();
+        drawWifiBadge(225, 58);
+      }
+    }
+
+    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
+      static wl_status_t lastDashWifiSt = WL_IDLE_STATUS;
+      if (WiFi.status() != lastDashWifiSt) {
+        lastDashWifiSt = WiFi.status();
+        drawWifiBadge(238, 54);
+      }
     }
 
     if (currentAppState == SENSOR_MONITOR)

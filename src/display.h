@@ -13,6 +13,7 @@ void updateDashboardTimers();
 void updateDashboardGraph();
 
 void drawStartMenu();
+void drawWifiBadge(int x, int y);
 void drawLoadCellPage(bool valuesOnly = false);
 void drawSystemCheckMenu();
 void drawFanTestPick();
