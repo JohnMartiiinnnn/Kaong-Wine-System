@@ -175,6 +175,7 @@ char pidLogFileName[32] = "/pid_track.csv";
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
 float stageTargetTemp[3] = {40.0f, 38.0f, 72.0f};
+float preheatCoolTarget = 38.0f;
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
@@ -308,6 +309,24 @@ void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd, uint32_t yeastVal) {
 // ---- Brew State NVS Persistence ----
 Preferences brewPrefs;
 
+void saveSettingsToNVS() {
+  brewPrefs.begin("winebrew", false);
+  brewPrefs.putFloat("minVol", minVolumeReq);
+  brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
+  brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
+  brewPrefs.putInt("fanBase", pidFanPercent);
+  brewPrefs.end();
+}
+
+void loadSettingsFromNVS() {
+  brewPrefs.begin("winebrew", true);
+  minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
+  stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
+  preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
+  pidFanPercent = brewPrefs.getInt("fanBase", 20);
+  brewPrefs.end();
+}
+
 void saveBrewStateToNVS() {
   brewPrefs.begin("winebrew", false);
   brewPrefs.putInt("stage", activeBrewStage);
@@ -316,6 +335,8 @@ void saveBrewStateToNVS() {
   brewPrefs.putFloat("startWt", transferStartWeight);
   brewPrefs.putFloat("targetVol", transferTargetVolume);
   brewPrefs.putFloat("minVol", minVolumeReq);
+  brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
+  brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
   brewPrefs.putFloat("yeastG", yeastPitchGrams);
   brewPrefs.putUInt("fermDur", fermDurationMs);
   brewPrefs.putFloat("og", originalGravity);
@@ -335,6 +356,8 @@ void loadBrewStateFromNVS() {
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
     minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
+    stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
+    preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     fermDurationMs = brewPrefs.getUInt("fermDur", 48UL * 3600 * 1000);
     originalGravity = brewPrefs.getFloat("og", 0.0f);
@@ -559,6 +582,7 @@ void setup() {
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
 
+  loadSettingsFromNVS();
   loadBrewStateFromNVS();
   if (activeBrewStage == 0) {
     mcp.digitalWrite(LIGHT_R, RELAY_ON);
@@ -773,10 +797,14 @@ void loop() {
           if (settingsSelection == 0) {
             minVolumeReq = max(1.0f, minVolumeReq - 0.5f);
           } else if (settingsSelection == 1) {
+            stageTargetTemp[0] = max(30.0f, stageTargetTemp[0] - 0.5f);
+          } else if (settingsSelection == 2) {
+            preheatCoolTarget = max(25.0f, preheatCoolTarget - 0.5f);
+          } else if (settingsSelection == 3) {
             pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
           }
         } else {
-          settingsSelection = (settingsSelection + 1) % 4;
+          settingsSelection = (settingsSelection + 1) % 6;
         }
         drawSettingsMenu();
       }
@@ -927,10 +955,14 @@ void loop() {
         if (settingsSelection == 0) {
           minVolumeReq = min(50.0f, minVolumeReq + 0.5f);
         } else if (settingsSelection == 1) {
+          stageTargetTemp[0] = min(70.0f, stageTargetTemp[0] + 0.5f);
+        } else if (settingsSelection == 2) {
+          preheatCoolTarget = min(45.0f, preheatCoolTarget + 0.5f);
+        } else if (settingsSelection == 3) {
           pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
         }
       } else {
-        settingsSelection = (settingsSelection + 3) % 4;
+        settingsSelection = (settingsSelection + 5) % 6;
       }
       drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
@@ -1475,13 +1507,13 @@ void loop() {
         drawSettingsMenu();
       }
     } else if (currentAppState == SETTINGS_MENU) {
-      if (settingsSelection == 0) {
+      if (settingsSelection <= 3) {
         settingsEditing = !settingsEditing;
+        if (!settingsEditing) {
+          saveSettingsToNVS();
+        }
         drawSettingsMenu();
-      } else if (settingsSelection == 1) {
-        settingsEditing = !settingsEditing;
-        drawSettingsMenu();
-      } else if (settingsSelection == 2) {
+      } else if (settingsSelection == 4) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetYear = now.year();
@@ -1495,7 +1527,7 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         rtcSetField = 0;
         drawRtcSetMenu();
-      } else if (settingsSelection == 3) {
+      } else if (settingsSelection == 5) {
         prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
@@ -1764,14 +1796,18 @@ void loop() {
       if (settingsSelection == 0) {
         minVolumeReq = min(50.0f, minVolumeReq + 0.5f);
       } else if (settingsSelection == 1) {
+        stageTargetTemp[0] = min(70.0f, stageTargetTemp[0] + 0.5f);
+      } else if (settingsSelection == 2) {
+        preheatCoolTarget = min(45.0f, preheatCoolTarget + 0.5f);
+      } else if (settingsSelection == 3) {
         pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
       }
       drawSettingsMenu();
     } else {
-      if (settingsSelection == 0 || settingsSelection == 1) {
+      if (settingsSelection <= 3) {
         settingsEditing = true;
         drawSettingsMenu();
-      } else if (settingsSelection == 2) {
+      } else if (settingsSelection == 4) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetYear = max((uint16_t)2026, now.year());
@@ -1784,7 +1820,7 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         rtcSetField = 0;
         drawRtcSetMenu();
-      } else if (settingsSelection == 3) {
+      } else if (settingsSelection == 5) {
         prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
@@ -2036,10 +2072,15 @@ void loop() {
         if (settingsSelection == 0) {
           minVolumeReq = max(1.0f, minVolumeReq - 0.5f);
         } else if (settingsSelection == 1) {
+          stageTargetTemp[0] = max(30.0f, stageTargetTemp[0] - 0.5f);
+        } else if (settingsSelection == 2) {
+          preheatCoolTarget = max(25.0f, preheatCoolTarget - 0.5f);
+        } else if (settingsSelection == 3) {
           pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
         }
         drawSettingsMenu();
       } else {
+        saveSettingsToNVS();
         currentAppState = START_MENU;
         menuNeedsFullRedraw = true;
         drawStartMenu();
@@ -2546,13 +2587,13 @@ void loop() {
         } else {
           currentHeatingPercent = 0;
           if (liquidTemp > -100.0f && !preHeatCooled) {
-            if (liquidTemp > 38.0f && !skipPreheatHeater) {
-              // Active fan cooling while waiting for water to reach 38°C
+            if (liquidTemp > preheatCoolTarget && !skipPreheatHeater) {
+              // Active fan cooling while waiting for water to reach preheatCoolTarget
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
               setFanSpeed(100);
             } else {
-              // Reached 38°C: stop fan and trigger liquid transfer to fermentation!
+              // Reached preheatCoolTarget: stop fan and trigger liquid transfer to fermentation!
               preHeatCooled = true;
               isFanOn = false;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);

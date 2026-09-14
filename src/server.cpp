@@ -76,7 +76,14 @@ void handleData() {
   json += "\"mto\":" + String(motorTestOn ? 1 : 0) + ",";
   json += "\"mts\":" + String(motorTestSpeed) + ",";
   json += "\"mm\":" + String((int)currentMixerMode) + ",";
-  json += "\"app\":" + String((int)currentAppState);
+  json += "\"app\":" + String((int)currentAppState) + ",";
+  json += "\"stage\":" + String(activeBrewStage) + ",";
+  float curTgt = (activeBrewStage >= 0 && activeBrewStage < 3) ? stageTargetTemp[activeBrewStage] : stageTargetTemp[0];
+  json += "\"targetT\":" + String(curTgt, 1) + ",";
+  json += "\"coolT\":" + String(preheatCoolTarget, 1) + ",";
+  json += "\"hp\":" + String(currentHeatingPercent) + ",";
+  json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
+  json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1);
   json += "}";
   server.send(200, "application/json", json);
 }

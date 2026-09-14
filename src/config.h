@@ -340,6 +340,7 @@ extern bool lastLjRight, lastLjLeft, lastLjUp, lastLjDown, lastLjSelect;
 extern int activeBrewStage;
 extern uint32_t stageStartMillis;
 extern float stageTargetTemp[3];
+extern float preheatCoolTarget;
 extern float fermTargetPH;
 extern float fermTargetGravity;
 extern int stageParamSelection;
