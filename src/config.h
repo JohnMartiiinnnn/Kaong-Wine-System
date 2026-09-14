@@ -17,6 +17,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <Preferences.h>
 
 // ---- Pin Constants ----
 const int SSR_PREHEAT = 13;   // Pre-heat tank heater SSR (was DIM2_SHARED)
@@ -403,6 +404,12 @@ extern bool     stageTransferring;
 extern int      stageTransferTarget;
 extern uint32_t transferStartMs;
 extern float    transferStartWeight;
+extern float    transferTargetVolume;
+extern float    transferVolumeTransferred;
+extern bool     transferDryRunAlarm;
+extern uint32_t transferLastPulseMs;
+const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 5000;   // 5s of zero flow pulses while pump running triggers cutoff
+const uint32_t  TRANSFER_MAX_SAFETY_MS     = 180000; // 3 minutes absolute maximum pump runtime
 
 
 // ---- Physical Test Run Settings ----
@@ -428,5 +435,14 @@ float getFermTemp();
 
 // ---- Motor & Yeast Dispenser Command Sender ----
 void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd = 0, uint32_t yeastVal = 0);
+
+// ---- Liquid Transfer Helper ----
+void startLiquidTransfer(int targetStage);
+
+// ---- Brew State NVS Persistence ----
+void saveBrewStateToNVS();
+void loadBrewStateFromNVS();
+void clearBrewStateInNVS();
+
 
 

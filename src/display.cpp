@@ -191,14 +191,8 @@ void updateDashboardValues() {
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 0) {
-      float totalVol = (transferStartWeight > 0.0f) ? transferStartWeight : 10.0f;
-      float xferVol = 0.0f;
-      if (currentWeight < totalVol) xferVol = totalVol - currentWeight;
-      else xferVol = (float)((millis() - transferStartMs) / 1000) * (totalVol / 10.0f);
-      if (xferVol > totalVol) xferVol = totalVol;
-
-      tft.drawCentreString("TRANSFERRING", 239, 190, 2);
-      sprintf(subBuf, "%.1fL / %.1fL", xferVol, totalVol);
+      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 190, 2);
+      sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else if (preHeatSterilized && isFanOn) {
@@ -263,14 +257,8 @@ void updateDashboardValues() {
     float fermT = (incomingData.ds18Status == 1) ? getFermTemp() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 1) {
-      float totalVol = (transferStartWeight > 0.0f) ? transferStartWeight : 10.0f;
-      float xferVol = 0.0f;
-      if (currentWeight < totalVol) xferVol = totalVol - currentWeight;
-      else xferVol = (float)((millis() - transferStartMs) / 1000) * (totalVol / 10.0f);
-      if (xferVol > totalVol) xferVol = totalVol;
-
-      tft.drawCentreString("TRANSFERRING", 239, 228, 2);
-      sprintf(subBuf, "%.1fL / %.1fL", xferVol, totalVol);
+      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 228, 2);
+      sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 243, 1);
 
     } else {
@@ -303,14 +291,8 @@ void updateDashboardValues() {
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 2) {
-      float totalVol = (transferStartWeight > 0.0f) ? transferStartWeight : 10.0f;
-      float xferVol = 0.0f;
-      if (currentWeight < totalVol) xferVol = totalVol - currentWeight;
-      else xferVol = (float)((millis() - transferStartMs) / 1000) * (totalVol / 10.0f);
-      if (xferVol > totalVol) xferVol = totalVol;
-
-      tft.drawCentreString("TRANSFERRING", 239, 190, 2);
-      sprintf(subBuf, "%.1fL / %.1fL", xferVol, totalVol);
+      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 190, 2);
+      sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else if (pastSterilized && isFanOn) {
@@ -477,14 +459,16 @@ void updateDashboardTimers() {
   }
   tft.setTextPadding(0);
   if (stageTransferring) {
-    int rem = 10 - (int)((millis() - transferStartMs) / 1000);
-    if (rem < 0)
-      rem = 0;
-    char cbuf[8];
-    sprintf(cbuf, "%d", rem);
-    tft.setTextColor(TFT_NAVY, TFT_WHITE);
-    tft.setTextPadding(160);
-    tft.drawCentreString(cbuf, CENTER_X, 368, 6);
+    char cbuf[16];
+    sprintf(cbuf, "%.1f L", transferVolumeTransferred);
+    tft.setTextColor(transferDryRunAlarm ? TFT_RED : TFT_NAVY, TFT_WHITE);
+    tft.setTextPadding(180);
+    tft.drawCentreString(cbuf, CENTER_X, 360, 6);
+    char pctBuf[32];
+    int pct = (transferTargetVolume > 0.0f) ? (int)((transferVolumeTransferred / transferTargetVolume) * 100.0f) : 0;
+    if (pct > 100) pct = 100;
+    sprintf(pctBuf, "%s%d%% (TGT %.1fL)", transferDryRunAlarm ? "DRY! " : "", pct, transferTargetVolume);
+    tft.drawCentreString(pctBuf, CENTER_X, 415, 2);
     tft.setTextPadding(0);
   }
 }

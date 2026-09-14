@@ -240,6 +240,10 @@ bool stageTransferring = false;
 int stageTransferTarget = -1;
 uint32_t transferStartMs = 0;
 float transferStartWeight = 10.0f;
+float transferTargetVolume = 10.0f;
+float transferVolumeTransferred = 0.0f;
+bool transferDryRunAlarm = false;
+uint32_t transferLastPulseMs = 0;
 
 bool skipPreheatHeater = false;
 float minVolumeReq = 10.0f;
@@ -299,6 +303,82 @@ void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd, uint32_t yeastVal) {
   for (size_t i = 0; i < sizeof(motor_cmd_t) - 1; i++)
     cmd.checksum ^= p[i];
   Serial2.write((uint8_t *)&cmd, sizeof(cmd));
+}
+
+// ---- Brew State NVS Persistence ----
+Preferences brewPrefs;
+
+void saveBrewStateToNVS() {
+  brewPrefs.begin("winebrew", false);
+  brewPrefs.putInt("stage", activeBrewStage);
+  brewPrefs.putBool("xfer", stageTransferring);
+  brewPrefs.putInt("xferTgt", stageTransferTarget);
+  brewPrefs.putFloat("startWt", transferStartWeight);
+  brewPrefs.putFloat("targetVol", transferTargetVolume);
+  brewPrefs.putFloat("minVol", minVolumeReq);
+  brewPrefs.putFloat("yeastG", yeastPitchGrams);
+  brewPrefs.putUInt("fermDur", fermDurationMs);
+  brewPrefs.putFloat("og", originalGravity);
+  brewPrefs.putString("startTm", brewStartTime);
+  brewPrefs.putBool("phSter", preHeatSterilized);
+  brewPrefs.putBool("phCool", preHeatCooled);
+  brewPrefs.putBool("pastSter", pastSterilized);
+  brewPrefs.end();
+}
+
+void loadBrewStateFromNVS() {
+  brewPrefs.begin("winebrew", true);
+  activeBrewStage = brewPrefs.getInt("stage", -1);
+  if (activeBrewStage >= 0) {
+    stageTransferring = brewPrefs.getBool("xfer", false);
+    stageTransferTarget = brewPrefs.getInt("xferTgt", -1);
+    transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
+    transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
+    minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
+    yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
+    fermDurationMs = brewPrefs.getUInt("fermDur", 48UL * 3600 * 1000);
+    originalGravity = brewPrefs.getFloat("og", 0.0f);
+    String st = brewPrefs.getString("startTm", "");
+    if (st.length() > 0) {
+      strncpy(brewStartTime, st.c_str(), sizeof(brewStartTime) - 1);
+    }
+    preHeatSterilized = brewPrefs.getBool("phSter", false);
+    preHeatCooled = brewPrefs.getBool("phCool", false);
+    pastSterilized = brewPrefs.getBool("pastSter", false);
+    stageStartMillis = millis();
+  }
+  brewPrefs.end();
+}
+
+void clearBrewStateInNVS() {
+  brewPrefs.begin("winebrew", false);
+  brewPrefs.clear();
+  brewPrefs.end();
+}
+
+// ---- Liquid Transfer Helper ----
+void startLiquidTransfer(int targetStage) {
+  stageTransferring = true;
+  stageTransferTarget = targetStage;
+  transferStartMs = millis();
+  transferLastPulseMs = millis();
+  transferDryRunAlarm = false;
+  transferVolumeTransferred = 0.0f;
+
+  if (targetStage == 1) {
+    flowPulse1 = 0;
+    transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
+    transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
+  } else if (targetStage == 2) {
+    flowPulse2 = 0;
+    transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
+  }
+
+  mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+  dashNeedsFullRedraw = true;
+  saveBrewStateToNVS();
 }
 
 
@@ -479,6 +559,15 @@ void setup() {
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
 
+  loadBrewStateFromNVS();
+  if (activeBrewStage == 0) {
+    mcp.digitalWrite(LIGHT_R, RELAY_ON);
+  } else if (activeBrewStage == 1) {
+    mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+  } else if (activeBrewStage == 2) {
+    mcp.digitalWrite(LIGHT_G, RELAY_ON);
+  }
+
   delay(600);
   currentAppState = START_MENU;
   drawStartMenu();
@@ -634,6 +723,7 @@ void loop() {
       simRunActive = false;
       stageTransferring = false;
       activeBrewStage = -1;
+      clearBrewStateInNVS();
       currentHeatingPercent = 0;
       isFanOn = false;
       mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
@@ -1013,8 +1103,13 @@ void loop() {
           ogSampleCount = 0;
           ogCapturing = true;
           activeBrewStage = 0;
+          simRunActive = false;
           stageStartMillis = millis();
           tempHistoryCount = 0;
+          transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
+          transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
+          transferVolumeTransferred = 0.0f;
+          transferDryRunAlarm = false;
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -1031,6 +1126,7 @@ void loop() {
           simManual[0] = simManual[1] = simManual[2] = false;
           stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
           stageParamEditing = false;
+          saveBrewStateToNVS();
           currentAppState = DASHBOARD_ACTIVE;
           dashNeedsFullRedraw = true;
           moduleViewActive = false;
@@ -1572,16 +1668,10 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
           stageElapsedMs[activeBrewStage] = millis() - stageStartMillis;
           if (activeBrewStage < 2) {
-            stageTransferring = true;
-            stageTransferTarget = activeBrewStage + 1;
-            transferStartMs = millis();
-            transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
-
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+            startLiquidTransfer(activeBrewStage + 1);
           } else {
             activeBrewStage = -1;
+            clearBrewStateInNVS();
             mcp.digitalWrite(LIGHT_R, RELAY_ON);
             mcp.digitalWrite(LIGHT_Y, RELAY_ON);
             mcp.digitalWrite(LIGHT_G, RELAY_ON);
@@ -2331,38 +2421,79 @@ void loop() {
       drawPidTrackingMenu(true);
     }
 
-    // ---- Transfer Completion ----
-    if (stageTransferring && millis() - transferStartMs >= 10000UL) {
-      stageTransferring = false;
-      activeBrewStage = stageTransferTarget;
-      stageStartMillis = millis();
-      tempHistoryCount = 0;
-      if (activeBrewStage == 1) {
-        mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-        mcp.digitalWrite(LIGHT_Y, RELAY_ON);
-        mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-        // Auto-dispatch yeast at configured pitch rate
-        if (yeastPitchGrams > 0.0f)
-          sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
-        // Auto-start mixer in AUTO mode (5 min ON / 355 min OFF)
-        currentMixerMode = MIXER_AUTO;
-        mixerRunning = true;
-        mixerOnTimer = millis();
-        mixerCycleTimer = 0;
-        mixerSpeedPercent = 100;
-        setMixerSpeed(100);
-      } else if (activeBrewStage == 2) {
-        mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-        mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-        mcp.digitalWrite(LIGHT_G, RELAY_ON);
+    // ---- Transfer Execution & Completion ----
+    if (stageTransferring) {
+      uint32_t pulses = (stageTransferTarget == 1) ? flowPulse1 : flowPulse2;
+      float kFact = (stageTransferTarget == 1) ? flowKFactor[0] : flowKFactor[1];
+      if (kFact <= 0.0f) kFact = 450.0f;
+      transferVolumeTransferred = (float)pulses / kFact;
+
+      static uint32_t lastKnownPulses = 0;
+      if (pulses != lastKnownPulses) {
+        transferLastPulseMs = millis();
+        lastKnownPulses = pulses;
       }
-      setPump1(false);
-      setPump2(false);
-      pumpPreHeatFermOn = false;
-      pumpFermPastOn = false;
-      dashNeedsFullRedraw = true;
-      if (currentAppState == DASHBOARD_ACTIVE)
-        drawDashboardLayout();
+
+      bool transferDone = false;
+      // 1. Target volume transferred
+      if (transferVolumeTransferred >= transferTargetVolume) {
+        transferDone = true;
+      }
+      // 2. Pre-heat scale empty (for Transfer 1)
+      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.3f && transferVolumeTransferred >= 0.5f) {
+        transferDone = true;
+      }
+      // 3. Dry-run / Empty tank timeout: Pump ran > 3s and no pulses for 5s
+      if (millis() - transferStartMs >= 3000UL && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
+        if (transferVolumeTransferred >= 0.5f) {
+          transferDone = true;
+        } else {
+          transferDryRunAlarm = true;
+          transferDone = true;
+        }
+      }
+      // 4. Maximum pump safety cutoff (3 minutes)
+      if (millis() - transferStartMs >= TRANSFER_MAX_SAFETY_MS) {
+        transferDone = true;
+      }
+
+      if (transferDone) {
+        stageTransferring = false;
+        setPump1(false);
+        setPump2(false);
+        pumpPreHeatFermOn = false;
+        pumpFermPastOn = false;
+
+        activeBrewStage = stageTransferTarget;
+        stageStartMillis = millis();
+        tempHistoryCount = 0;
+
+        if (activeBrewStage == 1) {
+          mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+          mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          // Auto-dispatch yeast at configured pitch rate
+          if (yeastPitchGrams > 0.0f)
+            sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
+          // Auto-start mixer in AUTO mode (5 min ON / 355 min OFF)
+          currentMixerMode = MIXER_AUTO;
+          mixerRunning = true;
+          mixerOnTimer = millis();
+          mixerCycleTimer = 0;
+          mixerSpeedPercent = 100;
+          setMixerSpeed(100);
+        } else if (activeBrewStage == 2) {
+          mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_G, RELAY_ON);
+          pastPid.reset();
+        }
+
+        saveBrewStateToNVS();
+        dashNeedsFullRedraw = true;
+        if (currentAppState == DASHBOARD_ACTIVE)
+          drawDashboardLayout();
+      }
     }
 
     // ---- Closed-Loop Brew Stage Control ----
@@ -2440,13 +2571,7 @@ void loop() {
               // Auto-advance: pre-heat sterilized and cooled → transfer to fermentation
               if (!stageTransferring) {
                 stageElapsedMs[0] = millis() - stageStartMillis;
-                stageTransferring = true;
-                stageTransferTarget = 1;
-                transferStartMs = millis();
-                transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
-                mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-                mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-                mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+                startLiquidTransfer(1);
               }
             }
           }
@@ -2504,13 +2629,7 @@ void loop() {
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
             mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
             setFanSpeed(0);
-            stageTransferring = true;
-            stageTransferTarget = 2;
-            transferStartMs = millis();
-            transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : 10.0f;
-            mcp.digitalWrite(LIGHT_R, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
-            mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+            startLiquidTransfer(2);
           }
         }
 
@@ -2535,6 +2654,7 @@ void loop() {
                 // Brew complete
                 stageElapsedMs[2] = millis() - stageStartMillis;
                 activeBrewStage = -1;
+                clearBrewStateInNVS();
                 mcp.digitalWrite(LIGHT_R, RELAY_ON);
                 mcp.digitalWrite(LIGHT_Y, RELAY_ON);
                 mcp.digitalWrite(LIGHT_G, RELAY_ON);
