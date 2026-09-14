@@ -146,6 +146,13 @@ PlatformIO CLI commands for building and uploading firmware:
 * **Live Telemetry Inspection (CLI)**:
   `curl -s http://192.168.1.137/data`
 
+* **Beelink 24/7 Wi-Fi Telemetry Logger Service**:
+  * Daemon location: `/home/dave/systems/winebrew-logger/winebrew_logger.py`
+  * Logs storage: `/home/dave/systems/winebrew-logger/logs/winebrew_log_YYYYMMDD.csv`
+  * Systemd service: `winebrew-logger.service` (runs under `systemctl --user`)
+  * Status command: `systemctl --user status winebrew-logger.service`
+  * Live log tail: `journalctl --user -u winebrew-logger.service -f`
+
 ---
 
 ## 6. Sensor Calibration References
