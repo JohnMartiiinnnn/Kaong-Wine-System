@@ -174,7 +174,7 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {50.0f, 28.0f, 72.0f};
+float stageTargetTemp[3] = {40.0f, 38.0f, 72.0f};
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
@@ -2552,13 +2552,13 @@ void loop() {
         } else {
           currentHeatingPercent = 0;
           if (liquidTemp > -100.0f && !preHeatCooled) {
-            if (liquidTemp > 48.0f && !skipPreheatHeater) {
-              // Active fan cooling while waiting for water to reach 48°C
+            if (liquidTemp > 38.0f && !skipPreheatHeater) {
+              // Active fan cooling while waiting for water to reach 38°C
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
               setFanSpeed(100);
             } else {
-              // Reached 48°C: stop fan and trigger liquid transfer to fermentation!
+              // Reached 38°C: stop fan and trigger liquid transfer to fermentation!
               preHeatCooled = true;
               isFanOn = false;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
