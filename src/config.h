@@ -5,6 +5,7 @@
 #include <Adafruit_MCP23X17.h>
 #include <Arduino.h>
 #include <DallasTemperature.h>
+#include <ArduinoOTA.h>
 #include <ESPmDNS.h>
 #include <FS.h>
 #include <HX711.h>

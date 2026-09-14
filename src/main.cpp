@@ -476,6 +476,8 @@ void setup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
   server.begin();
+  ArduinoOTA.setHostname("winebrew-main");
+  ArduinoOTA.begin();
 
   delay(600);
   currentAppState = START_MENU;
@@ -485,6 +487,7 @@ void setup() {
 // ---- Main Loop ----
 void loop() {
   server.handleClient();
+  ArduinoOTA.handle();
 
   // ---- Calibration Wizard LED UI ----
   if (currentAppState == CALIB_WIZARD) {
