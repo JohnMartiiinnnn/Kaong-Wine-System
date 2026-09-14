@@ -4,6 +4,19 @@ This document serves as the single source of truth for the Automated Wine Brewin
 
 ---
 
+## 0. Workspace Skills & Flashing Rules
+
+Whenever an AGY instance is started in this repository:
+* **Upload Policy (STRICT)**: NEVER run an upload command (`pio run -t upload`, OTA, or USB) unless Dave Patrick explicitly commands you to upload in that turn. Code compilation checks (`pio run`) are allowed to verify builds, but firmware flashing is strictly prohibited without explicit user command.
+* **Autonomous Skill Invocations**:
+  * `adhd`: Direct answers, concise bounded steps, no em-dashes, no double-hyphens, no markdown tables.
+  * `system-sync`: Clean git checkpoints upon completing changes.
+  * `security-pen-testing`: Verify UART packet structures, checksums, and HTTP endpoints.
+  * `grill-me`: Stress-test design decisions prior to modifying stage temperatures or PID logic.
+* **Documentation Cadence**: Documentation and git commits occur upon completing milestones or tasks, not as an unprompted background process.
+
+---
+
 ## 1. System Architecture
 
 The system utilizes two **ESP32 DevKits** communicating via **UART (Serial)**.
