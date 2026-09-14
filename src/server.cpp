@@ -81,6 +81,7 @@ void handleData() {
   float curTgt = (activeBrewStage >= 0 && activeBrewStage < 3) ? stageTargetTemp[activeBrewStage] : stageTargetTemp[0];
   json += "\"targetT\":" + String(curTgt, 1) + ",";
   json += "\"coolT\":" + String(preheatCoolTarget, 1) + ",";
+  json += "\"fermTgt\":" + String(stageTargetTemp[1], 1) + ",";
   json += "\"hp\":" + String(currentHeatingPercent) + ",";
   json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
   json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1);

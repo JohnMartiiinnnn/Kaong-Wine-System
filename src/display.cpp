@@ -76,14 +76,14 @@ void drawNewBrewWizard(bool valuesOnly) {
     if (canProceed) {
       tft.drawCentreString("START BREW", CENTER_X, 260, 4);
       tft.drawCentreString("SELECT TO CONFIRM", CENTER_X, 298, 2);
-      sprintf(buf, "PREHEAT: %.1f C  |  COOL: %.1f C", stageTargetTemp[0], preheatCoolTarget);
+      sprintf(buf, "PRE: %.1fC | COOL: %.1fC | FERM: %.1fC", stageTargetTemp[0], preheatCoolTarget, stageTargetTemp[1]);
       tft.drawCentreString(buf, CENTER_X, 340, 2);
       tft.drawCentreString("(ADJUST RECIPE IN SETTINGS)", CENTER_X, 365, 1);
     } else {
       tft.drawCentreString("LOCKED", CENTER_X, 260, 4);
       tft.drawCentreString("MIN VOLUME NOT MET", CENTER_X, 298, 2);
       tft.drawCentreString("ENABLE WEIGHT BYPASS", CENTER_X, 320, 2);
-      sprintf(buf, "PREHEAT: %.1f C  |  COOL: %.1f C", stageTargetTemp[0], preheatCoolTarget);
+      sprintf(buf, "PRE: %.1fC | COOL: %.1fC | FERM: %.1fC", stageTargetTemp[0], preheatCoolTarget, stageTargetTemp[1]);
       tft.drawCentreString(buf, CENTER_X, 355, 2);
     }
     if (isProceedSel) { tft.drawRect(10, 188, 300, 241, TFT_WHITE); tft.drawRect(11, 189, 298, 239, TFT_WHITE); }
@@ -1735,8 +1735,8 @@ void drawSettingsMenu() {
     bool isEditingThis = sel && settingsEditing;
     uint16_t bg = isEditingThis ? 0x03E0 : (sel ? 0x3566 : 0xD6BA);
     uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
-    int tileY = 56 + (i * 62);
-    int tileH = 56;
+    int tileY = 54 + (i * 53);
+    int tileH = 48;
     tft.fillRect(10, tileY, 300, tileH, bg);
 
     if (isEditingThis) {
@@ -1768,34 +1768,39 @@ void drawSettingsMenu() {
         sprintf(buf, "PREHEAT COOL: %.1f C", preheatCoolTarget);
     } else if (i == 3) {
       if (isEditingThis)
+        sprintf(buf, "FERM TARGET: < %.1f C >", stageTargetTemp[1]);
+      else
+        sprintf(buf, "FERM TARGET: %.1f C", stageTargetTemp[1]);
+    } else if (i == 4) {
+      if (isEditingThis)
         sprintf(buf, "FERM FAN BASELINE: < %d%% >", pidFanPercent > 0 ? pidFanPercent : 20);
       else
         sprintf(buf, "FERM FAN BASELINE: %d%%", pidFanPercent > 0 ? pidFanPercent : 20);
-    } else if (i == 4) {
+    } else if (i == 5) {
       strcpy(buf, "SET RTC DATE & TIME");
     } else {
       strcpy(buf, "TARE LOAD CELL");
     }
-    tft.drawCentreString(buf, CENTER_X, tileY + 11, 2);
+    tft.drawCentreString(buf, CENTER_X, tileY + 8, 2);
 
-    if (i <= 3) {
+    if (i <= 4) {
       if (isEditingThis) {
         tft.drawCentreString("[ EDITING - UP/DN/L/R TO ADJUST ]",
-                             CENTER_X, tileY + 34, 1);
+                             CENTER_X, tileY + 28, 1);
       } else if (sel) {
         tft.drawCentreString("[ PRESS SELECT TO EDIT ]",
-                             CENTER_X, tileY + 34, 1);
+                             CENTER_X, tileY + 28, 1);
       } else {
         tft.drawCentreString("[ ADJUSTABLE VALUE ]",
-                             CENTER_X, tileY + 34, 1);
+                             CENTER_X, tileY + 28, 1);
       }
     } else {
       if (sel) {
         tft.drawCentreString("[ PRESS SELECT TO OPEN ]",
-                             CENTER_X, tileY + 34, 1);
+                             CENTER_X, tileY + 28, 1);
       } else {
         tft.drawCentreString("[ MENU ACTION ]",
-                             CENTER_X, tileY + 34, 1);
+                             CENTER_X, tileY + 28, 1);
       }
     }
   };
@@ -1805,7 +1810,7 @@ void drawSettingsMenu() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("SETTINGS", 10, 15, 4);
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
       drawTile(i, settingsSelection == i);
     }
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
@@ -1822,7 +1827,7 @@ void drawSettingsMenu() {
     settingsNeedsFullRedraw = false;
     prevSel = settingsSelection;
   } else {
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
       drawTile(i, settingsSelection == i);
     }
     prevSel = settingsSelection;
