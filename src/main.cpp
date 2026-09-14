@@ -2058,6 +2058,22 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
+      // Motor stall protection: SenseVoltage >= 0.353V (3.0A draw) for >3 consecutive seconds
+      static uint32_t motorStallStartMs = 0;
+      if (mixerSpeedPercent > 0 && incomingData.motorSenseVolts >= 0.353f) {
+        if (motorStallStartMs == 0) {
+          motorStallStartMs = millis();
+        } else if (millis() - motorStallStartMs >= 3000) {
+          mixerSpeedPercent = 0;
+          setMixerSpeed(0);
+          mixerRunning = false;
+          currentMixerMode = MIXER_OFF;
+          sendMotorCommand(0, true);
+        }
+      } else {
+        motorStallStartMs = 0;
+      }
+
       // Reply with heartbeat to Secondary ESP32
       sendMotorCommand(mixerSpeedPercent, true);
 
@@ -2406,6 +2422,10 @@ void loop() {
             } else {
               preHeatHolding = false;
             }
+          } else {
+            // Sensor disconnect safety interlock
+            currentHeatingPercent = 0;
+            preheatPid.reset();
           }
         } else {
           currentHeatingPercent = 0;
@@ -2461,6 +2481,10 @@ void loop() {
             fermStageOvershootStartMs = 0;
             setFanSpeed(20);
           }
+        } else {
+          // Sensor disconnect safety interlock
+          currentHeatingPercent = 0;
+          setFanSpeed(0);
         }
 
         // Fermentation completion: pH at/below target, gravity at/below target, or time elapsed
@@ -2521,6 +2545,10 @@ void loop() {
             } else {
               pastHolding = false;
             }
+          } else {
+            // Sensor disconnect safety interlock
+            currentHeatingPercent = 0;
+            pastPid.reset();
           }
         } else {
           currentHeatingPercent = 0;
