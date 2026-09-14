@@ -197,7 +197,7 @@ void updateDashboardValues() {
 
     } else if (preHeatSterilized && isFanOn) {
       tft.drawCentreString("COOLING", 239, 190, 2);
-      sprintf(subBuf, "%.1fC / %.1fC", curT, ambT);
+      sprintf(subBuf, "%.1fC / 48.0C", curT);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else if (preHeatHolding) {

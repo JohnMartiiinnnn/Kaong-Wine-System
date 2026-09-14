@@ -174,11 +174,11 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {80.0f, 28.0f, 72.0f};
+float stageTargetTemp[3] = {50.0f, 28.0f, 72.0f};
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
-uint32_t fermDurationMs  = 48UL * 3600 * 1000;
+uint32_t fermDurationMs  = 10UL * 60 * 1000;
 int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
 bool stageParamEditing = false;
@@ -2538,18 +2538,11 @@ void loop() {
               if (simManual[0]) currentHeatingPercent = 0;
             }
             if (liquidTemp >= stageTargetTemp[0]) {
-              if (!preHeatHolding) {
-                preHeatHolding = true;
-                preHeatHoldStart = millis();
-              }
-              if (millis() - preHeatHoldStart >= PREHEAT_HOLD_MS) {
-                preHeatSterilized = true;
-                preHeatHolding = false;
-                currentHeatingPercent = 0;
-                preheatPid.reset();
-              }
-            } else {
+              // Reached 50°C target: mark heated and turn off heater immediately
+              preHeatSterilized = true;
               preHeatHolding = false;
+              currentHeatingPercent = 0;
+              preheatPid.reset();
             }
           } else {
             // Sensor disconnect safety interlock
@@ -2559,16 +2552,18 @@ void loop() {
         } else {
           currentHeatingPercent = 0;
           if (liquidTemp > -100.0f && !preHeatCooled) {
-            if (liquidTemp > 30.0f && !skipPreheatHeater) {
+            if (liquidTemp > 48.0f && !skipPreheatHeater) {
+              // Active fan cooling while waiting for water to reach 48°C
               isFanOn = true;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
               setFanSpeed(100);
             } else {
+              // Reached 48°C: stop fan and trigger liquid transfer to fermentation!
               preHeatCooled = true;
               isFanOn = false;
               mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
               setFanSpeed(0);
-              // Auto-advance: pre-heat sterilized and cooled → transfer to fermentation
+              // Auto-advance: transfer to fermentation
               if (!stageTransferring) {
                 stageElapsedMs[0] = millis() - stageStartMillis;
                 startLiquidTransfer(1);
@@ -2583,43 +2578,31 @@ void loop() {
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
-          static uint32_t fermStageOvershootStartMs = 0;
-          float fermLow  = stageTargetTemp[1] - 1.5f;  // heat on below 26.5°C
-          float fermHigh = stageTargetTemp[1];          // cool on at 28°C (PNS max)
+          // PID temperature control using quartzPid
+          if (pidTick) {
+            float pidOut = quartzPid.compute(stageTargetTemp[1], liquidTemp, brewDt);
+            currentHeatingPercent = (int)pidOut;
+            if (simManual[1]) currentHeatingPercent = 0;
+          }
 
-          if (liquidTemp < fermLow) {
-            currentHeatingPercent = 50;
-            fermStageOvershootStartMs = 0;
-            setFanSpeed(20);
-          } else if (liquidTemp > fermHigh) {
-            currentHeatingPercent = 0;
-            if (fermStageOvershootStartMs == 0) fermStageOvershootStartMs = millis();
-            uint32_t overSec = (millis() - fermStageOvershootStartMs) / 1000;
-            float overDeg = liquidTemp - fermHigh;
-            int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
+          // Fan cooling when above target
+          if (liquidTemp > stageTargetTemp[1]) {
+            float overDeg = liquidTemp - stageTargetTemp[1];
+            int fanSpd = 20 + (int)(overDeg * 25.0f);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);
           } else {
-            currentHeatingPercent = 0;
-            fermStageOvershootStartMs = 0;
             setFanSpeed(20);
           }
         } else {
           // Sensor disconnect safety interlock
           currentHeatingPercent = 0;
           setFanSpeed(0);
+          quartzPid.reset();
         }
 
-        // Fermentation completion: pH at/below target, gravity at/below target, or time elapsed
-        bool fermComplete = false;
-        if (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f &&
-            incomingData.phValue <= fermTargetPH)
-          fermComplete = true;
-        if (incomingData.pillGravity > 0.5f && incomingData.pillGravity < 2.0f &&
-            incomingData.pillGravity <= fermTargetGravity)
-          fermComplete = true;
-        if (millis() - stageStartMillis >= fermDurationMs)
-          fermComplete = true;
+        // Fermentation completion: 10 minutes test timer (pH disregarded for water testing)
+        bool fermComplete = (millis() - stageStartMillis >= fermDurationMs);
         if (fermComplete && !phAlertActive) {
           phAlertActive = true;
           if (!stageTransferring) {
