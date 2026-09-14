@@ -31,14 +31,17 @@ The system utilizes two **ESP32 DevKits** communicating via **UART (Serial)**.
 Use the PlatformIO CLI commands for building and uploading the primary firmware:
 
 ```bash
-# Compile code
+# Compile code locally
 ~/.platformio/penv/bin/pio run
 
-# Flash code (auto-detect port)
+# Flash code locally via USB (auto-detect port)
 ~/.platformio/penv/bin/pio run -t upload
 
-# Flash code on a specific port
-~/.platformio/penv/bin/pio run -t upload --upload-port /dev/cu.usbserial-0001
+# Flash code locally over Wi-Fi (OTA)
+~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.1.137
+
+# One-Click Autonomous OTA Flash from Beelink Server (pulls latest git, compiles, flashes)
+flash-winebrew
 ```
 
 *Note: Host macOS clang may show false-positive errors on TFT constants or Arduino header references in your IDE. Ignore them; the ESP32 toolchain via PlatformIO is the absolute source of correctness.*
@@ -90,7 +93,7 @@ src/
 ### Software Logic State Machine
 *   `SYSTEM_INIT` → `START_MENU` (after splash screen).
 *   `NEW_BREW_WIZARD`: Minimum volume safety check (locked if volume requirement is not met) and option to disable preheat immersion heater.
-*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; configure minimum volume, preheat heater toggle, fermentation baseline fan speed, RTC date/time shortcut, and scale tare shortcut.
+*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; 7 configurable items: MIN VOLUME (1.0 to 50.0 L), PREHEAT TARGET (30.0 to 70.0 C), PREHEAT COOL (25.0 to 45.0 C), FERM TARGET (18.0 to 45.0 C), FERM FAN BASELINE (0 to 50%), RTC date/time shortcut, and scale tare shortcut. All persisted in NVS flash ("winebrew" namespace).
 *   `RTC_SET_MENU`: 7-field D-pad navigation (YEAR, MONTH, DAY, HOUR, MIN, SAVE & EXIT, CANCEL); RIGHT increases (+), LEFT decreases (-).
 *   `DASHBOARD_ACTIVE`: Three sub-views — Pre-Heating, Fermentation, Pasteurization.
 *   `COOLING_MENU`: Manual/Auto fan control.

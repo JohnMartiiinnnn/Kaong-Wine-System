@@ -113,33 +113,42 @@ If any of these fail, they are marked as unavailable and the system continues wi
 
 ## 4. Main Menu
 
-Five options, navigated with UP/DOWN and confirmed with SELECT.
+Navigated with UP/DOWN and confirmed with SELECT.
 
-| Option | What it does |
-|--------|-------------|
-| NEW BREW | Starts a new brew cycle with a volume check |
-| CONTINUE BREW | Goes to the dashboard (use if returning after a restart mid-brew — note: brew state is not saved to flash, so stage must be re-set manually) |
-| SYSTEM CHECK | Opens the hardware test menu |
-| SENSOR VALUES | Shows a live read of all sensors |
-| CALIBRATE | Opens the guided Calibration Wizard (for flow sensors and load cell) |
+* **NEW BREW (or VIEW ACTIVE BREW)**: Starts a new batch with weight check and recipe preview, or returns to the active brew dashboard.
+* **SETTINGS**: Configures minimum volume, preheat target temperature, preheat cooling threshold, fermentation target temperature, baseline cooling fan speed, RTC date/time, and load cell tare shortcut. All settings persist in NVS flash memory.
+* **SYSTEM CHECK**: Opens the hardware diagnostic and component test suite.
+* **SENSOR VALUES**: Shows a real-time monitor of all local and remote sensors.
+* **CALIBRATE**: Opens the guided sensor calibration interface.
 
 ---
 
-## 5. Starting a Brew
+## 5. Starting a Brew & Recipe Configuration
 
-### New Brew Wizard
+### New Brew Setup Wizard
 
-After selecting NEW BREW, you are presented with the New Brew Wizard screen which offers several configuration options:
+Selecting NEW BREW opens the setup wizard:
 
-- **MIN VOLUME (Row 0):** Adjust the minimum required volume on the scale to proceed (adjustable from 1.0 L to 50.0 L, defaults to 10.0 L). Use LEFT/RIGHT in Edit Mode to modify.
-- **PREHEAT HEATER (Row 1):** Toggle between **ENABLED** and **DISABLED**. Setting this to "DISABLED" skips turning on the preheating side's immersion heater, which is extremely useful for physical runs/testing using water where heating is not desired.
-- **PROCEED (START BREW) (Row 2):** Highlights and becomes selectable once the weight on the load cell meets or exceeds the set **MIN VOLUME**. Pressing SELECT on this row starts the brew.
-- **BYPASS (TEST RUN) (Row 3):** Allows bypassing the volume check entirely and starting the brew anyway — useful for dry or simulation testing.
+* **WEIGHT & MIN REQ**: Real-time sap weight from the HX711 load cell displayed alongside the minimum required volume.
+* **WEIGHT BYPASS (Row 0)**: Allows starting a test run with water or empty tanks without meeting the minimum volume threshold.
+* **START BREW (Row 1)**: Becomes active once weight requirements are met or bypassed. Displays your active recipe target temperatures:
+  `PRE: 40.0C | COOL: 38.0C | FERM: 30.0C`
+  Pressing SELECT confirms and begins Stage 0 (Pre-heating).
 
-When a brew starts:
-- If **PREHEAT HEATER** was disabled, the sterilization and cooling phases are bypassed (or considered immediately complete), immediately allowing the transfer pump to Fermentation.
-- The first 5 valid specific gravity readings from the Bluetooth hydrometer are averaged and saved as the **Original Gravity** (OG). This is used later to calculate alcohol content.
-- The Stage 0 pre-heating process begins automatically.
+### Settings Menu (Recipe & Hardware Preferences)
+
+From the Main Menu, navigate to **SETTINGS** to configure operational parameters:
+
+* **MIN VOLUME (Item 0)**: Minimum required liquid volume before brewing can start (1.0 L to 50.0 L in 0.5 L steps).
+* **PREHEAT TARGET (Item 1)**: Temperature setpoint for the pre-heating immersion heater (30.0°C to 70.0°C in 0.5°C steps).
+* **PREHEAT COOL (Item 2)**: Cooling threshold before automatic transfer pump triggers (25.0°C to 45.0°C in 0.5°C steps).
+* **FERM TARGET (Item 3)**: Temperature setpoint for the fermentation chamber radiant quartz heater and cooling fan (18.0°C to 45.0°C in 0.5°C steps).
+* **FERM FAN BASELINE (Item 4)**: Idle baseline speed for the fermentation chamber exhaust fan (0% to 50% in 5% steps).
+* **SET RTC DATE & TIME (Item 5)**: Opens the 7-field DS3231 real-time clock adjustment screen.
+* **TARE LOAD CELL (Item 6)**: Instantly zeros out the vat weight sensor.
+
+*Editing Controls*:
+Press **SELECT** or **RIGHT** on items 0 to 4 to enter edit mode, use **UP/DOWN** or **LEFT/RIGHT** to change values, and press **SELECT** to confirm. Exiting saves all values to NVS flash memory (`brewPrefs`).
 
 ---
 
@@ -541,18 +550,18 @@ Open a browser and go to `http://winebrew.local` or the device's IP address to s
 
 The web page shows live sensor values and updates every second automatically:
 
-| Field | Value |
-|-------|-------|
-| Volume | Current liquid weight (liters) |
-| Local Ambient | BME280 temperature |
-| Local Liquid | Pre-heat DS18B20 temperature |
-| Ferm Ambient | Fermentation ambient temperature |
-| Ferm Liquid | Fermentation liquid temperature |
-| pH | Current pH reading |
-| Specific Gravity | Current gravity from hydrometer |
-| ABV | Estimated alcohol content (%) |
+* Volume: Current liquid weight (liters)
+* Local Ambient: BME280 temperature
+* Local Liquid: Pre-heat DS18B20 temperature
+* Ferm Ambient: Fermentation ambient temperature
+* Ferm Liquid: Fermentation liquid temperature
+* pH: Current pH reading
+* Specific Gravity: Current gravity from hydrometer
+* ABV: Estimated alcohol content (%)
+* Pill Battery: RAPT Pill battery percentage and Bluetooth signal strength (e.g. 51% (-82 dBm))
+* Active Targets: Real-time heating setpoint, cool-down threshold, and fermentation target
 
-Firmware can also be updated over Wi-Fi (OTA) using the Arduino IDE or PlatformIO targeting `winebrew-main`.
+Firmware can also be updated over Wi-Fi (OTA) using PlatformIO or the automated Beelink tool `flash-winebrew`.
 
 ---
 
@@ -617,6 +626,31 @@ The system logs sensor data to the SD card every 60 seconds while a brew is runn
 | ABV | Estimated ABV based on OG and current gravity |
 
 Logging requires both the RTC and SD card to be working. If either fails, logging is skipped for that cycle. The last log time is shown in the dashboard header bar.
+
+---
+
+## 18. Continuous Wi-Fi Telemetry Logging & Remote OTA Deployment
+
+In addition to onboard SD card logging, the system supports autonomous continuous logging over the local Wi-Fi network to the dedicated 24/7 Beelink Mini PC server.
+
+### Beelink 24/7 Background Telemetry Service
+* **Service Name**: `winebrew-logger.service` (systemd user daemon on Beelink)
+* **Log Location**: `/home/dave/systems/winebrew-logger/logs/winebrew_log_YYYYMMDD.csv`
+* **Polling Interval**: Every 5 seconds via `http://192.168.1.137/data`
+* **Logged Telemetry**: 22 fields per record including timestamp, brew stage, heater states, fan PWM, vat volume, all temperatures, pH, specific gravity, ABV, setpoints, RAPT Pill battery percentage, and BLE RSSI.
+* **Service Inspection**:
+  * Check status: `systemctl --user status winebrew-logger.service`
+  * Live log stream: `journalctl --user -u winebrew-logger.service -f`
+
+### Autonomous One-Click OTA Deployment
+Firmware updates can be compiled and flashed directly from the Beelink server over Wi-Fi without needing a USB cable or physical access to the brewing machine:
+* **Tool Location**: `/home/dave/.local/bin/flash-winebrew`
+* **Workflow**:
+  1. Pulls the latest commits from GitHub main branch.
+  2. Compiles the firmware locally using cached PlatformIO libraries in under 5 seconds.
+  3. Deploys over ArduinoOTA port 3232 to `192.168.1.137`.
+  4. Automatically pings `/data` after reboot to verify operational health.
+* **Command**: Run `flash-winebrew` from any shell on the Beelink server.
 
 ---
 
