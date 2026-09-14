@@ -70,7 +70,13 @@ void handleData() {
   json += "\"sg\":" + String(incomingData.pillGravity) + ",";
   float abv = (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0)
               ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
-  json += "\"abv\":" + String(abv);
+  json += "\"abv\":" + String(abv) + ",";
+  json += "\"mv\":" + String(incomingData.motorSenseVolts, 3) + ",";
+  json += "\"msp\":" + String(mixerSpeedPercent) + ",";
+  json += "\"mto\":" + String(motorTestOn ? 1 : 0) + ",";
+  json += "\"mts\":" + String(motorTestSpeed) + ",";
+  json += "\"mm\":" + String((int)currentMixerMode) + ",";
+  json += "\"app\":" + String((int)currentAppState);
   json += "}";
   server.send(200, "application/json", json);
 }

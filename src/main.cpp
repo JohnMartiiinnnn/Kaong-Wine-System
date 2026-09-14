@@ -2146,24 +2146,18 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
-      // Motor stall protection: SenseVoltage >= 0.353V (3.0A draw) for >3 consecutive seconds
-      static uint32_t motorStallStartMs = 0;
-      if (mixerSpeedPercent > 0 && incomingData.motorSenseVolts >= 0.353f) {
-        if (motorStallStartMs == 0) {
-          motorStallStartMs = millis();
-        } else if (millis() - motorStallStartMs >= 3000) {
-          mixerSpeedPercent = 0;
-          setMixerSpeed(0);
-          mixerRunning = false;
-          currentMixerMode = MIXER_OFF;
-          sendMotorCommand(0, true);
-        }
+      // Maintain continuous motor heartbeat to Secondary ESP32 based on active state
+      int activeMixerSpeed = 0;
+      if (currentAppState == MOTOR_TEST_MENU) {
+        activeMixerSpeed = motorTestOn ? motorTestSpeed : 0;
+      } else if (currentMixerMode == MIXER_AUTO) {
+        activeMixerSpeed = mixerRunning ? mixerSpeedPercent : 0;
+      } else if (currentMixerMode == MIXER_MANUAL) {
+        activeMixerSpeed = mixerSpeedPercent;
       } else {
-        motorStallStartMs = 0;
+        activeMixerSpeed = 0;
       }
-
-      // Reply with heartbeat to Secondary ESP32
-      sendMotorCommand(mixerSpeedPercent, true);
+      sendMotorCommand(activeMixerSpeed, true);
 
       // Check for new RAPT Pill telemetry update
       if (incomingData.pillGravity > 0.1f) {
