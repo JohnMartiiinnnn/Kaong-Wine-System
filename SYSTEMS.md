@@ -153,6 +153,10 @@ PlatformIO CLI commands for building and uploading firmware:
   * Status command: `systemctl --user status winebrew-logger.service`
   * Live log tail: `journalctl --user -u winebrew-logger.service -f`
 
+* **Beelink Automated One-Click OTA Deployment**:
+  * Command on Beelink: `flash-winebrew` (or `~/.local/bin/flash-winebrew`)
+  * Actions performed: Pulls latest git commit, compiles firmware, flashes ESP32 via OTA on `192.168.1.137`, and verifies `/data` response.
+
 ---
 
 ## 6. Sensor Calibration References
