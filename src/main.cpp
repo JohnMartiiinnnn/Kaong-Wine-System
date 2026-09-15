@@ -2596,24 +2596,39 @@ void loop() {
       }
 
       bool transferDone = false;
-      // 1. Target volume transferred
-      if (transferVolumeTransferred >= transferTargetVolume) {
+
+      // 1. Pre-Heat scale empty check (For Transfer 1: Pre-Heat -> Fermentation)
+      // If scale physically reads <= 0.3L, tank is completely drained
+      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.3f && (millis() - transferStartMs >= 3000UL)) {
         transferDone = true;
       }
-      // 2. Pre-heat scale empty (for Transfer 1)
-      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.3f && transferVolumeTransferred >= 0.5f) {
-        transferDone = true;
-      }
-      // 3. Dry-run / Empty tank timeout: Pump ran > 3s and no pulses for 5s
-      if (millis() - transferStartMs >= 3000UL && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
-        if (transferVolumeTransferred >= 0.5f) {
+
+      // 2. Empty Tank Detection via Flow Sensor (5s of zero pulses after flow started)
+      // When tank runs out of liquid and pulls air, the turbine stops generating pulses
+      if (millis() - transferStartMs >= 4000UL && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
+        // If we already moved liquid, it means the source chamber has been completely drained
+        if (transferVolumeTransferred >= 0.3f || (stageTransferTarget == 1 && hx711Status && currentWeight <= 1.0f)) {
           transferDone = true;
         } else {
+          // If zero liquid moved from the start, sound dry-run alarm
           transferDryRunAlarm = true;
           transferDone = true;
         }
       }
-      // 4. Maximum pump safety cutoff (3 minutes)
+
+      // 3. Fallback: If Flow Sensor reached target volume AND scale confirms drain (or HX711 unavailable)
+      if (transferVolumeTransferred >= transferTargetVolume) {
+        if (stageTransferTarget == 1 && hx711Status) {
+          // If scale still has liquid (> 0.5L), keep pumping to drain completely
+          if (currentWeight <= 0.5f) {
+            transferDone = true;
+          }
+        } else {
+          transferDone = true;
+        }
+      }
+
+      // 4. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
       if (millis() - transferStartMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
       }

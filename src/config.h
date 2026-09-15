@@ -426,7 +426,7 @@ extern float    transferVolumeTransferred;
 extern bool     transferDryRunAlarm;
 extern uint32_t transferLastPulseMs;
 const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 5000;   // 5s of zero flow pulses while pump running triggers cutoff
-const uint32_t  TRANSFER_MAX_SAFETY_MS     = 180000; // 3 minutes absolute maximum pump runtime
+const uint32_t  TRANSFER_MAX_SAFETY_MS     = 300000; // 5 minutes absolute maximum pump runtime
 
 
 // ---- Physical Test Run Settings ----
