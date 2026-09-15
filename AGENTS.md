@@ -381,7 +381,7 @@ Options in `MIXER CONTROL`:
 ### Debugging & Test Steps
 1.  **Bench Power:** Apply VM=12V, VCC=3.3V, tie STBY/AIN1 HIGH, AIN2 LOW. Connect PWMA to 3.3V. Motor should spin CW.
 2.  **Manual Mode:** Navigate to mixer control, set to MANUAL, verify speed adjustments in 10% increments.
-3.  **Auto Mode:** Confirm that it starts mixing on initial activation, running for 5 minutes (`MIXER_ON_MS`) and sleeping for 355 minutes (`MIXER_OFF_MS`).
+3.  **Auto Mode:** On initial yeast pitch upon fermentation entry, the mixer runs for 10 seconds per 1 gram of dispensed yeast (e.g., 3g = 30s, 5g = 50s). After completing the initial pitch mixing, it resumes the standard periodic cycle (5 minutes ON / `MIXER_ON_MS` and 355 minutes OFF / `MIXER_OFF_MS`).
 
 ### Speed Feedback, RPM Estimation & Stall Protection
 The JGB37 mixing motor speed is estimated by measuring the output voltage on the BTS7960's current sense (`IS`) pins, which are connected to ADS1115 Channel A1 (Secondary ESP32) with a 1kΩ pull-down resistor to GND.

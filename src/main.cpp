@@ -84,6 +84,7 @@ MixerMode currentMixerMode = MIXER_OFF;
 bool mixerRunning = false;
 uint32_t mixerOnTimer = 0;
 uint32_t mixerCycleTimer = 0;
+uint32_t mixerActiveDurationMs = MIXER_ON_MS;
 
 // ---- UI / App State ----
 AppState currentAppState = SYSTEM_INIT;
@@ -2319,16 +2320,18 @@ void loop() {
   if (currentMixerMode == MIXER_AUTO) {
     uint32_t now = millis();
     if (mixerRunning) {
-      if (now - mixerOnTimer >= MIXER_ON_MS) {
+      if (now - mixerOnTimer >= mixerActiveDurationMs) {
         mixerRunning = false;
         mixerCycleTimer = now;
         mixerSpeedPercent = 0;
         setMixerSpeed(0);
+        mixerActiveDurationMs = MIXER_ON_MS; // reset to 5-min cycle for subsequent periodic mixing
       }
     } else {
       if (now - mixerCycleTimer >= MIXER_OFF_MS) {
         mixerRunning = true;
         mixerOnTimer = now;
+        mixerActiveDurationMs = MIXER_ON_MS;
         mixerSpeedPercent = 100;
         setMixerSpeed(100);
       }
@@ -2520,9 +2523,14 @@ void loop() {
           mcp.digitalWrite(LIGHT_Y, RELAY_ON);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
           // Auto-dispatch yeast at configured pitch rate
-          if (yeastPitchGrams > 0.0f)
+          if (yeastPitchGrams > 0.0f) {
             sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
-          // Auto-start mixer in AUTO mode (5 min ON / 355 min OFF)
+            // Run mixer for 10 seconds per gram dispensed (e.g. 3g = 30s)
+            mixerActiveDurationMs = (uint32_t)(yeastPitchGrams * 10.0f * 1000.0f);
+          } else {
+            mixerActiveDurationMs = MIXER_ON_MS;
+          }
+          // Auto-start mixer in AUTO mode
           currentMixerMode = MIXER_AUTO;
           mixerRunning = true;
           mixerOnTimer = millis();

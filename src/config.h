@@ -248,6 +248,7 @@ extern MixerMode currentMixerMode;
 extern bool mixerRunning;
 extern uint32_t mixerOnTimer;
 extern uint32_t mixerCycleTimer;
+extern uint32_t mixerActiveDurationMs;
 
 // ---- UI / App State ----
 extern AppState currentAppState;
