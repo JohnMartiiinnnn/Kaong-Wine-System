@@ -16,7 +16,7 @@
 #endif
 
 #ifndef DEFAULT_MS_PER_GRAM_YEAST
-#define DEFAULT_MS_PER_GRAM_YEAST 1000.0f // Default 1000 ms per gram
+#define DEFAULT_MS_PER_GRAM_YEAST 1764.0f // Empirical calibration fit: 0.567 g/s (1764 ms/g) from 21 trials (R2=0.98)
 #endif
 
 #ifndef YEAST_DISPENSE_TIMEOUT_MS

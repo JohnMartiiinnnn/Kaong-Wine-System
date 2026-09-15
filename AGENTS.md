@@ -477,6 +477,12 @@ Sensor calibration is handled over the board's inter-controller UART connection 
 *   **Pin Mapping:** `DRV8871 IN1` → **GPIO 4**, `DRV8871 IN2` → **GPIO 5**.
 *   **Duty Cap & Protection:** Maximum PWM duty cycle must be capped at 50% (`MAX_YEAST_MOTOR_DUTY = 128/255`) to limit peak output to ~6.0V.
 *   **PWM Mode:** 1 kHz frequency, Fast-Decay mode (`IN1=PWM, IN2=0`).
-*   **Active Braking:** Fires `IN1=HIGH, IN2=HIGH` for 200ms at cycle end to stop rotation instantly and prevent over-dispensing/drip.
-*   **Calibration Formula:** $\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}}$
+*   **Calibration Formula & Empirical Constant:**
+    $$\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}} = 1764.0\text{ ms/g}$$
+    *   **Empirical Flow Rate:** $0.567\text{ g/s}$ ($\approx 1.764\text{ s/g}$, 21-trial linear fit with $R^2 = 0.98$).
+*   **System Check UI (Index 10: DISPENSER TEST):**
+    *   Row 0: Start/Stop action card with live countdown and real-time dispensed grams tracking (`liveDispensed = elapsedMs / 1764.0f`).
+    *   Row 1: Pulse duration setting (1s to 60s, UP/DOWN adjust in edit mode).
+    *   Row 2: Estimated dispensed yeast output (`estGrams = durationSec * 0.567f`).
+    *   Row 3: Calibration model reference panel ($R^2 = 0.98$, 21 trials fit, DRV8871 50% PWM Fast-Decay).
 

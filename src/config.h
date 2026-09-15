@@ -297,6 +297,7 @@ extern bool dispenserTestEditing;
 extern bool dispenserTestOn;
 extern int  dispenserTestDurationSec;
 extern uint32_t dispenserTestStartMs;
+extern float msPerGramYeast;
 extern bool pidTestNeedsFullRedraw;
 extern bool pidConfigNeedsFullRedraw;
 extern bool pidConfigEditing;
