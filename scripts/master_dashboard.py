@@ -204,6 +204,43 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- Chamber Volume Distribution -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Chamber Volume Distribution</span>
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <div class="metric-row" style="margin-bottom: 0.25rem;">
+          <span class="metric-label">1. Pre-Heat Vat (Scale)</span>
+          <span class="metric-val" id="vol-preheat">--<span class="metric-unit">L</span></span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-fill" id="bar-preheat" style="width: 0%; background: #f87171;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <div class="metric-row" style="margin-bottom: 0.25rem;">
+          <span class="metric-label">2. Fermentation Vessel</span>
+          <span class="metric-val" id="vol-ferm">--<span class="metric-unit">L</span></span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-fill" id="bar-ferm" style="width: 0%; background: #fbbf24;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 0.5rem;">
+        <div class="metric-row" style="margin-bottom: 0.25rem;">
+          <span class="metric-label">3. Pasteurization Tank</span>
+          <span class="metric-val" id="vol-past">--<span class="metric-unit">L</span></span>
+        </div>
+        <div class="bar-container">
+          <div class="bar-fill" id="bar-past" style="width: 0%; background: #34d399;"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Export & Batch Logger Status -->
@@ -281,6 +318,35 @@ async function updateData() {
     document.getElementById('mixer-info').innerText = (mixerModes[d.mm] || 'OFF') + ' (' + (d.msp || 0) + '%)';
 
     document.getElementById('yeast-disp').innerHTML = (d.yd !== undefined ? d.yd.toFixed(1) : '0.0') + '<span class="metric-unit">g</span>';
+
+    // 3-Chamber Volume Distribution
+    let vPre = (d.vol !== undefined && d.vol > 0) ? d.vol : 0.0;
+    let vFerm = 0.0;
+    let vPast = 0.0;
+
+    if (!window.initialVatVolume && vPre > 0.5) {
+      window.initialVatVolume = vPre;
+    }
+
+    if (d.stage === 0) {
+      vFerm = 0.0;
+      vPast = 0.0;
+    } else if (d.stage === 1) {
+      vFerm = Math.max(0.0, (window.initialVatVolume || 12.14) - vPre);
+      vPast = 0.0;
+    } else if (d.stage === 2) {
+      vPast = Math.max(0.0, (window.initialVatVolume || 12.14) - vPre);
+      vFerm = 0.0;
+    }
+
+    document.getElementById('vol-preheat').innerHTML = vPre.toFixed(2) + '<span class="metric-unit">L</span>';
+    document.getElementById('bar-preheat').style.width = Math.min(100, (vPre / 15.0) * 100) + '%';
+
+    document.getElementById('vol-ferm').innerHTML = vFerm.toFixed(2) + '<span class="metric-unit">L</span>';
+    document.getElementById('bar-ferm').style.width = Math.min(100, (vFerm / 15.0) * 100) + '%';
+
+    document.getElementById('vol-past').innerHTML = vPast.toFixed(2) + '<span class="metric-unit">L</span>';
+    document.getElementById('bar-past').style.width = Math.min(100, (vPast / 15.0) * 100) + '%';
 
   } catch(e) {
     document.getElementById('conn-status').innerText = 'ESP32 RECONNECTING...';
