@@ -120,9 +120,11 @@ HTML_PAGE = """<!DOCTYPE html>
       </div>
     </div>
     <div class="targets">
-      <div>Preheat Target: <strong id="tgt-ph">40.0°C</strong></div>
-      <div>Cooling Target: <strong id="tgt-cool">38.0°C</strong></div>
-      <div>Ferm Target: <strong id="tgt-ferm">30.0°C</strong></div>
+      <div>Preheat: <strong id="tgt-ph">40.0°C</strong></div>
+      <div>Cooling: <strong id="tgt-cool">38.0°C</strong></div>
+      <div>Ferm: <strong id="tgt-ferm">30.0°C</strong></div>
+      <div>Past: <strong id="tgt-past">72.0°C</strong></div>
+      <div style="margin-left: 0.5rem; padding-left: 0.5rem; border-left: 1px solid rgba(255,255,255,0.15);">Active Target: <strong id="tgt-active" style="color: var(--green);">40.0°C</strong></div>
     </div>
   </div>
 
@@ -289,9 +291,11 @@ async function updateData() {
     document.getElementById('top-vol').innerText = (d.vol !== undefined ? d.vol.toFixed(2) : '--') + ' L';
 
     // Targets
-    document.getElementById('tgt-ph').innerText = (d.targetT || 40.0).toFixed(1) + '°C';
-    document.getElementById('tgt-cool').innerText = (d.coolT || 38.0).toFixed(1) + '°C';
-    document.getElementById('tgt-ferm').innerText = (d.fermTgt || 30.0).toFixed(1) + '°C';
+    document.getElementById('tgt-ph').innerText = (d.tgt_ph !== undefined ? d.tgt_ph : 40.0).toFixed(1) + '°C';
+    document.getElementById('tgt-cool').innerText = (d.tgt_cool !== undefined ? d.tgt_cool : (d.coolT || 38.0)).toFixed(1) + '°C';
+    document.getElementById('tgt-ferm').innerText = (d.tgt_ferm !== undefined ? d.tgt_ferm : (d.fermTgt || 30.0)).toFixed(1) + '°C';
+    document.getElementById('tgt-past').innerText = (d.tgt_past !== undefined ? d.tgt_past : 72.0).toFixed(1) + '°C';
+    document.getElementById('tgt-active').innerText = (d.targetT || 40.0).toFixed(1) + '°C';
 
     // Temps
     document.getElementById('ll').innerHTML = (d.ll ? d.ll.toFixed(1) : '--') + '<span class="metric-unit">°C</span>';
@@ -324,19 +328,21 @@ async function updateData() {
     let vFerm = 0.0;
     let vPast = 0.0;
 
-    if (!window.initialVatVolume && vPre > 0.5) {
-      window.initialVatVolume = vPre;
+    let savedTotal = parseFloat(localStorage.getItem('winebrew_batch_volume')) || 12.14;
+    if (d.stage === 0 && vPre > 5.0) {
+      savedTotal = vPre;
+      localStorage.setItem('winebrew_batch_volume', savedTotal.toString());
     }
 
     if (d.stage === 0) {
       vFerm = 0.0;
       vPast = 0.0;
     } else if (d.stage === 1) {
-      vFerm = Math.max(0.0, (window.initialVatVolume || 12.14) - vPre);
+      vFerm = (d.v_xfer !== undefined && d.v_xfer > 0) ? d.v_xfer : Math.max(0.0, savedTotal - vPre);
       vPast = 0.0;
     } else if (d.stage === 2) {
-      vPast = Math.max(0.0, (window.initialVatVolume || 12.14) - vPre);
       vFerm = 0.0;
+      vPast = (d.v_xfer !== undefined && d.v_xfer > 0) ? d.v_xfer : Math.max(0.0, savedTotal - vPre);
     }
 
     document.getElementById('vol-preheat').innerHTML = vPre.toFixed(2) + '<span class="metric-unit">L</span>';

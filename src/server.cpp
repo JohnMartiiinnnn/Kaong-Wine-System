@@ -120,8 +120,14 @@ void handleData() {
   json += "\"stage\":" + String(activeBrewStage) + ",";
   float curTgt = (activeBrewStage >= 0 && activeBrewStage < 3) ? stageTargetTemp[activeBrewStage] : stageTargetTemp[0];
   json += "\"targetT\":" + String(curTgt, 1) + ",";
+  json += "\"tgt_ph\":" + String(stageTargetTemp[0], 1) + ",";
+  json += "\"tgt_cool\":" + String(preheatCoolTarget, 1) + ",";
+  json += "\"tgt_ferm\":" + String(stageTargetTemp[1], 1) + ",";
+  json += "\"tgt_past\":" + String(stageTargetTemp[2], 1) + ",";
   json += "\"coolT\":" + String(preheatCoolTarget, 1) + ",";
   json += "\"fermTgt\":" + String(stageTargetTemp[1], 1) + ",";
+  json += "\"v_start\":" + String(transferStartWeight, 2) + ",";
+  json += "\"v_xfer\":" + String(transferVolumeTransferred, 2) + ",";
   json += "\"hp\":" + String(currentHeatingPercent) + ",";
   json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
   json += "\"yd\":" + String(actualYeastDispensedGrams, 2) + ",";
