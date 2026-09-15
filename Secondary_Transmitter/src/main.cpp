@@ -188,6 +188,11 @@ void setup() {
         delay(100);
     }
   }
+  ArduinoOTA.onStart([]() {
+    if (pBLEScan) {
+      pBLEScan->stop();
+    }
+  });
   ArduinoOTA.setHostname("winebrew-secondary");
   ArduinoOTA.begin();
 
@@ -231,6 +236,15 @@ void setup() {
 }
 void loop() {
   ArduinoOTA.handle();
+
+  // Auto-reconnect Wi-Fi non-blockingly every 15s if connection dropped
+  static uint32_t lastWifiCheckMs = 0;
+  if (millis() - lastWifiCheckMs >= 15000) {
+    lastWifiCheckMs = millis();
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.reconnect();
+    }
+  }
 
   // Read sensors and transmit every 1000ms
   static uint32_t lastSensorSendMs = 0;
