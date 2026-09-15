@@ -266,9 +266,26 @@ void updateDashboardValues() {
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 243, 1);
 
+    } else if (isYeastDispensingActive) {
+      tft.drawCentreString("DISPENSING", 239, 228, 2);
+      sprintf(subBuf, "%.1fg / %.1fg", actualYeastDispensedGrams, yeastPitchGrams);
+      tft.drawCentreString(subBuf, 239, 243, 1);
+
+    } else if (isInitialPitchMixing && mixerRunning) {
+      uint32_t remMs = (millis() - mixerOnTimer < mixerActiveDurationMs) ? (mixerActiveDurationMs - (millis() - mixerOnTimer)) : 0;
+      uint32_t remSec = (remMs + 999) / 1000;
+      uint32_t totalSec = (pitchMixTotalDurationMs > 0) ? (pitchMixTotalDurationMs / 1000) : 0;
+      tft.drawCentreString("PITCH MIXING", 239, 228, 2);
+      sprintf(subBuf, "%us / %us left", remSec, totalSec);
+      tft.drawCentreString(subBuf, 239, 243, 1);
+
     } else {
       tft.drawCentreString("FERMENTING", 239, 228, 2);
-      sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);
+      if (actualYeastDispensedGrams > 0.0f) {
+        sprintf(subBuf, "%.1fC/%.1fC (%.1fg)", fermT, stageTargetTemp[1], actualYeastDispensedGrams);
+      } else {
+        sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);
+      }
       tft.drawCentreString(subBuf, 239, 243, 1);
     }
 
@@ -1265,8 +1282,19 @@ void drawMixerMenu() {
     tft.fillRect(20, 360, 280, 50, statusColor);
     tft.drawRect(20, 360, 280, 50, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, statusColor);
-    tft.drawCentreString(mixerRunning ? "RUNNING" : "STANDBY", CENTER_X, 377,
-                         2);
+    if (mixerRunning) {
+      uint32_t remMs = (millis() - mixerOnTimer < mixerActiveDurationMs) ? (mixerActiveDurationMs - (millis() - mixerOnTimer)) : 0;
+      uint32_t remSec = (remMs + 999) / 1000;
+      char mixBuf[48];
+      if (isInitialPitchMixing) {
+        sprintf(mixBuf, "PITCH MIX: %us / %us", remSec, pitchMixTotalDurationMs / 1000);
+      } else {
+        sprintf(mixBuf, "AUTO MIX: %us LEFT", remSec);
+      }
+      tft.drawCentreString(mixBuf, CENTER_X, 377, 2);
+    } else {
+      tft.drawCentreString("STANDBY", CENTER_X, 377, 2);
+    }
   }
 
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);

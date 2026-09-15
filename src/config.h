@@ -250,6 +250,12 @@ extern bool mixerRunning;
 extern uint32_t mixerOnTimer;
 extern uint32_t mixerCycleTimer;
 extern uint32_t mixerActiveDurationMs;
+extern float    actualYeastDispensedGrams;
+extern bool     isYeastDispensingActive;
+extern uint32_t yeastDispenseStartMs;
+extern uint32_t yeastDispenseDurationMs;
+extern bool     isInitialPitchMixing;
+extern uint32_t pitchMixTotalDurationMs;
 
 // ---- UI / App State ----
 extern AppState currentAppState;

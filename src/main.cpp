@@ -85,6 +85,12 @@ bool mixerRunning = false;
 uint32_t mixerOnTimer = 0;
 uint32_t mixerCycleTimer = 0;
 uint32_t mixerActiveDurationMs = MIXER_ON_MS;
+float    actualYeastDispensedGrams = 0.0f;
+bool     isYeastDispensingActive = false;
+uint32_t yeastDispenseStartMs = 0;
+uint32_t yeastDispenseDurationMs = 0;
+bool     isInitialPitchMixing = false;
+uint32_t pitchMixTotalDurationMs = 0;
 
 // ---- UI / App State ----
 AppState currentAppState = SYSTEM_INIT;
@@ -357,6 +363,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("phSter", preHeatSterilized);
   brewPrefs.putBool("phCool", preHeatCooled);
   brewPrefs.putBool("pastSter", pastSterilized);
+  brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
   brewPrefs.end();
 }
 
@@ -373,6 +380,7 @@ void loadBrewStateFromNVS() {
     preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
+    actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
     fermDurationMs = brewPrefs.getUInt("fermDur", 48UL * 3600 * 1000);
     originalGravity = brewPrefs.getFloat("og", 0.0f);
     String st = brewPrefs.getString("startTm", "");
@@ -1176,6 +1184,9 @@ void loop() {
           transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
           transferVolumeTransferred = 0.0f;
           transferDryRunAlarm = false;
+          actualYeastDispensedGrams = 0.0f;
+          isYeastDispensingActive = false;
+          isInitialPitchMixing = false;
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -2393,18 +2404,32 @@ void loop() {
     drawNewBrewWizard(true);
   }
 
+  // Dynamic yeast dispensing real-time gram accumulation
+  if (isYeastDispensingActive) {
+    uint32_t elapsed = millis() - yeastDispenseStartMs;
+    if (elapsed < yeastDispenseDurationMs && yeastDispenseDurationMs > 0) {
+      actualYeastDispensedGrams = ((float)elapsed / (float)yeastDispenseDurationMs) * yeastPitchGrams;
+    } else {
+      actualYeastDispensedGrams = yeastPitchGrams;
+      isYeastDispensingActive = false;
+      saveBrewStateToNVS();
+    }
+  }
+
   // Auto-mixing scheduler
   if (currentMixerMode == MIXER_AUTO) {
     uint32_t now = millis();
     if (mixerRunning) {
       if (now - mixerOnTimer >= mixerActiveDurationMs) {
         mixerRunning = false;
+        isInitialPitchMixing = false;
         mixerCycleTimer = now;
         mixerSpeedPercent = 0;
         setMixerSpeed(0);
         mixerActiveDurationMs = MIXER_ON_MS; // reset to 5-min cycle for subsequent periodic mixing
       }
     } else {
+      isInitialPitchMixing = false;
       if (now - mixerCycleTimer >= MIXER_OFF_MS) {
         mixerRunning = true;
         mixerOnTimer = now;
@@ -2602,9 +2627,19 @@ void loop() {
           // Auto-dispatch yeast at configured pitch rate
           if (yeastPitchGrams > 0.0f) {
             sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
+            isYeastDispensingActive = true;
+            yeastDispenseStartMs = millis();
+            yeastDispenseDurationMs = (uint32_t)(yeastPitchGrams * msPerGramYeast);
+            actualYeastDispensedGrams = 0.0f;
             // Run mixer for 10 seconds per gram dispensed (e.g. 3g = 30s)
-            mixerActiveDurationMs = (uint32_t)(yeastPitchGrams * 10.0f * 1000.0f);
+            pitchMixTotalDurationMs = (uint32_t)(yeastPitchGrams * 10.0f * 1000.0f);
+            mixerActiveDurationMs = pitchMixTotalDurationMs;
+            isInitialPitchMixing = true;
           } else {
+            isYeastDispensingActive = false;
+            actualYeastDispensedGrams = 0.0f;
+            isInitialPitchMixing = false;
+            pitchMixTotalDurationMs = 0;
             mixerActiveDurationMs = MIXER_ON_MS;
           }
           // Auto-start mixer in AUTO mode
