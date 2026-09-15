@@ -26,11 +26,11 @@ HTML_PAGE = """<!DOCTYPE html>
 <title>WineBrew System Master Dashboard</title>
 <style>
   :root {
-    --bg: #09090b;
-    --card-bg: #121216;
-    --card-border: #27272a;
-    --text-main: #f4f4f5;
-    --text-muted: #a1a1aa;
+    --bg: #090d16;
+    --card-bg: #131b2e;
+    --card-border: #1e293b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
     --accent: #38bdf8;
     --green: #10b981;
     --yellow: #f59e0b;
@@ -44,7 +44,7 @@ HTML_PAGE = """<!DOCTYPE html>
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; }
   .title-group h1 { font-size: 1.55rem; color: #fff; font-weight: 800; letter-spacing: -0.02em; }
   .title-group p { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
-  .live-badge { display: inline-flex; align-items: center; gap: 0.45rem; background: rgba(16, 185, 129, 0.12); color: var(--green); padding: 0.4rem 0.85rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.25); }
+  .live-badge { display: inline-flex; align-items: center; gap: 0.45rem; background: rgba(16, 185, 129, 0.15); color: var(--green); padding: 0.4rem 0.85rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3); }
   .live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
   
   @keyframes pulse {
@@ -54,20 +54,20 @@ HTML_PAGE = """<!DOCTYPE html>
   }
 
   /* Stage Banner */
-  .stage-banner { background: #131318; border: 1px solid var(--card-border); border-radius: 14px; padding: 1.15rem 1.4rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+  .stage-banner { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 14px; padding: 1.15rem 1.4rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
   .stage-info { display: flex; align-items: center; gap: 1.25rem; }
   .stage-pill { padding: 0.45rem 1.1rem; border-radius: 8px; font-weight: 800; font-size: 1rem; letter-spacing: 0.04em; text-transform: uppercase; }
-  .stage-preheat { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
-  .stage-ferm { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
-  .stage-past { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
-  .stage-idle { background: rgba(161, 161, 170, 0.12); color: #e4e4e7; border: 1px solid rgba(161, 161, 170, 0.25); }
+  .stage-preheat { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+  .stage-ferm { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+  .stage-past { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+  .stage-idle { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4); }
   
   /* Target Pills Grid */
   .targets-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-  .target-pill { display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.65rem; border-radius: 8px; min-width: 80px; text-align: center; }
+  .target-pill { display: flex; flex-direction: column; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.35rem 0.65rem; border-radius: 8px; min-width: 80px; text-align: center; }
   .target-pill-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
   .target-pill-val { font-size: 0.95rem; font-weight: 800; color: #fff; margin-top: 0.1rem; }
-  .target-pill.active { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.35); }
+  .target-pill.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
   .target-pill.active .target-pill-label { color: #34d399; }
   .target-pill.active .target-pill-val { color: #10b981; }
 
@@ -78,7 +78,7 @@ HTML_PAGE = """<!DOCTYPE html>
   }
   
   /* Cards */
-  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15); min-height: 250px; }
+  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); min-height: 250px; }
   .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.9rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
   .card-title { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
   
@@ -90,7 +90,7 @@ HTML_PAGE = """<!DOCTYPE html>
   .metric-unit { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.2rem; font-weight: 400; }
 
   /* Progress Bar */
-  .bar-container { width: 100%; height: 6px; background: #27272a; border-radius: 9999px; overflow: hidden; margin-top: 0.35rem; }
+  .bar-container { width: 100%; height: 6px; background: #1e293b; border-radius: 9999px; overflow: hidden; margin-top: 0.35rem; }
   .bar-fill { height: 100%; background: var(--accent); border-radius: 9999px; transition: width 0.4s ease; }
   .bar-fill.heat { background: linear-gradient(90deg, #f59e0b, #ef4444); }
 
