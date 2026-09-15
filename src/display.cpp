@@ -897,9 +897,11 @@ void drawDispenserTestMenu() {
       sprintf(buf, "%d SECONDS", dispenserTestDurationSec);
       tft.drawCentreString(buf, CENTER_X, y + 55, 4);
 
-      float estG = (float)(dispenserTestDurationSec * 1000) / msPerGramYeast;
-      sprintf(buf, "EST. YEAST: %.2f g", estG);
-      tft.drawCentreString(buf, CENTER_X, y + 105, 2);
+      if (sel && edit) {
+        tft.drawCentreString("[ UP / DOWN TO ADJUST ]", CENTER_X, y + 105, 2);
+      } else {
+        tft.drawCentreString(sel ? "[ PRESS SELECT TO EDIT ]" : "RANGE: 1s - 60s", CENTER_X, y + 105, 2);
+      }
     }
   };
 
