@@ -392,12 +392,16 @@ The JGB37 mixing motor speed is estimated by measuring the output voltage on the
 
 ## 9. Flashing and Calibration for Enclosed Secondary ESP32
 
-Because the Secondary ESP32 is inside the fermentation enclosure, its USB port is inaccessible during normal operation, and direct serial monitoring is not possible. Over-the-Air (OTA) flashing is unsupported due to high maintenance. Flashing is always performed by removing the Secondary ESP32 from the enclosure and plugging it in directly via Micro-USB.
+The Secondary ESP32 inside the fermentation enclosure supports both direct USB flashing and Wi-Fi Over-The-Air (OTA) flashing (`winebrew-secondary.local` / `192.168.1.139`) with dual-app partition support (`min_spiffs.csv`) and automated BLE scan pausing during OTA transfers.
 
 ### Flashing the Secondary ESP32
-To flash the Secondary ESP32, remove it from the enclosure and run:
+
 ```bash
-~/.platformio/penv/bin/pio run -d Secondary_Transmitter -t upload
+# Flash Secondary via USB (when plugged in)
+~/.platformio/penv/bin/pio run -d Secondary_Transmitter -e esp32dev -t upload --upload-port /dev/cu.usbserial-0001
+
+# Flash Secondary over Wi-Fi (OTA)
+~/.platformio/penv/bin/pio run -d Secondary_Transmitter -e esp32dev -t upload --upload-port 192.168.1.139
 ```
 
 ### Sensor Calibration Workflow
