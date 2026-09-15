@@ -329,6 +329,7 @@ void saveSettingsToNVS() {
   brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
   brewPrefs.putFloat("fermTgt", stageTargetTemp[1]);
+  brewPrefs.putFloat("pastTgt", stageTargetTemp[2]);
   brewPrefs.putInt("fanBase", pidFanPercent);
   brewPrefs.putFloat("dispMsG", msPerGramYeast);
   brewPrefs.end();
@@ -340,6 +341,7 @@ void loadSettingsFromNVS() {
   stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
   preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
+  stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
   msPerGramYeast = brewPrefs.getFloat("dispMsG", 1764.0f);
   brewPrefs.end();
@@ -356,6 +358,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
   brewPrefs.putFloat("fermTgt", stageTargetTemp[1]);
+  brewPrefs.putFloat("pastTgt", stageTargetTemp[2]);
   brewPrefs.putFloat("yeastG", yeastPitchGrams);
   brewPrefs.putUInt("fermDur", fermDurationMs);
   brewPrefs.putFloat("og", originalGravity);
@@ -380,6 +383,7 @@ void loadBrewStateFromNVS() {
     stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
     preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
+    stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
     currentLogFile = brewPrefs.getString("logFile", "/data_log.csv");
@@ -829,10 +833,12 @@ void loop() {
           } else if (settingsSelection == 3) {
             stageTargetTemp[1] = max(18.0f, stageTargetTemp[1] - 0.5f);
           } else if (settingsSelection == 4) {
+            stageTargetTemp[2] = max(50.0f, stageTargetTemp[2] - 0.5f);
+          } else if (settingsSelection == 5) {
             pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
           }
         } else {
-          settingsSelection = (settingsSelection + 1) % 7;
+          settingsSelection = (settingsSelection + 1) % 8;
         }
         drawSettingsMenu();
       }
@@ -997,10 +1003,12 @@ void loop() {
         } else if (settingsSelection == 3) {
           stageTargetTemp[1] = min(45.0f, stageTargetTemp[1] + 0.5f);
         } else if (settingsSelection == 4) {
+          stageTargetTemp[2] = min(85.0f, stageTargetTemp[2] + 0.5f);
+        } else if (settingsSelection == 5) {
           pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
         }
       } else {
-        settingsSelection = (settingsSelection + 6) % 7;
+        settingsSelection = (settingsSelection + 7) % 8;
       }
       drawSettingsMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
@@ -1592,13 +1600,13 @@ void loop() {
         drawSettingsMenu();
       }
     } else if (currentAppState == SETTINGS_MENU) {
-      if (settingsSelection <= 4) {
+      if (settingsSelection <= 5) {
         settingsEditing = !settingsEditing;
         if (!settingsEditing) {
           saveSettingsToNVS();
         }
         drawSettingsMenu();
-      } else if (settingsSelection == 5) {
+      } else if (settingsSelection == 6) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetYear = now.year();
@@ -1612,7 +1620,7 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         rtcSetField = 0;
         drawRtcSetMenu();
-      } else if (settingsSelection == 6) {
+      } else if (settingsSelection == 7) {
         prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
@@ -1887,14 +1895,16 @@ void loop() {
       } else if (settingsSelection == 3) {
         stageTargetTemp[1] = min(45.0f, stageTargetTemp[1] + 0.5f);
       } else if (settingsSelection == 4) {
+        stageTargetTemp[2] = min(85.0f, stageTargetTemp[2] + 0.5f);
+      } else if (settingsSelection == 5) {
         pidFanPercent = min(50, (pidFanPercent > 0 ? pidFanPercent : 20) + 5);
       }
       drawSettingsMenu();
     } else {
-      if (settingsSelection <= 4) {
+      if (settingsSelection <= 5) {
         settingsEditing = true;
         drawSettingsMenu();
-      } else if (settingsSelection == 5) {
+      } else if (settingsSelection == 6) {
         if (rtcStatus) {
           DateTime now = rtc.now();
           rtcSetYear = max((uint16_t)2026, now.year());
@@ -1907,7 +1917,7 @@ void loop() {
         rtcSetNeedsFullRedraw = true;
         rtcSetField = 0;
         drawRtcSetMenu();
-      } else if (settingsSelection == 6) {
+      } else if (settingsSelection == 7) {
         prevLoadCellState = SETTINGS_MENU;
         currentAppState = LOAD_CELL_PAGE;
         loadCellNeedsFullRedraw = true;
@@ -2186,6 +2196,8 @@ void loop() {
         } else if (settingsSelection == 3) {
           stageTargetTemp[1] = max(18.0f, stageTargetTemp[1] - 0.5f);
         } else if (settingsSelection == 4) {
+          stageTargetTemp[2] = max(50.0f, stageTargetTemp[2] - 0.5f);
+        } else if (settingsSelection == 5) {
           pidFanPercent = max(0, (pidFanPercent > 0 ? pidFanPercent : 20) - 5);
         }
         drawSettingsMenu();
