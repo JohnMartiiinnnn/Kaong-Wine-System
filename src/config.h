@@ -129,6 +129,7 @@ enum AppState {
   PH_FERM_MENU,
   PID_TRACKING_MENU,
   DISPENSER_TEST_MENU,
+  DISPENSER_CAL_MENU,
   SETTINGS_MENU,
   GRAPH_PICK_MENU,
   PID_CHAMBER_PICK,
@@ -299,6 +300,13 @@ extern bool dispenserTestOn;
 extern int  dispenserTestDurationSec;
 extern uint32_t dispenserTestStartMs;
 extern float msPerGramYeast;
+extern bool dispenserCalNeedsFullRedraw;
+extern int  dispenserCalSelection;
+extern bool dispenserCalEditing;
+extern int  dispenserCalTestSec;
+extern float dispenserCalWeighedGrams;
+extern bool dispenserCalSaved;
+extern uint32_t dispenserCalSavedTimer;
 extern bool pidTestNeedsFullRedraw;
 extern bool pidConfigNeedsFullRedraw;
 extern bool pidConfigEditing;

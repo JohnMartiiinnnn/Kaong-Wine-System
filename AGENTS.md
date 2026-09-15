@@ -485,8 +485,11 @@ Sensor calibration is handled over the board's inter-controller UART connection 
     $$\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}} = 1764.0\text{ ms/g}$$
     *   **Empirical Flow Rate:** $0.567\text{ g/s}$ ($\approx 1.764\text{ s/g}$, 21-trial linear fit with $R^2 = 0.98$).
 *   **System Check UI (Index 10: DISPENSER TEST):**
-    *   Row 0: Start/Stop action card with live countdown and real-time dispensed grams tracking (`liveDispensed = elapsedMs / 1764.0f`).
-    *   Row 1: Pulse duration setting (1s to 60s, UP/DOWN adjust in edit mode).
-    *   Row 2: Estimated dispensed yeast output (`estGrams = durationSec * 0.567f`).
-    *   Row 3: Calibration model reference panel ($R^2 = 0.98$, 21 trials fit, DRV8871 50% PWM Fast-Decay).
+    *   **Tile 0 (Action)**: Start/Stop action card with live countdown (`%ds`) and real-time dispensed grams tracking (`LIVE: ~%.2fg / %.2fg` when running, `EST. YEAST: ~%.2f g` when stopped).
+    *   **Tile 1 (Pulse Duration)**: Pulse duration setting (1s to 60s, UP/DOWN adjust in edit mode, recalculates target yield immediately).
+    *   **Tile 2 (Calibration Launcher)**: Shows current flow rate in `g/s` and opens the interactive **Calibration Sub-Screen** on SELECT.
+*   **Calibration Utility Screen (`DISPENSER_CAL_MENU`):**
+    *   **Step 1 (Test Pulse)**: Directly triggers a test dispense into an external cup/scale.
+    *   **Step 2 (Weighed Grams Input)**: User inputs measured weight from external scale with 0.1g step (UP/DOWN) or 1.0g step (LEFT/RIGHT).
+    *   **Step 3 (Dynamic Computation & Flash Save)**: Computes new flow rate and constant in real time, and persists to NVS flash (`"dispMsG"` in `"winebrew"` namespace) upon SELECT.
 

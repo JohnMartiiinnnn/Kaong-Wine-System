@@ -42,6 +42,7 @@ void drawRaptTestPage(bool valuesOnly = false);
 void drawPhFermMenu(bool valuesOnly = false);
 void drawPidTrackingMenu(bool valuesOnly = false);
 void drawDispenserTestMenu();
+void drawDispenserCalMenu();
 void drawSettingsMenu();
 void drawGraphPickMenu();
 void drawPidChamberPick();

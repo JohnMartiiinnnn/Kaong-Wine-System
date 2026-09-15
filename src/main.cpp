@@ -138,6 +138,13 @@ bool dispenserTestEditing = false;
 bool dispenserTestOn = false;
 int  dispenserTestDurationSec = 5;
 uint32_t dispenserTestStartMs = 0;
+bool dispenserCalNeedsFullRedraw = true;
+int  dispenserCalSelection = 0;
+bool dispenserCalEditing = false;
+int  dispenserCalTestSec = 5;
+float dispenserCalWeighedGrams = 2.83f;
+bool dispenserCalSaved = false;
+uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -317,6 +324,7 @@ void saveSettingsToNVS() {
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
   brewPrefs.putFloat("fermTgt", stageTargetTemp[1]);
   brewPrefs.putInt("fanBase", pidFanPercent);
+  brewPrefs.putFloat("dispMsG", msPerGramYeast);
   brewPrefs.end();
 }
 
@@ -327,6 +335,7 @@ void loadSettingsFromNVS() {
   preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
+  msPerGramYeast = brewPrefs.getFloat("dispMsG", 1764.0f);
   brewPrefs.end();
 }
 
@@ -858,9 +867,17 @@ void loop() {
         dispenserTestDurationSec++;
         if (dispenserTestDurationSec > 60) dispenserTestDurationSec = 60;
       } else {
-        dispenserTestSelection = (dispenserTestSelection + 1) % 2;
+        dispenserTestSelection = (dispenserTestSelection + 2) % 3;
       }
       drawDispenserTestMenu();
+    } else if (currentAppState == DISPENSER_CAL_MENU) {
+      if (dispenserCalSelection == 1 && dispenserCalEditing) {
+        dispenserCalWeighedGrams += 0.1f;
+        if (dispenserCalWeighedGrams > 50.0f) dispenserCalWeighedGrams = 50.0f;
+      } else {
+        dispenserCalSelection = (dispenserCalSelection + 2) % 3;
+      }
+      drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
       pidTestChoice = (pidTestChoice + 1) % 3;
       drawPidChamberPick();
@@ -1017,9 +1034,17 @@ void loop() {
         dispenserTestDurationSec--;
         if (dispenserTestDurationSec < 1) dispenserTestDurationSec = 1;
       } else {
-        dispenserTestSelection = (dispenserTestSelection + 1) % 2;
+        dispenserTestSelection = (dispenserTestSelection + 1) % 3;
       }
       drawDispenserTestMenu();
+    } else if (currentAppState == DISPENSER_CAL_MENU) {
+      if (dispenserCalSelection == 1 && dispenserCalEditing) {
+        dispenserCalWeighedGrams -= 0.1f;
+        if (dispenserCalWeighedGrams < 0.1f) dispenserCalWeighedGrams = 0.1f;
+      } else {
+        dispenserCalSelection = (dispenserCalSelection + 1) % 3;
+      }
+      drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
       pidTestChoice = (pidTestChoice + 2) % 3;
       drawPidChamberPick();
@@ -1321,8 +1346,39 @@ void loop() {
         }
       } else if (dispenserTestSelection == 1) {
         dispenserTestEditing = !dispenserTestEditing;
+      } else if (dispenserTestSelection == 2) {
+        currentAppState = DISPENSER_CAL_MENU;
+        dispenserCalNeedsFullRedraw = true;
+        dispenserCalSelection = 0;
+        dispenserCalEditing = false;
+        dispenserCalSaved = false;
+        dispenserCalTestSec = dispenserTestDurationSec;
+        dispenserCalWeighedGrams = (float)(dispenserCalTestSec * 1000) / msPerGramYeast;
+        drawDispenserCalMenu();
       }
       drawDispenserTestMenu();
+    } else if (currentAppState == DISPENSER_CAL_MENU) {
+      if (dispenserCalSelection == 0) {
+        if (!dispenserTestOn) {
+          dispenserTestOn = true;
+          dispenserTestStartMs = millis();
+          sendMotorCommand(0, true, 1, (uint32_t)dispenserCalTestSec * 1000);
+        } else {
+          dispenserTestOn = false;
+          dispenserTestStartMs = 0;
+          sendMotorCommand(0, true, 3, 0);
+        }
+      } else if (dispenserCalSelection == 1) {
+        dispenserCalEditing = !dispenserCalEditing;
+      } else if (dispenserCalSelection == 2) {
+        if (dispenserCalWeighedGrams > 0.05f) {
+          msPerGramYeast = ((float)dispenserCalTestSec * 1000.0f) / dispenserCalWeighedGrams;
+          saveSettingsToNVS();
+          dispenserCalSaved = true;
+          dispenserCalSavedTimer = millis();
+        }
+      }
+      drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
       if (pidTestChoice == 0) { pidTestHeatTarget = 80.0f; pidTestCoolTarget = 75.0f; }
       else if (pidTestChoice == 1) { pidTestHeatTarget = 27.0f; pidTestCoolTarget = 29.0f; }
@@ -1841,6 +1897,13 @@ void loop() {
       }
     }
   }
+
+  if (cRight && !ljRight && currentAppState == DISPENSER_CAL_MENU) {
+    if (dispenserCalEditing && dispenserCalSelection == 1) {
+      dispenserCalWeighedGrams = min(50.0f, dispenserCalWeighedGrams + 1.0f);
+      drawDispenserCalMenu();
+    }
+  }
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
@@ -1987,6 +2050,20 @@ void loop() {
         currentAppState = SYSTEM_CHECK_MENU;
         systemCheckNeedsFullRedraw = true;
         drawSystemCheckMenu();
+      }
+    } else if (currentAppState == DISPENSER_CAL_MENU) {
+      if (dispenserCalEditing) {
+        dispenserCalEditing = false;
+        drawDispenserCalMenu();
+      } else {
+        if (dispenserTestOn) {
+          dispenserTestOn = false;
+          dispenserTestStartMs = 0;
+          sendMotorCommand(0, true, 3, 0);
+        }
+        currentAppState = DISPENSER_TEST_MENU;
+        dispenserTestNeedsFullRedraw = true;
+        drawDispenserTestMenu();
       }
     } else if (currentAppState == PID_CHAMBER_PICK) {
       currentAppState = SYSTEM_CHECK_MENU;
@@ -2978,6 +3055,17 @@ void loop() {
         dispenserTestStartMs = 0;
       }
       drawDispenserTestMenu();
+    }
+
+    if (currentAppState == DISPENSER_CAL_MENU) {
+      if (dispenserTestOn && millis() - dispenserTestStartMs >= (uint32_t)dispenserCalTestSec * 1000) {
+        dispenserTestOn = false;
+        dispenserTestStartMs = 0;
+      }
+      if (dispenserCalSaved && millis() - dispenserCalSavedTimer >= 2500) {
+        dispenserCalSaved = false;
+      }
+      drawDispenserCalMenu();
     }
 
     if (currentAppState == STAGE_PARAM_MENU)

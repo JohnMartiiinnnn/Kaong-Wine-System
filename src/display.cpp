@@ -847,16 +847,19 @@ void drawDispenserTestMenu() {
   char buf[48];
 
   auto drawRowTile = [&](int row, bool sel, bool edit) {
-    int y = 75 + (row * 170);
-    int w = 280;
-    int h = 150;
-    int x = 20;
+    int y = 56 + (row * 124);
+    int w = 300;
+    int h = 118;
+    int x = 10;
 
     uint16_t bg = sel ? (edit ? 0x03E0 : 0x3566) : 0xD6BA;
     uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
 
     if (row == 0) {
       bg = dispenserTestOn ? 0x0400 : (sel ? 0xF800 : 0x4208);
+      fg = TFT_WHITE;
+    } else if (row == 2) {
+      bg = sel ? 0x3566 : 0x2124;
       fg = TFT_WHITE;
     }
 
@@ -873,7 +876,7 @@ void drawDispenserTestMenu() {
     }
 
     if (row == 0) {
-      tft.drawCentreString("DISPENSER", CENTER_X, y + 20, 2);
+      tft.drawCentreString("DISPENSER", CENTER_X, y + 15, 2);
       if (dispenserTestOn) {
         uint32_t elapsed = millis() - dispenserTestStartMs;
         uint32_t totalMs = (uint32_t)dispenserTestDurationSec * 1000;
@@ -882,26 +885,32 @@ void drawDispenserTestMenu() {
         float totalTarget = (float)totalMs / msPerGramYeast;
 
         sprintf(buf, "%ds", remSec);
-        tft.drawCentreString(buf, CENTER_X, y + 55, 4);
+        tft.drawCentreString(buf, CENTER_X, y + 42, 4);
 
         sprintf(buf, "LIVE: ~%.2fg / %.2fg", liveDispensed, totalTarget);
-        tft.drawCentreString(buf, CENTER_X, y + 105, 2);
+        tft.drawCentreString(buf, CENTER_X, y + 85, 2);
       } else {
-        tft.drawCentreString("STOPPED", CENTER_X, y + 55, 4);
+        tft.drawCentreString("STOPPED", CENTER_X, y + 42, 4);
         float estG = (float)(dispenserTestDurationSec * 1000) / msPerGramYeast;
         sprintf(buf, "EST. YEAST: ~%.2f g", estG);
-        tft.drawCentreString(buf, CENTER_X, y + 105, 2);
+        tft.drawCentreString(buf, CENTER_X, y + 85, 2);
       }
     } else if (row == 1) {
-      tft.drawCentreString("PULSE DURATION", CENTER_X, y + 20, 2);
+      tft.drawCentreString("PULSE DURATION", CENTER_X, y + 15, 2);
       sprintf(buf, "%d SECONDS", dispenserTestDurationSec);
-      tft.drawCentreString(buf, CENTER_X, y + 55, 4);
+      tft.drawCentreString(buf, CENTER_X, y + 42, 4);
 
       if (sel && edit) {
-        tft.drawCentreString("[ UP / DOWN TO ADJUST ]", CENTER_X, y + 105, 2);
+        tft.drawCentreString("[ UP / DOWN TO ADJUST ]", CENTER_X, y + 85, 2);
       } else {
-        tft.drawCentreString(sel ? "[ PRESS SELECT TO EDIT ]" : "RANGE: 1s - 60s", CENTER_X, y + 105, 2);
+        tft.drawCentreString(sel ? "[ PRESS SELECT TO EDIT ]" : "RANGE: 1s - 60s", CENTER_X, y + 85, 2);
       }
+    } else if (row == 2) {
+      tft.drawCentreString("CALIBRATE FLOW RATE", CENTER_X, y + 15, 2);
+      float currentRate = 1000.0f / msPerGramYeast;
+      sprintf(buf, "%.3f g/s  (%.0f ms/g)", currentRate, msPerGramYeast);
+      tft.drawCentreString(buf, CENTER_X, y + 42, 4);
+      tft.drawCentreString(sel ? "[ PRESS SELECT TO OPEN ]" : "[ ADJUST FLOUR / YEAST ]", CENTER_X, y + 85, 2);
     }
   };
 
@@ -911,13 +920,13 @@ void drawDispenserTestMenu() {
     tft.setTextColor(TFT_WHITE);
     tft.drawString("DISPENSER TEST", 10, 15, 4);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
       drawRowTile(i, dispenserTestSelection == i, (dispenserTestSelection == i) && dispenserTestEditing);
     }
 
     tft.fillRect(0, 434, 320, 46, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("UP/DOWN: NAV/ADJUST   SELECT: START/STOP/EDIT", CENTER_X, 447, 1);
+    tft.drawCentreString("UP/DOWN: NAV   SELECT: START/EDIT/CAL", CENTER_X, 447, 1);
     tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
 
     dispenserTestNeedsFullRedraw = false;
@@ -928,7 +937,7 @@ void drawDispenserTestMenu() {
   } else {
     bool stateChanged = (prevOn != dispenserTestOn) || (prevSec != dispenserTestDurationSec) || (prevSel != dispenserTestSelection) || (prevEdit != dispenserTestEditing);
     if (dispenserTestOn || stateChanged) {
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < 3; i++) {
         drawRowTile(i, dispenserTestSelection == i, (dispenserTestSelection == i) && dispenserTestEditing);
       }
     }
@@ -936,6 +945,118 @@ void drawDispenserTestMenu() {
     prevEdit = dispenserTestEditing;
     prevOn = dispenserTestOn;
     prevSec = dispenserTestDurationSec;
+  }
+}
+
+void drawDispenserCalMenu() {
+  static int prevSel = -1;
+  static bool prevEdit = false;
+  static bool prevOn = false;
+  static float prevGrams = -1.0f;
+  static bool prevSaved = false;
+
+  char buf[48];
+
+  auto drawCalCard = [&](int row, bool sel, bool edit) {
+    int y = 56 + (row * 122);
+    int w = 300;
+    int h = 116;
+    int x = 10;
+
+    uint16_t bg = sel ? (edit ? 0x03E0 : 0x3566) : 0xD6BA;
+    uint16_t fg = sel ? TFT_WHITE : TFT_BLACK;
+
+    if (row == 0) {
+      bg = dispenserTestOn ? 0x0400 : (sel ? 0xF800 : 0x4208);
+      fg = TFT_WHITE;
+    } else if (row == 2) {
+      bg = dispenserCalSaved ? 0x0400 : (sel ? 0x3566 : 0x2124);
+      fg = TFT_WHITE;
+    }
+
+    tft.fillRect(x, y, w, h, bg);
+    tft.setTextColor(fg, bg);
+
+    if (sel && edit) {
+      tft.drawRect(x, y, w, h, TFT_WHITE);
+      tft.drawRect(x + 1, y + 1, w - 2, h - 2, TFT_WHITE);
+    } else if (sel) {
+      tft.drawRect(x, y, w, h, TFT_WHITE);
+    } else {
+      tft.drawRect(x, y, w, h, TFT_DARKGREY);
+    }
+
+    if (row == 0) {
+      tft.drawCentreString("1. RUN TEST PULSE", CENTER_X, y + 14, 2);
+      if (dispenserTestOn) {
+        uint32_t elapsed = millis() - dispenserTestStartMs;
+        uint32_t totalMs = (uint32_t)dispenserCalTestSec * 1000;
+        int remSec = (int)((totalMs > elapsed ? totalMs - elapsed : 0) / 1000) + 1;
+        sprintf(buf, "%d SEC REMAINING", remSec);
+        tft.drawCentreString(buf, CENTER_X, y + 42, 4);
+        tft.drawCentreString("DISPENSING INTO SCALE...", CENTER_X, y + 84, 2);
+      } else {
+        sprintf(buf, "PULSE: %d SEC", dispenserCalTestSec);
+        tft.drawCentreString(buf, CENTER_X, y + 42, 4);
+        tft.drawCentreString(sel ? "[ PRESS SELECT TO PULSE ]" : "[ DISPENSE INTO SCALE ]", CENTER_X, y + 84, 2);
+      }
+    } else if (row == 1) {
+      tft.drawCentreString("2. ENTER WEIGHED GRAMS", CENTER_X, y + 14, 2);
+      sprintf(buf, "%.2f GRAMS", dispenserCalWeighedGrams);
+      tft.drawCentreString(buf, CENTER_X, y + 42, 4);
+      if (sel && edit) {
+        tft.drawCentreString("< UP/DN: 0.1g  L/R: 1.0g >", CENTER_X, y + 84, 2);
+      } else {
+        tft.drawCentreString(sel ? "[ PRESS SELECT TO EDIT ]" : "[ SCALE WEIGHED VALUE ]", CENTER_X, y + 84, 2);
+      }
+    } else if (row == 2) {
+      tft.drawCentreString("3. CONVERSION & SAVE", CENTER_X, y + 12, 2);
+      float calculatedRate = dispenserCalWeighedGrams > 0.05f ? (dispenserCalWeighedGrams / (float)dispenserCalTestSec) : 0.0f;
+      float calculatedMsG = calculatedRate > 0.001f ? (1000.0f / calculatedRate) : 0.0f;
+      sprintf(buf, "Rate: %.3f g/s  (%.0f ms/g)", calculatedRate, calculatedMsG);
+      tft.drawCentreString(buf, CENTER_X, y + 38, 2);
+
+      if (dispenserCalSaved) {
+        tft.drawCentreString("CALIBRATION SAVED!", CENTER_X, y + 68, 4);
+      } else {
+        tft.drawCentreString(sel ? "[ SELECT: SAVE TO NVS ]" : "[ NVS PERSISTED ]", CENTER_X, y + 68, 4);
+      }
+    }
+  };
+
+  if (dispenserCalNeedsFullRedraw) {
+    tft.fillRect(0, 0, 320, 50, 0x03E0);
+    tft.fillRect(0, 50, 320, 430, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("DISPENSER CALIBRATION", 10, 15, 4);
+
+    for (int i = 0; i < 3; i++) {
+      drawCalCard(i, dispenserCalSelection == i, (dispenserCalSelection == i) && dispenserCalEditing);
+    }
+
+    tft.fillRect(0, 434, 320, 46, TFT_WHITE);
+    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
+    tft.drawCentreString("UP/DOWN: NAV   SELECT: RUN/EDIT/SAVE", CENTER_X, 447, 1);
+    tft.drawCentreString("RETURN: BACK TO TEST", CENTER_X, 462, 1);
+
+    dispenserCalNeedsFullRedraw = false;
+    prevSel = dispenserCalSelection;
+    prevEdit = dispenserCalEditing;
+    prevOn = dispenserTestOn;
+    prevGrams = dispenserCalWeighedGrams;
+    prevSaved = dispenserCalSaved;
+  } else {
+    bool stateChanged = (prevOn != dispenserTestOn) || (prevGrams != dispenserCalWeighedGrams) || (prevSel != dispenserCalSelection) || (prevEdit != dispenserCalEditing) || (prevSaved != dispenserCalSaved);
+    if (dispenserTestOn || stateChanged) {
+      for (int i = 0; i < 3; i++) {
+        drawCalCard(i, dispenserCalSelection == i, (dispenserCalSelection == i) && dispenserCalEditing);
+      }
+    }
+    prevSel = dispenserCalSelection;
+    prevEdit = dispenserCalEditing;
+    prevOn = dispenserTestOn;
+    prevGrams = dispenserCalWeighedGrams;
+    prevSaved = dispenserCalSaved;
   }
 }
 
