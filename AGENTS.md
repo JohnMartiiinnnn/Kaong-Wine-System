@@ -101,8 +101,11 @@ src/
 *   `SENSOR_MONITOR`: Raw value display for debugging (accessed via SENSOR VALUES on Main Menu).
 *   `LOAD_CELL_PAGE`: Simple scale tare utility, now located as item #11 inside `SYSTEM CHECK` menu.
 *   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, now located as item #12 inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
-*   **Data Logging:** Records all sensor data to `/data_log.csv` every 60 seconds.
-*   **Web Dashboard:** Soft-AP `WineBrew_System` (pass: `12345678`), mDNS `winebrew.local`. Live JSON at `/data`, UI at `/`.
+*   **Data Logging & Persistence**:
+    *   **On-Board SD Logging**: Automatically creates batch-named CSV files (e.g. `/brew_YYYYMMDD_HHMM.csv`) capturing all 21 system parameters every 60 seconds.
+    *   **Wi-Fi Log Export**: Web server routes `/log.csv` and `/download` stream the active batch CSV directly to browser/clients over Wi-Fi.
+    *   **24/7 Autonomous Server Daemon**: Background service on Beelink (`winebrew-logger.service`) polls `/data` every 5s and writes second-precision telemetry directly to `/home/dave/winebrew-logs/` with zero manual intervention.
+*   **Web Dashboard:** Soft-AP `WineBrew_System` (pass: `12345678`), mDNS `winebrew.local`, IP `192.168.1.137`. Live JSON at `/data`, web UI at `/`, one-click batch export at `/log.csv`.
 
 ---
 
