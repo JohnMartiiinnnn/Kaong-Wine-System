@@ -2827,11 +2827,12 @@ void loop() {
               currentHeatingPercent = (int)pidOut;
               if (simManual[2]) currentHeatingPercent = 0;
             }
-            if (liquidTemp >= stageTargetTemp[2]) {
-              if (!pastHolding) {
+            if (!pastHolding) {
+              if (liquidTemp >= stageTargetTemp[2]) {
                 pastHolding = true;
                 pastHoldStart = millis();
               }
+            } else {
               if (millis() - pastHoldStart >= PAST_HOLD_MS) {
                 pastSterilized = true;
                 pastHolding = false;
@@ -2846,8 +2847,6 @@ void loop() {
                 mcp.digitalWrite(LIGHT_G, RELAY_ON);
                 dashNeedsFullRedraw = true;
               }
-            } else {
-              pastHolding = false;
             }
           } else {
             // Sensor disconnect safety interlock
