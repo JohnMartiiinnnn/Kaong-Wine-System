@@ -17,6 +17,36 @@ from datetime import datetime
 DEFAULT_IP = "192.168.1.137"
 DEFAULT_INTERVAL = 5.0 # seconds
 
+CSV_LEGEND = [
+    ["# WineBrew Automated Wine Brewing System - Experimental Telemetry Log"],
+    ["# System Architecture: Primary ESP32 (Master) + Secondary ESP32 (Sensor Node) + RAPT Pill Hydrometer"],
+    ["#"],
+    ["# PARAMETER LEGEND & SENSOR SPECIFICATIONS:"],
+    ["# Date               : Sample Date (YYYY-MM-DD)"],
+    ["# Time               : Sample Timestamp with Second Precision (HH:MM:SS)"],
+    ["# Stage              : Active Stage (PREHEAT, FERMENTATION, PASTEURIZATION, IDLE)"],
+    ["# Volume_L           : Vat / Sap Volume in Liters (HX711 Load Cell)"],
+    ["# LocalAmbient_C     : Preheat Chamber Ambient Temperature (BME280, Celsius)"],
+    ["# PreheatLiquid_C    : Preheat Chamber Liquid Temperature (DS18B20 Probe 2, Celsius)"],
+    ["# PastLiquid_C       : Pasteurization Liquid Temperature (DS18B20 Probe 1, Celsius)"],
+    ["# FermAmbient_C      : Fermentation Enclosure Ambient Air Temperature (BME280 Remote, Celsius)"],
+    ["# FermLiquid_C       : Fermentation Vessel Liquid Temperature (DS18B20 Remote, Celsius)"],
+    ["# pH                 : Liquid Acidity / pH Level (ADS1115 Dual-Slope Calibrated Probe)"],
+    ["# Gravity            : Specific Gravity (RAPT Pill BLE Digital Hydrometer, calibrated to 1.000)"],
+    ["# ABV_pct            : Estimated Alcohol by Volume Percentage ((OG - FG) * 131.25)"],
+    ["# TargetTemp_C       : Closed-Loop Stage Target Temperature Setpoint (Celsius)"],
+    ["# Heater_pct         : SSR Heating Element Output Duty Cycle (0 - 100%)"],
+    ["# Fan_State          : Chamber Ventilation Fan (PREHEAT_FAN, FERM_FAN, OFF)"],
+    ["# Mixer_Mode         : Mixing Impeller Automation Mode (OFF, MANUAL, AUTO)"],
+    ["# MixerSpeed_pct     : JGB37 Mixing Motor Speed (0 - 100%)"],
+    ["# YeastDispensed_g   : Yeast Mass Dispensed into Fermentation Chamber (Grams)"],
+    ["# Pill_Battery_pct   : RAPT Pill Battery Level (0 - 100%)"],
+    ["# Pill_RSSI_dBm      : RAPT Pill Bluetooth Signal Strength (dBm)"],
+    ["# Motor_Sense_V      : Mixing Motor BTS7960 Current Sense Feedback Voltage (Volts)"],
+    ["# Active_Log_File    : Primary Controller Active SD Batch File Reference"],
+    ["#"]
+]
+
 CSV_HEADERS = [
     "Date",
     "Time",
@@ -95,6 +125,8 @@ def main():
     with open(csv_path, mode="a", newline="", buffering=1) as f:
         writer = csv.writer(f)
         if not file_exists:
+            for leg in CSV_LEGEND:
+                writer.writerow(leg)
             writer.writerow(CSV_HEADERS)
             f.flush()
 

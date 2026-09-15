@@ -25,8 +25,12 @@ void logDataToSD() {
   File dataFile  = SD.open(currentLogFile, FILE_APPEND);
   if (!dataFile)
     return;
-  if (!fileExists)
+  if (!fileExists) {
+    dataFile.println("# WineBrew Automated Wine Brewing System - Experimental Telemetry Log");
+    dataFile.println("# System Architecture: Primary Controller (Master) + Secondary Node + RAPT Pill Hydrometer");
+    dataFile.println("# Legend: Date,Time,Stage,Volume_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
     dataFile.println("Date,Time,Stage,Volume_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
+  }
 
   int h12 = now.hour() % 12;
   if (h12 == 0) h12 = 12;
