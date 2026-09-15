@@ -29,7 +29,7 @@ This guide documents the hardware specifications, DRV8871 motor driver configura
 const int DRV8871_IN1_PIN_CFG = 4;
 const int DRV8871_IN2_PIN_CFG = 5;
 const uint8_t MAX_YEAST_MOTOR_DUTY = 128;       // 50% duty cap (6.0V max for 6V motor on 11.93V rail)
-const float DEFAULT_MS_PER_GRAM_YEAST = 1000.0f; // Default calibration constant (1000 ms/g)
+const float DEFAULT_MS_PER_GRAM_YEAST = 1764.0f; // Empirical calibration fit: 0.567 g/s (1764 ms/g, R2=0.98)
 const uint32_t YEAST_DISPENSE_TIMEOUT_MS = 30000UL; // Safety cutoff timeout
 const uint16_t YEAST_BRAKE_DURATION_MS = 200;   // Active braking duration
 ```
@@ -59,20 +59,19 @@ The Yeast Dispenser module is available on both the Primary ESP32 (`src/`) and S
 
 ---
 
-## 4. Calibration & Testing Protocol
+## 4. Empirical Calibration & Fermentation Pitch Mixing
 
-### Step-by-Step Calibration
-1. Place a empty container on a digital scale and tare it to `0.0 g`.
-2. Run the motor for a fixed 5.0-second test run:
-   ```cpp
-   dispenseYeastDuration(5000);
-   ```
-3. Record the weight of the dispensed yeast (e.g. `4.8 g`).
-4. Update the system calibration factor:
-   ```cpp
-   float newFactor = calculateMsPerGram(5000.0f, 4.8f);
-   // newFactor = 1041.67 ms/g
-   ```
+### Empirical Calibration Model
+From 21 bench trials across pulse durations of 3s to 25s:
+* **Flow Rate**: $0.567\text{ g/s}$ ($\approx 1764.0\text{ ms/g}$)
+* **Linear Fit ($R^2 = 0.98$)**: $\text{Output (g)} = 0.567 \times \text{Time (s)}$
+
+### Proportional Pitch Mixing
+When transitioning into the Fermentation stage (`activeBrewStage == 1`), the system runs the mixing impeller for **10 seconds per 1 gram** of dispensed yeast:
+$$\text{Mixing Duration} = \text{Yeast Grams} \times 10.0\text{ s}$$
+* **3.0g dispensed**: Mixer runs for **30 seconds**.
+* **5.0g dispensed**: Mixer runs for **50 seconds**.
+After completing initial pitch mixing, it resumes the standard periodic cycle (5 minutes ON / 355 minutes OFF).
 5. Perform a verification dose:
    ```cpp
    dispenseYeastGrams(5.0f); // Dispenses exactly 5.0 grams of yeast
