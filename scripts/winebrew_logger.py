@@ -18,7 +18,8 @@ DEFAULT_IP = "192.168.1.137"
 DEFAULT_INTERVAL = 5.0 # seconds
 
 CSV_HEADERS = [
-    "Timestamp",
+    "Date",
+    "Time",
     "Stage",
     "Volume_L",
     "LocalAmbient_C",
@@ -112,7 +113,8 @@ def main():
                 mixer_str = MIXER_MODES.get(mixer_mode, str(mixer_mode))
 
                 row = [
-                    t_now.strftime("%Y-%m-%d %H:%M:%S"),
+                    t_now.strftime("%Y-%m-%d"),
+                    t_now.strftime("%H:%M:%S"),
                     stage_str,
                     f"{data.get('vol', 0.0):.2f}",
                     f"{data.get('la', 0.0):.2f}",
