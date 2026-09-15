@@ -364,6 +364,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("phCool", preHeatCooled);
   brewPrefs.putBool("pastSter", pastSterilized);
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
+  brewPrefs.putString("logFile", currentLogFile);
   brewPrefs.end();
 }
 
@@ -381,6 +382,7 @@ void loadBrewStateFromNVS() {
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
+    currentLogFile = brewPrefs.getString("logFile", "/data_log.csv");
     fermDurationMs = brewPrefs.getUInt("fermDur", 48UL * 3600 * 1000);
     originalGravity = brewPrefs.getFloat("og", 0.0f);
     String st = brewPrefs.getString("startTm", "");
@@ -600,6 +602,8 @@ void setup() {
     MDNS.addService("http", "tcp", 80);
   server.on("/", HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
+  server.on("/log.csv", HTTP_GET, handleDownloadLog);
+  server.on("/download", HTTP_GET, handleDownloadLog);
   server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -1171,6 +1175,11 @@ void loop() {
             const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
             sprintf(brewStartTime, "%02d/%02d %d:%02d%s", now.day(), now.month(),
                     h12, now.minute(), ampm);
+            char batchName[32];
+            sprintf(batchName, "/brew_%04d%02d%02d_%02d%02d.csv", now.year(), now.month(), now.day(), now.hour(), now.minute());
+            currentLogFile = String(batchName);
+          } else {
+            currentLogFile = "/data_log.csv";
           }
           originalGravity = 0.0f;
           ogSampleSum = 0.0f;

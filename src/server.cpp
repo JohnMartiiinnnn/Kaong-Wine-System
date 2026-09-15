@@ -37,6 +37,9 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
   <div class="card"><div class="label">ABV</div><div class="val" id="abv">--</div><span class="unit">%</span></div>
   <div class="card"><div class="label">Pill Battery</div><div class="val" id="bat">--</div><span class="unit" id="rssi"></span></div>
 </div>
+<div style="text-align:center;margin-top:1.25rem">
+  <a href="/log.csv" download style="display:inline-block;background:#0284c7;color:#fff;padding:.75rem 1.5rem;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)">Export Batch CSV Log</a>
+</div>
 <script>
 async function update(){
   try{
@@ -61,6 +64,37 @@ setInterval(update,1000);
 )rawliteral";
 
 void handleRoot() { server.send(200, "text/html", INDEX_HTML); }
+
+void handleDownloadLog() {
+  if (!sdStatus) {
+    server.send(503, "text/plain", "SD Card Not Initialized");
+    return;
+  }
+  String path = currentLogFile;
+  if (server.hasArg("file")) {
+    path = "/" + server.arg("file");
+  }
+  if (!SD.exists(path)) {
+    if (SD.exists("/data_log.csv")) {
+      path = "/data_log.csv";
+    } else {
+      server.send(404, "text/plain", "No CSV log file found on SD card");
+      return;
+    }
+  }
+  File file = SD.open(path, FILE_READ);
+  if (!file) {
+    server.send(500, "text/plain", "Failed to open CSV log file");
+    return;
+  }
+  String filename = path;
+  if (filename.startsWith("/")) filename = filename.substring(1);
+  server.sendHeader("Content-Type", "text/csv");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+  server.sendHeader("Connection", "close");
+  server.streamFile(file, "text/csv");
+  file.close();
+}
 
 void handleData() {
   String json = "{";
@@ -90,6 +124,8 @@ void handleData() {
   json += "\"fermTgt\":" + String(stageTargetTemp[1], 1) + ",";
   json += "\"hp\":" + String(currentHeatingPercent) + ",";
   json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
+  json += "\"yd\":" + String(actualYeastDispensedGrams, 2) + ",";
+  json += "\"logFile\":\"" + currentLogFile + "\",";
   json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1);
   json += "}";
   server.send(200, "application/json", json);

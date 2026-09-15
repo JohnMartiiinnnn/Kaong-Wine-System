@@ -3,3 +3,4 @@
 
 void handleRoot();
 void handleData();
+void handleDownloadLog();
