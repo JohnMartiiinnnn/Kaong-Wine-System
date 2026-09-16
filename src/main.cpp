@@ -2625,14 +2625,25 @@ void loop() {
       // 2. Empty Tank Detection via Flow Sensor (only evaluated after 15s priming grace period)
       if (millis() - transferStartMs >= TRANSFER_PRIMING_GRACE_MS && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
         if (stageTransferTarget == 1) {
-          // For Transfer 1: only declare done if scale confirms drain
-          if (hx711Status && currentWeight <= 0.5f) {
-            transferDone = true;
-          } else if (!hx711Status && transferVolumeTransferred >= 0.5f) {
-            transferDone = true;
+          // For Transfer 1: Pre-Heat tank has the HX711 scale
+          if (hx711Status) {
+            if (currentWeight <= 0.35f) {
+              // Scale confirms tank is empty
+              transferDone = true;
+            } else if (millis() - transferLastPulseMs >= 45000UL) {
+              // Scale says liquid is present (>0.35kg) but 45s of 0 pulses means hose clog/airlock
+              transferDryRunAlarm = true;
+              transferDone = true;
+            }
+            // Otherwise: scale confirms liquid is still in Pre-Heat, keep pump running to prime/drain!
           } else {
-            transferDryRunAlarm = true;
-            transferDone = true;
+            // No scale connected: fallback to volume moved
+            if (transferVolumeTransferred >= 0.5f) {
+              transferDone = true;
+            } else {
+              transferDryRunAlarm = true;
+              transferDone = true;
+            }
           }
         } else {
           // For Transfer 2 (Fermentation -> Pasteurization)
