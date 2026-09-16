@@ -256,6 +256,7 @@ extern uint32_t yeastDispenseStartMs;
 extern uint32_t yeastDispenseDurationMs;
 extern bool     isInitialPitchMixing;
 extern uint32_t pitchMixTotalDurationMs;
+extern uint32_t mixerTotalRunSec;
 
 // ---- UI / App State ----
 extern AppState currentAppState;
@@ -387,6 +388,8 @@ extern bool     transferTestNeedsFullRedraw;
 extern int      transferTestSelection;
 extern bool     pumpPreHeatFermOn;
 extern bool     pumpFermPastOn;
+extern volatile bool sysPump1Active;
+extern volatile bool sysPump2Active;
 extern volatile uint32_t flowPulse1;
 extern volatile uint32_t flowPulse2;
 extern float     flowKFactor[2];
@@ -424,8 +427,8 @@ extern float    transferStartWeight;
 extern float    transferTargetVolume;
 extern float    transferVolumeTransferred;
 extern bool     transferDryRunAlarm;
-extern uint32_t transferLastPulseMs;
-const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 5000;   // 5s of zero flow pulses while pump running triggers cutoff
+const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
+const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 10000;  // 10s of zero flow pulses while pump running triggers cutoff
 const uint32_t  TRANSFER_MAX_SAFETY_MS     = 300000; // 5 minutes absolute maximum pump runtime
 
 

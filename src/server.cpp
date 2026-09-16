@@ -132,7 +132,33 @@ void handleData() {
   json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
   json += "\"yd\":" + String(actualYeastDispensedGrams, 2) + ",";
   json += "\"logFile\":\"" + currentLogFile + "\",";
-  json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1);
+  json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1) + ",";
+
+  // Post-Batch-1 Comprehensive Telemetry Fields (Phase 4A)
+  float xfer_pct = (transferTargetVolume > 0.0f) ? ((transferVolumeTransferred / transferTargetVolume) * 100.0f) : 0.0f;
+  int p1 = (sysPump1Active || pumpPreHeatFermOn) ? 1 : 0;
+  int p2 = (sysPump2Active || pumpFermPastOn) ? 1 : 0;
+  int yd_state = isYeastDispensingActive ? 1 : ((actualYeastDispensedGrams > 0.0f && actualYeastDispensedGrams >= yeastPitchGrams) ? 2 : 0);
+  uint32_t mix_cyc_sec = (mixerRunning && mixerOnTimer > 0 && millis() >= mixerOnTimer) ? ((millis() - mixerOnTimer) / 1000UL) : 0;
+  float mix_tot_min = (float)mixerTotalRunSec / 60.0f;
+
+  json += "\"xfer\":" + String(stageTransferring ? 1 : 0) + ",";
+  json += "\"xfer_vol\":" + String(transferVolumeTransferred, 2) + ",";
+  json += "\"xfer_tgt\":" + String(transferTargetVolume, 2) + ",";
+  json += "\"xfer_pct\":" + String(xfer_pct, 1) + ",";
+  json += "\"p1\":" + String(p1) + ",";
+  json += "\"p2\":" + String(p2) + ",";
+  json += "\"tgt_ph\":" + String(stageTargetTemp[0], 1) + ",";
+  json += "\"tgt_cool\":" + String(preheatCoolTarget, 1) + ",";
+  json += "\"tgt_ferm\":" + String(stageTargetTemp[1], 1) + ",";
+  json += "\"tgt_past\":" + String(stageTargetTemp[2], 1) + ",";
+  json += "\"yd_tgt\":" + String(yeastPitchGrams, 2) + ",";
+  json += "\"yd_act\":" + String(actualYeastDispensedGrams, 2) + ",";
+  json += "\"yd_state\":" + String(yd_state) + ",";
+  json += "\"mix_mode\":" + String((int)currentMixerMode) + ",";
+  json += "\"mix_spd\":" + String(mixerSpeedPercent) + ",";
+  json += "\"mix_cyc_sec\":" + String(mix_cyc_sec) + ",";
+  json += "\"mix_tot_min\":" + String(mix_tot_min, 1);
   json += "}";
   server.send(200, "application/json", json);
 }

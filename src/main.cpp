@@ -91,6 +91,7 @@ uint32_t yeastDispenseStartMs = 0;
 uint32_t yeastDispenseDurationMs = 0;
 bool     isInitialPitchMixing = false;
 uint32_t pitchMixTotalDurationMs = 0;
+uint32_t mixerTotalRunSec = 0;
 
 // ---- UI / App State ----
 AppState currentAppState = SYSTEM_INIT;
@@ -367,6 +368,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("phCool", preHeatCooled);
   brewPrefs.putBool("pastSter", pastSterilized);
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
+  brewPrefs.putUInt("mixTotSec", mixerTotalRunSec);
   brewPrefs.putString("logFile", currentLogFile);
   brewPrefs.end();
 }
@@ -386,6 +388,7 @@ void loadBrewStateFromNVS() {
     stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
+    mixerTotalRunSec = brewPrefs.getUInt("mixTotSec", 0);
     currentLogFile = brewPrefs.getString("logFile", "/data_log.csv");
     fermDurationMs = brewPrefs.getUInt("fermDur", 48UL * 3600 * 1000);
     originalGravity = brewPrefs.getFloat("og", 0.0f);
@@ -405,6 +408,7 @@ void clearBrewStateInNVS() {
   brewPrefs.begin("winebrew", false);
   brewPrefs.clear();
   brewPrefs.end();
+  mixerTotalRunSec = 0;
 }
 
 // ---- Liquid Transfer Helper ----
@@ -2464,6 +2468,9 @@ void loop() {
   // Main 1s display update
   if (millis() - ld > 1000) {
     ld = millis();
+    if (mixerRunning || (currentMixerMode == MIXER_MANUAL && mixerSpeedPercent > 0)) {
+      mixerTotalRunSec++;
+    }
     // ---- PID Thermal Tracking Test Control ----
     if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
       static uint32_t pidTrackLastPidCalcMs = 0;
@@ -2610,29 +2617,38 @@ void loop() {
       bool transferDone = false;
 
       // 1. Pre-Heat scale empty check (For Transfer 1: Pre-Heat -> Fermentation)
-      // If scale physically reads <= 0.3L, tank is completely drained
-      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.3f && (millis() - transferStartMs >= 3000UL)) {
+      // If scale physically reads <= 0.25L, tank is completely drained
+      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.25f && (millis() - transferStartMs >= 3000UL)) {
         transferDone = true;
       }
 
-      // 2. Empty Tank Detection via Flow Sensor (5s of zero pulses after flow started)
-      // When tank runs out of liquid and pulls air, the turbine stops generating pulses
-      if (millis() - transferStartMs >= 4000UL && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
-        // If we already moved liquid, it means the source chamber has been completely drained
-        if (transferVolumeTransferred >= 0.3f || (stageTransferTarget == 1 && hx711Status && currentWeight <= 1.0f)) {
-          transferDone = true;
+      // 2. Empty Tank Detection via Flow Sensor (only evaluated after 15s priming grace period)
+      if (millis() - transferStartMs >= TRANSFER_PRIMING_GRACE_MS && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
+        if (stageTransferTarget == 1) {
+          // For Transfer 1: only declare done if scale confirms drain
+          if (hx711Status && currentWeight <= 0.5f) {
+            transferDone = true;
+          } else if (!hx711Status && transferVolumeTransferred >= 0.5f) {
+            transferDone = true;
+          } else {
+            transferDryRunAlarm = true;
+            transferDone = true;
+          }
         } else {
-          // If zero liquid moved from the start, sound dry-run alarm
-          transferDryRunAlarm = true;
-          transferDone = true;
+          // For Transfer 2 (Fermentation -> Pasteurization)
+          if (transferVolumeTransferred >= 0.8f * transferTargetVolume || transferVolumeTransferred >= 1.0f) {
+            transferDone = true;
+          } else {
+            transferDryRunAlarm = true;
+            transferDone = true;
+          }
         }
       }
 
-      // 3. Fallback: If Flow Sensor reached target volume AND scale confirms drain (or HX711 unavailable)
+      // 3. Fallback: If Flow Sensor reached target volume
       if (transferVolumeTransferred >= transferTargetVolume) {
         if (stageTransferTarget == 1 && hx711Status) {
-          // If scale still has liquid (> 0.5L), keep pumping to drain completely
-          if (currentWeight <= 0.5f) {
+          if (currentWeight <= 0.35f) {
             transferDone = true;
           }
         } else {
@@ -2651,6 +2667,24 @@ void loop() {
         setPump2(false);
         pumpPreHeatFermOn = false;
         pumpFermPastOn = false;
+
+        // CRITICAL HEATER SAFETY INTERLOCK:
+        // If transfer triggered a dry-run alarm or virtually no liquid was moved (< 0.5L),
+        // DO NOT advance stage and NEVER turn on heating!
+        if (transferDryRunAlarm || transferVolumeTransferred < 0.5f) {
+          currentHeatingPercent = 0;
+          digitalWrite(SSR_PREHEAT, LOW);
+          digitalWrite(SSR_FERM, LOW);
+          digitalWrite(SSR_PAST, LOW);
+          mcp.digitalWrite(LIGHT_R, RELAY_ON);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          dashNeedsFullRedraw = true;
+          if (currentAppState == DASHBOARD_ACTIVE)
+            drawDashboardLayout();
+          saveBrewStateToNVS();
+          return;
+        }
 
         activeBrewStage = stageTransferTarget;
         stageStartMillis = millis();
@@ -2715,8 +2749,12 @@ void loop() {
         liquidTemp = simTempOverride[activeBrewStage];
       } else if (activeBrewStage == 0 && (liquid1Status || liquid2Status)) {
         liquidTemp = getPreheatTemp();
-      } else if (activeBrewStage == 1 && incomingData.sensor2Status > 0) {
-        liquidTemp = incomingData.room2Temp;
+      } else if (activeBrewStage == 1) {
+        if (incomingData.room2LiquidTemp > -50.0f && incomingData.room2LiquidTemp < 100.0f) {
+          liquidTemp = getFermTemp();
+        } else if (incomingData.sensor2Status > 0) {
+          liquidTemp = incomingData.room2Temp; // Safe fallback to ambient only if liquid probe is disconnected
+        }
       } else if (activeBrewStage == 2 && liquid1Status) {
         liquidTemp = getPastTemp();
       }

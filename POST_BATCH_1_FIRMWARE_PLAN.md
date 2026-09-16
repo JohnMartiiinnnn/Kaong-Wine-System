@@ -1,27 +1,83 @@
 # Kaong Wine Firmware & Telemetry Post-Batch-1 Comprehensive Upgrade Plan
 
 **Created**: September 16, 2026  
-**Status**: Staged for Post-Batch-1 Deployment (Do Not Flash During Active Run)  
-**Target Repository**: `~/Projects/Kaong-Wine/`  
+**Status**: Staged for Post-Batch-1 Deployment (Ready for OTA Flash)  
+**Target Repositories**: `~/Projects/Kaong-Wine/` & `~/systems/`  
 
 ---
 
-## 1. Executive Summary & Problem Diagnosis
+## 1. Executive Summary & Incident Root Causes
 
-During the live execution of **Batch 1**, physical telemetry revealed three critical operational anomalies:
-1. **Fermentation Liquid Temperature Lag**: Chamber 2 ambient air reached the 38.0 °C setpoint, but actual liquid remained at ~34.4 °C because the PID controller was mistakenly assigned the ambient BME280 sensor instead of the submerged DS18B20 liquid probe, triggering cooling fans and throttling the heater prematurely.
-2. **Premature Transfer Cutoff**: Liquid transfer from Chamber 1 (Pre-Heat) to Chamber 2 (Fermentation) cut off prematurely because a 5-second pulse stall after moving just 0.3 L triggered the "empty tank" dry-run failsafe while the load cell scale still held liquid.
-3. **Telemetry Blindspots**: The web API (`/data`), local CSV logger, and Google Sheets lacked real-time visibility into active transfer progress, stage setpoints, yeast dispensing status/grams, and cumulative mixing motor runtime.
+During the live test of **Batch 1**, physical telemetry and hardware observation revealed four critical bugs:
+1. **Dry Pasteurization Heating Incident**: Transfer 2 (Fermentation to Pasteurization) stalled during initial priming. Because no flow pulses registered within 5.0 seconds, the code declared transfer complete, advanced to Pasteurization, and fired the Pasteurization heater at **100% duty cycle on an empty chamber**.
+2. **Premature Chamber 1 Cutoff**: Transfer 1 (Pre-Heat to Fermentation) stopped after moving only 300 mL due to an over-eager 5s dry-run timeout overriding the physical load cell scale.
+3. **Fermentation Liquid Temp Lag**: The PID controller was reading `incomingData.room2Temp` (ambient air inside the enclosure) instead of `incomingData.room2LiquidTemp` (submerged DS18B20 probe), throttling the quartz heater and turning ON cooling fans prematurely.
+4. **Telemetry Blindspots**: The web API (`/data`), local CSV logger, and Google Sheets lacked real-time visibility into active transfer progress, stage setpoints, yeast dispensing status/grams, and cumulative mixing runtime.
 
 ---
 
 ## 2. Comprehensive Implementation Specifications
 
-### Phase 1: Fermentation Temperature Control Fix (`src/main.cpp`)
+### Phase 1: Critical Heater Safety Interlock & Stage Protection (`src/main.cpp`)
+
+* **Strict Safety Rule**: A heating stage must **NEVER** start after an aborted or dry transfer.
+* **Implementation**:
+  ```cpp
+  if (transferDone) {
+      stageTransferring = false;
+      setPump1(false);
+      setPump2(false);
+      pumpPreHeatFermOn = false;
+      pumpFermPastOn = false;
+
+      // CRITICAL HEATER SAFETY INTERLOCK:
+      // If dry-run alarm triggered or virtually no liquid was moved (< 0.5L),
+      // DO NOT advance stage and NEVER turn on the heater!
+      if (transferDryRunAlarm || transferVolumeTransferred < 0.5f) {
+          // Force all heaters to 0% immediately
+          currentHeatingPercent = 0;
+          digitalWrite(SSR_PREHEAT, LOW);
+          digitalWrite(SSR_FERM, LOW);
+          digitalWrite(SSR_PAST, LOW);
+
+          // Trigger persistent alarm state on screen
+          alarmActive = true;
+          alarmType = ALARM_TEMP; // Or ALARM_TRANSFER_FAILED
+          buzzerAlarmActive = true;
+          mcp.digitalWrite(LIGHT_R, RELAY_ON);
+          mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+          mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+          return; // Abort stage advancement!
+      }
+
+      // Only advance stage if liquid transfer was physically confirmed
+      activeBrewStage = stageTransferTarget;
+      stageStartMillis = millis();
+      tempHistoryCount = 0;
+  }
+  ```
+
+---
+
+### Phase 2: Pump Priming Grace Window & Dual-Signal Drain Cutoff (`src/main.cpp`)
+
+* **File**: `src/main.cpp` (Lines 2600–2635)
+* **Priming Grace Window**: Give pumps **15 seconds** of run time (`TRANSFER_PRIMING_GRACE_MS = 15000UL`) before allowing any zero-pulse dry-run checks to trigger.
+* **Drain Detection Logic**:
+  1. **Transfer 1 (Pre-Heat -> Fermentation)**:
+     * Primary Trigger: `hx711Status && currentWeight <= 0.25f` (scale confirms physical drain).
+     * Flow Stall Check: Only allowed if `millis() - transferStartMs >= 15000UL` AND `millis() - transferLastPulseMs >= 10000UL` AND scale reads `< 0.5f`.
+  2. **Transfer 2 (Fermentation -> Pasteurization)**:
+     * Primary Trigger: Target volume reached (`transferVolumeTransferred >= transferTargetVolume`) with scale/batch verification.
+     * Flow Stall Check: Only allowed if `millis() - transferStartMs >= 15000UL` AND `millis() - transferLastPulseMs >= 10000UL` AND `transferVolumeTransferred >= 0.8f * transferTargetVolume`.
+  3. **Hardware Safety Ceiling**: Maintain 5-minute maximum continuous pump runtime limit.
+
+---
+
+### Phase 3: Fermentation Temperature Control Fix (`src/main.cpp`)
 
 * **File**: `src/main.cpp` (Lines 2701–2710)
-* **Bug**: Line 2707 assigns `liquidTemp = incomingData.room2Temp;` (ambient air).
-* **Fix**:
+* **Bug Fix**: Line 2707 switches to the submerged **DS18B20 liquid probe**:
   ```cpp
   // Prioritize true DS18B20 submerged liquid probe in Fermentation Tank
   if (incomingData.room2LiquidTemp > -50.0f && incomingData.room2LiquidTemp < 100.0f) {
@@ -31,76 +87,42 @@ During the live execution of **Batch 1**, physical telemetry revealed three crit
       liquidTemp = incomingData.room2Temp;
   }
   ```
-* **Expected Result**: PID loop observes true 34.4 °C liquid temp, drives quartz heater to 100% duty cycle, and keeps fermentation cooling fans OFF until the liquid itself crosses 38.0 °C.
+* **Expected Result**: PID loop tracks true liquid temp, fires quartz heater until liquid hits 38.0 °C, and keeps fermentation fans OFF during heating.
 
 ---
 
-### Phase 2: Dual-Signal Liquid Transfer & Drain Reliability (`src/main.cpp`)
+### Phase 4: Full Telemetry & 28-Column Pipeline Sync
 
-* **File**: `src/main.cpp` (Lines 2600–2635)
-* **Fix Strategy**:
-  1. **Primary Completion (Scale Drain)**: For Transfer 1 (Pre-Heat to Fermentation), transfer is only marked complete when `hx711Status && currentWeight <= 0.25f` (scale confirms physical drain).
-  2. **Flow Sensor Dry-Run Debounce**: Increase zero-pulse timeout from 5s to **10s** (`TRANSFER_DRYRUN_TIMEOUT_MS = 10000UL`), and require scale weight `< 0.5f` before declaring a dry tank.
-  3. **Transfer 2 (Fermentation to Pasteurization)**: Use flow sensor target volume (`transferVolumeTransferred >= transferTargetVolume`) with 10s zero-pulse tail debounce.
-  4. **Hardware Safety Ceiling**: Maintain 5-minute maximum continuous pump runtime limit.
-
----
-
-### Phase 3: Telemetry & State Exposure (`src/server.cpp` & `src/main.cpp`)
-
-#### A. Explicit Stage String Mapping
-When `stageTransferring == true`, map the active stage name to:
-* `XFER_PREHEAT_TO_FERM` (Transfer 1)
-* `XFER_FERM_TO_PAST` (Transfer 2)
-
-#### B. JSON `/data` Schema Expansion (`src/server.cpp`)
-Add the following fields to `handleData()`:
+#### A. JSON `/data` Schema (`src/server.cpp`)
+Add the following fields:
 * `"xfer"`: `stageTransferring ? 1 : 0`
-* `"xfer_vol"`: `transferVolumeTransferred` (Liters moved, 2 decimals)
-* `"xfer_tgt"`: `transferTargetVolume` (Target liters, 2 decimals)
-* `"xfer_pct"`: `(transferTargetVolume > 0) ? (int)((transferVolumeTransferred / transferTargetVolume) * 100) : 0`
-* `"p1"`: `pumpPreHeatFermOn ? 1 : 0`
-* `"p2"`: `pumpFermPastOn ? 1 : 0`
-* `"tgt_ph"`: `stageTargetTemp[0]` (Preheat Target, 40.0 °C)
-* `"tgt_cool"`: `preheatCoolTarget` (Preheat Cool Setpoint, 38.0 °C)
-* `"tgt_ferm"`: `stageTargetTemp[1]` (Fermentation Target, 38.0 °C)
-* `"tgt_past"`: `stageTargetTemp[2]` (Pasteurization Target, 72.0 °C)
-* `"yd_tgt"`: `targetYeastGrams` (Target Yeast, e.g. 24.0g)
-* `"yd_act"`: `actualYeastDispensedGrams` (Dispensed Yeast, grams)
-* `"yd_state"`: `yeastDispenserStateString` (`IDLE`, `DISPENSING`, `COMPLETE`)
-* `"mix_mode"`: `currentMixerMode` (`OFF`, `MANUAL`, `AUTO`)
-* `"mix_spd"`: `mixerSpeedPercent` (0–100%)
-* `"mix_cyc_sec"`: `mixerCycleElapsedSeconds` (Seconds in active ON cycle)
-* `"mix_tot_min"`: `mixerTotalRuntimeMinutes` (Cumulative mixing minutes)
+* `"xfer_vol"`: `transferVolumeTransferred`
+* `"xfer_tgt"`: `transferTargetVolume`
+* `"xfer_pct"`: `transferProgressPct`
+* `"p1"` / `"p2"`: `pump1_state` / `pump2_state`
+* `"tgt_ph"` / `"tgt_cool"` / `"tgt_ferm"` / `"tgt_past"`: Stage setpoints (40.0, 38.0, 38.0, 72.0 °C)
+* `"yd_tgt"` / `"yd_act"` / `"yd_state"`: Yeast target grams, actual dispensed grams, dispenser status
+* `"mix_mode"` / `"mix_spd"` / `"mix_cyc_sec"` / `"mix_tot_min"`: Mixer mode, speed, active cycle sec, total run min
+
+#### B. Local CSV & Google Sheets Auto-Sync (`winebrew_sheets_sync.py`)
+* Automatically formats and provisions these 28 columns into future batch tabs (`Batch 2`, `Batch 3`...).
+* Keeps frozen Row 1 headers and dynamic 5,000-row border expansion.
 
 ---
 
-### Phase 4: Local CSV & Google Sheets Pipeline Synchronization
+## 3. Deployment Checklist (Post-Batch 1)
 
-#### A. Local Logger (`logger_daemon.py` & `logging.cpp`)
-Update standard CSV headers to include the new 28-column telemetry schema.
-
-#### B. Google Sheets Streamer (`winebrew_sheets_sync.py`)
-* Update column headers in auto-tab creation (`Batch 1`, `Batch 2`...).
-* Standardize column alignments (Date/Time/Stage centered, measurements right-aligned).
-* Maintain the 5,000-row dynamic border extension and Row 1 frozen header.
-
----
-
-## 3. Post-Batch-1 Deployment Checklist
-
-When Batch 1 finishes:
-1. [ ] Apply `main.cpp` Line 2707 sensor assignment fix.
-2. [ ] Apply `main.cpp` transfer cutoff debounce and scale drain logic.
-3. [ ] Update `server.cpp` with expanded 28-field `/data` JSON schema.
-4. [ ] Build firmware locally:
+1. [x] Apply `main.cpp` safety interlock (never advance stage or heat if transfer failed).
+2. [x] Apply `main.cpp` 15-second pump priming grace window and drain cutoff logic.
+3. [x] Apply `main.cpp` Line 2707 submerged liquid probe fix.
+4. [x] Update `server.cpp` with 28-field `/data` schema.
+5. [x] Build firmware:
    ```bash
-   cd /home/dave/Projects/Kaong-Wine
-   pio run -e esp32dev
+   cd /home/dave/Projects/Kaong-Wine && pio run -e esp32dev
    ```
-5. [ ] Perform Over-The-Air (OTA) Flash to primary ESP32:
+6. [ ] Deploy via OTA:
    ```bash
    flash-winebrew
    ```
-6. [ ] Update and restart `winebrew-sheets-sync.service` on the Beelink.
-7. [ ] Run `Batch 2` and verify real-time yeast grams, mixing timers, transfer progress, and true liquid heating curve in Google Sheets.
+7. [ ] Verify Transfer Test menu on device to ensure Flow Sensor 2 registers turbine pulses.
+8. [ ] Start `Batch 2` with full telemetry streaming to Google Sheets.
