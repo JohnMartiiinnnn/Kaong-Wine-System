@@ -265,6 +265,7 @@ extern int menuSelection;
 extern bool wizardNeedsFullRedraw;
 extern int wizardSelection;
 extern bool bypassWeightCheck;
+extern bool transferTestMode;
 extern bool dashNeedsFullRedraw;
 extern int dashSelection;
 extern bool dashGraphSelected;

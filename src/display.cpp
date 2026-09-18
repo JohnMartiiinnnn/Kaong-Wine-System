@@ -58,36 +58,44 @@ void drawNewBrewWizard(bool valuesOnly) {
 
   // Helper: draw the live WEIGHT info tile (redrawn every 250ms)
   auto drawWeightTile = [&]() {
-    tft.fillRect(5, 55, 152, 65, 0xD6BA);
-    tft.drawRect(5, 55, 152, 65, TFT_DARKGREY);
+    tft.fillRect(5, 55, 152, 54, 0xD6BA);
+    tft.drawRect(5, 55, 152, 54, TFT_DARKGREY);
     tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-    tft.drawCentreString("WEIGHT", 81, 59, 1);
+    tft.drawCentreString("WEIGHT", 81, 58, 1);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
     if (hx711Status) sprintf(buf, "%.1f L", currentWeight); else strcpy(buf, "--");
-    tft.drawCentreString(buf, 81, 77, 4);
+    tft.drawCentreString(buf, 81, 74, 4);
   };
 
-  // Helper: draw START BREW tile
+  // Helper: draw START BREW / START XFER TEST tile
   auto drawStartTile = [&]() {
-    bool isProceedSel = (wizardSelection == 1);
-    uint16_t procBg = canProceed ? (isProceedSel ? 0x3566 : 0x0400) : (isProceedSel ? 0xF800 : 0x4208);
-    tft.fillRect(10, 188, 300, 241, procBg);
+    bool isProceedSel = (wizardSelection == 2);
+    uint16_t procBg = canProceed ? (isProceedSel ? 0x3566 : (transferTestMode ? 0x03E0 : 0x0400)) : (isProceedSel ? 0xF800 : 0x4208);
+    tft.fillRect(10, 222, 300, 204, procBg);
     tft.setTextColor(TFT_WHITE, procBg);
     if (canProceed) {
-      tft.drawCentreString("START BREW", CENTER_X, 260, 4);
-      tft.drawCentreString("SELECT TO CONFIRM", CENTER_X, 298, 2);
-      sprintf(buf, "PRE: %.1fC | COOL: %.1fC | FERM: %.1fC", stageTargetTemp[0], preheatCoolTarget, stageTargetTemp[1]);
-      tft.drawCentreString(buf, CENTER_X, 340, 2);
-      tft.drawCentreString("(ADJUST RECIPE IN SETTINGS)", CENTER_X, 365, 1);
+      if (transferTestMode) {
+        tft.drawCentreString("START XFER TEST", CENTER_X, 246, 4);
+        tft.drawCentreString("SELECT TO CONFIRM", CENTER_X, 282, 2);
+        tft.drawCentreString("PRE -> FERM -> PAST", CENTER_X, 316, 2);
+        tft.drawCentreString("NO HEAT | NO DISPENSE | NO FANS", CENTER_X, 342, 2);
+        tft.drawCentreString("(DIRECT SEQUENTIAL TRANSFER)", CENTER_X, 375, 1);
+      } else {
+        tft.drawCentreString("START BREW", CENTER_X, 246, 4);
+        tft.drawCentreString("SELECT TO CONFIRM", CENTER_X, 282, 2);
+        sprintf(buf, "PRE: %.1fC | COOL: %.1fC | FERM: %.1fC", stageTargetTemp[0], preheatCoolTarget, stageTargetTemp[1]);
+        tft.drawCentreString(buf, CENTER_X, 330, 2);
+        tft.drawCentreString("(ADJUST RECIPE IN SETTINGS)", CENTER_X, 365, 1);
+      }
     } else {
-      tft.drawCentreString("LOCKED", CENTER_X, 260, 4);
-      tft.drawCentreString("MIN VOLUME NOT MET", CENTER_X, 298, 2);
-      tft.drawCentreString("ENABLE WEIGHT BYPASS", CENTER_X, 320, 2);
+      tft.drawCentreString("LOCKED", CENTER_X, 246, 4);
+      tft.drawCentreString("MIN VOLUME NOT MET", CENTER_X, 282, 2);
+      tft.drawCentreString("ENABLE WEIGHT BYPASS", CENTER_X, 315, 2);
       sprintf(buf, "PRE: %.1fC | COOL: %.1fC | FERM: %.1fC", stageTargetTemp[0], preheatCoolTarget, stageTargetTemp[1]);
-      tft.drawCentreString(buf, CENTER_X, 355, 2);
+      tft.drawCentreString(buf, CENTER_X, 350, 2);
     }
-    if (isProceedSel) { tft.drawRect(10, 188, 300, 241, TFT_WHITE); tft.drawRect(11, 189, 298, 239, TFT_WHITE); }
-    else tft.drawRect(10, 188, 300, 241, TFT_DARKGREY);
+    if (isProceedSel) { tft.drawRect(10, 222, 300, 204, TFT_WHITE); tft.drawRect(11, 223, 298, 202, TFT_WHITE); }
+    else tft.drawRect(10, 222, 300, 204, TFT_DARKGREY);
   };
 
   if (valuesOnly) {
@@ -111,28 +119,41 @@ void drawNewBrewWizard(bool valuesOnly) {
 
   // Info tiles: WEIGHT (live) | MIN REQ (static)
   drawWeightTile();
-  tft.fillRect(163, 55, 152, 65, 0xD6BA);
-  tft.drawRect(163, 55, 152, 65, TFT_DARKGREY);
+  tft.fillRect(163, 55, 152, 54, 0xD6BA);
+  tft.drawRect(163, 55, 152, 54, TFT_DARKGREY);
   tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("MIN REQ", 239, 59, 1);
+  tft.drawCentreString("MIN REQ", 239, 58, 1);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
   sprintf(buf, "%.1f L", minVolumeReq);
-  tft.drawCentreString(buf, 239, 77, 4);
+  tft.drawCentreString(buf, 239, 74, 4);
 
   // Row 0: Weight bypass toggle (wizardSelection == 0)
   bool isBypassSel = (wizardSelection == 0);
   uint16_t bypassBg = isBypassSel ? 0x3566 : (bypassWeightCheck ? 0x03E0 : 0xD6BA);
   uint16_t bypassFg = (isBypassSel || bypassWeightCheck) ? TFT_WHITE : TFT_BLACK;
-  tft.fillRect(10, 124, 300, 60, bypassBg);
+  tft.fillRect(10, 114, 300, 48, bypassBg);
   tft.setTextColor(bypassFg, bypassBg);
-  tft.drawString("WEIGHT BYPASS", 18, 133, 2);
+  tft.drawString("WEIGHT BYPASS", 18, 122, 2);
   tft.setTextPadding(90);
-  tft.drawRightString(bypassWeightCheck ? "ON" : "OFF", 302, 136, 4);
+  tft.drawRightString(bypassWeightCheck ? "ON" : "OFF", 302, 124, 4);
   tft.setTextPadding(0);
-  if (isBypassSel) { tft.drawRect(10, 124, 300, 60, TFT_WHITE); tft.drawRect(11, 125, 298, 58, TFT_WHITE); }
-  else tft.drawRect(10, 124, 300, 60, TFT_DARKGREY);
+  if (isBypassSel) { tft.drawRect(10, 114, 300, 48, TFT_WHITE); tft.drawRect(11, 115, 298, 46, TFT_WHITE); }
+  else tft.drawRect(10, 114, 300, 48, TFT_DARKGREY);
 
-  // Row 1: START BREW button
+  // Row 1: Transfer test toggle (wizardSelection == 1)
+  bool isXferSel = (wizardSelection == 1);
+  uint16_t xferBg = isXferSel ? 0x3566 : (transferTestMode ? 0x03E0 : 0xD6BA);
+  uint16_t xferFg = (isXferSel || transferTestMode) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(10, 168, 300, 48, xferBg);
+  tft.setTextColor(xferFg, xferBg);
+  tft.drawString("TRANSFER TEST", 18, 176, 2);
+  tft.setTextPadding(90);
+  tft.drawRightString(transferTestMode ? "ON" : "OFF", 302, 178, 4);
+  tft.setTextPadding(0);
+  if (isXferSel) { tft.drawRect(10, 168, 300, 48, TFT_WHITE); tft.drawRect(11, 169, 298, 46, TFT_WHITE); }
+  else tft.drawRect(10, 168, 300, 48, TFT_DARKGREY);
+
+  // Row 2: START BREW / START XFER TEST button (wizardSelection == 2)
   drawStartTile();
 }
 

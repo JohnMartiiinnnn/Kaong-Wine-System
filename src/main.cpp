@@ -100,6 +100,7 @@ int menuSelection = 0;
 bool wizardNeedsFullRedraw = true;
 int wizardSelection = 0;
 bool bypassWeightCheck = false;
+bool transferTestMode = false;
 bool settingsNeedsFullRedraw = true;
 int settingsSelection = 0;
 bool settingsEditing = false;
@@ -367,6 +368,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("phSter", preHeatSterilized);
   brewPrefs.putBool("phCool", preHeatCooled);
   brewPrefs.putBool("pastSter", pastSterilized);
+  brewPrefs.putBool("xferTest", transferTestMode);
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
   brewPrefs.putUInt("mixTotSec", mixerTotalRunSec);
   brewPrefs.putString("logFile", currentLogFile);
@@ -379,6 +381,7 @@ void loadBrewStateFromNVS() {
   if (activeBrewStage >= 0) {
     stageTransferring = brewPrefs.getBool("xfer", false);
     stageTransferTarget = brewPrefs.getInt("xferTgt", -1);
+    transferTestMode = brewPrefs.getBool("xferTest", false);
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
     minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
@@ -822,7 +825,7 @@ void loop() {
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
       if (cDown && !ljDown) {
-        wizardSelection = (wizardSelection + 1) % 2;
+        wizardSelection = (wizardSelection + 1) % 3;
         drawNewBrewWizard();
       }
     } else if (currentAppState == SETTINGS_MENU) {
@@ -994,7 +997,7 @@ void loop() {
       menuSelection = (menuSelection + 3) % 4;
       drawStartMenu();
     } else if (currentAppState == NEW_BREW_WIZARD) {
-      wizardSelection = (wizardSelection + 1) % 2;
+      wizardSelection = (wizardSelection + 2) % 3;
       drawNewBrewWizard();
     } else if (currentAppState == SETTINGS_MENU) {
       if (settingsEditing) {
@@ -1179,6 +1182,9 @@ void loop() {
         bypassWeightCheck = !bypassWeightCheck;
         drawNewBrewWizard();
       } else if (wizardSelection == 1) {
+        transferTestMode = !transferTestMode;
+        drawNewBrewWizard();
+      } else if (wizardSelection == 2) {
         if (bypassWeightCheck || currentWeight >= minVolumeReq) {
           if (rtcStatus) {
             DateTime now = rtc.now();
@@ -1196,7 +1202,7 @@ void loop() {
           originalGravity = 0.0f;
           ogSampleSum = 0.0f;
           ogSampleCount = 0;
-          ogCapturing = true;
+          ogCapturing = !transferTestMode;
           activeBrewStage = 0;
           simRunActive = false;
           stageStartMillis = millis();
@@ -1211,8 +1217,8 @@ void loop() {
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-          preHeatSterilized = skipPreheatHeater;
-          preHeatCooled = skipPreheatHeater;
+          preHeatSterilized = skipPreheatHeater || transferTestMode;
+          preHeatCooled = skipPreheatHeater || transferTestMode;
           preHeatHolding = false;
           pastSterilized = false;
           pastHolding = false;
@@ -1224,6 +1230,19 @@ void loop() {
           simManual[0] = simManual[1] = simManual[2] = false;
           stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
           stageParamEditing = false;
+          if (transferTestMode) {
+            currentHeatingPercent = 0;
+            digitalWrite(SSR_PREHEAT, LOW);
+            digitalWrite(SSR_FERM, LOW);
+            digitalWrite(SSR_PAST, LOW);
+            isFanOn = false;
+            isFermFanOn = false;
+            mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+            mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+            setFanSpeed(0);
+            startLiquidTransfer(1);
+          }
           saveBrewStateToNVS();
           currentAppState = DASHBOARD_ACTIVE;
           dashNeedsFullRedraw = true;
@@ -2697,6 +2716,40 @@ void loop() {
           return;
         }
 
+        if (transferTestMode) {
+          if (stageTransferTarget == 1) {
+            // Transfer 1 (Pre-Heat -> Ferm) complete in Test Mode!
+            // Immediately chain Transfer 2 (Ferm -> Past) with NO delay, NO heating, NO yeast dispensing
+            activeBrewStage = 1;
+            stageElapsedMs[0] = millis() - stageStartMillis;
+            startLiquidTransfer(2);
+            saveBrewStateToNVS();
+            dashNeedsFullRedraw = true;
+            if (currentAppState == DASHBOARD_ACTIVE)
+              drawDashboardLayout();
+            return;
+          } else if (stageTransferTarget == 2) {
+            // Transfer 2 (Ferm -> Past) complete in Test Mode!
+            // End the test safely with all heaters/fans/pumps OFF
+            stageElapsedMs[1] = millis() - stageStartMillis;
+            activeBrewStage = -1;
+            stageTransferring = false;
+            transferTestMode = false;
+            currentHeatingPercent = 0;
+            digitalWrite(SSR_PREHEAT, LOW);
+            digitalWrite(SSR_FERM, LOW);
+            digitalWrite(SSR_PAST, LOW);
+            clearBrewStateInNVS();
+            mcp.digitalWrite(LIGHT_R, RELAY_ON);
+            mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+            mcp.digitalWrite(LIGHT_G, RELAY_ON);
+            dashNeedsFullRedraw = true;
+            if (currentAppState == DASHBOARD_ACTIVE)
+              drawDashboardLayout();
+            return;
+          }
+        }
+
         activeBrewStage = stageTransferTarget;
         stageStartMillis = millis();
         tempHistoryCount = 0;
@@ -2776,7 +2829,17 @@ void loop() {
       float brewDt = (!pidTick || brewPidLastMs == 0) ? 1.0f : (brewNow - brewPidLastMs) / 1000.0f;
       if (pidTick) brewPidLastMs = brewNow;
 
-      if (activeBrewStage == 0) {
+      if (transferTestMode) {
+        currentHeatingPercent = 0;
+        isFanOn = false;
+        isFermFanOn = false;
+        setFanSpeed(0);
+        if (activeBrewStage == 0 && !stageTransferring) {
+          startLiquidTransfer(1);
+        } else if (activeBrewStage == 1 && !stageTransferring) {
+          startLiquidTransfer(2);
+        }
+      } else if (activeBrewStage == 0) {
         if (!preHeatSterilized) {
           if (skipPreheatHeater) {
             preHeatSterilized = true;
@@ -3015,11 +3078,11 @@ void loop() {
       else
         activeHeaterPin = SSR_PAST;
     } else if (activeBrewStage == 0) {
-      activeHeaterPin = skipPreheatHeater ? -1 : SSR_PREHEAT;
+      activeHeaterPin = (skipPreheatHeater || transferTestMode) ? -1 : SSR_PREHEAT;
     } else if (activeBrewStage == 1) {
-      activeHeaterPin = SSR_FERM;
+      activeHeaterPin = transferTestMode ? -1 : SSR_FERM;
     } else if (activeBrewStage == 2) {
-      activeHeaterPin = SSR_PAST;
+      activeHeaterPin = transferTestMode ? -1 : SSR_PAST;
     }
 
     if (millis() - pidWindowStart >= PID_WINDOW_MS) {
