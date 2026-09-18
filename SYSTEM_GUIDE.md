@@ -129,11 +129,17 @@ Navigated with UP/DOWN and confirmed with SELECT.
 
 Selecting NEW BREW opens the setup wizard:
 
-* **WEIGHT & MIN REQ**: Real-time sap weight from the HX711 load cell displayed alongside the minimum required volume.
-* **WEIGHT BYPASS (Row 0)**: Allows starting a test run with water or empty tanks without meeting the minimum volume threshold.
-* **START BREW (Row 1)**: Becomes active once weight requirements are met or bypassed. Displays your active recipe target temperatures:
-  `PRE: 40.0C | COOL: 38.0C | FERM: 30.0C`
-  Pressing SELECT confirms and begins Stage 0 (Pre-heating).
+* **WEIGHT & MIN REQ**: Real-time sap weight from the HX711 load cell displayed alongside the minimum required volume (e.g., 10.0 L).
+* **WEIGHT BYPASS (Row 0)**: Allows starting a test run with water or small volumes without meeting the minimum volume threshold.
+* **TRANSFER TEST (Row 1)**: Dedicated hydraulic dual-transfer test toggle. When **ON**:
+  * Bypasses all heating (0% SSR duty cycle on all heaters).
+  * Bypasses yeast dispensing and fermentation cooling fans.
+  * Begins with Transfer 1 (Pre-Heat -> Fermentation via Pump 1).
+  * Automatically chains to Transfer 2 (Fermentation -> Pasteurization via Pump 2) as soon as Pre-Heat drains empty (`<= 0.25 L`).
+  * Shuts off all pumps and lights solid completion indicators when Fermentation drains.
+* **START BREW / START XFER TEST (Row 2)**: Becomes active once weight requirements are met or bypassed.
+  * In normal mode: Displays recipe targets (`PRE: 40.0C | COOL: 38.0C | FERM: 30.0C`) and starts Stage 0 Pre-heating upon confirmation.
+  * In Transfer Test mode: Shows `START XFER TEST` and executes the continuous dual-pump hydraulic transfer upon confirmation.
 
 ### Settings Menu (Recipe & Hardware Preferences)
 
@@ -635,12 +641,21 @@ In addition to onboard SD card logging, the system supports autonomous continuou
 
 ### Beelink 24/7 Background Telemetry Service
 * **Service Name**: `winebrew-logger.service` (systemd user daemon on Beelink)
-* **Log Location**: `/home/dave/systems/winebrew-logger/logs/winebrew_log_YYYYMMDD.csv`
+* **Log Location**: `/home/dave/winebrew-logs/brew_wifi_YYYYMMDD_HHMMSS.csv`
+* **Auto-Batch Rotation**: Automatically rotates into a new CSV file whenever a new brew or transfer test starts from IDLE, while standby noise routes to `idle_telemetry.csv`.
 * **Polling Interval**: Every 5 seconds via `http://192.168.1.137/data`
 * **Logged Telemetry**: 22 fields per record including timestamp, brew stage, heater states, fan PWM, vat volume, all temperatures, pH, specific gravity, ABV, setpoints, RAPT Pill battery percentage, and BLE RSSI.
 * **Service Inspection**:
   * Check status: `systemctl --user status winebrew-logger.service`
   * Live log stream: `journalctl --user -u winebrew-logger.service -f`
+
+### Autonomous Google Sheets Multi-Tab Auto-Sync
+* **Service Name**: `winebrew-sheets-sync.service` (systemd user daemon on Beelink)
+* **Spreadsheet ID**: `1-sY0B5F_4n6nvDWJp9xJroC7EzBFKkt7Hdg7_S5KZBg`
+* **Functionality**:
+  * Automatically assigns sequential batch tabs (`Batch 1`, `Batch 2`, `Batch 3`, etc.) for every distinct CSV file.
+  * Formats each worksheet with custom background styling, centered alignment, dynamic 5,000-row expanding borders, and strictly frozen Row 1 headers.
+  * Streams new rows in near-real-time every 5 seconds without duplicate entries.
 
 ### Autonomous One-Click OTA Deployment
 Firmware updates can be compiled and flashed directly from the Beelink server over Wi-Fi without needing a USB cable or physical access to the brewing machine:
