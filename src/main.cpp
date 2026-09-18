@@ -101,6 +101,8 @@ bool wizardNeedsFullRedraw = true;
 int wizardSelection = 0;
 bool bypassWeightCheck = false;
 bool transferTestMode = false;
+float chamberVolume[3] = {0.0f, 0.0f, 0.0f};
+bool dryElementAlarm = false;
 bool settingsNeedsFullRedraw = true;
 int settingsSelection = 0;
 bool settingsEditing = false;
@@ -369,6 +371,9 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("phCool", preHeatCooled);
   brewPrefs.putBool("pastSter", pastSterilized);
   brewPrefs.putBool("xferTest", transferTestMode);
+  brewPrefs.putFloat("chVol1", chamberVolume[1]);
+  brewPrefs.putFloat("chVol2", chamberVolume[2]);
+  brewPrefs.putBool("dryAlarm", dryElementAlarm);
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
   brewPrefs.putUInt("mixTotSec", mixerTotalRunSec);
   brewPrefs.putString("logFile", currentLogFile);
@@ -382,6 +387,9 @@ void loadBrewStateFromNVS() {
     stageTransferring = brewPrefs.getBool("xfer", false);
     stageTransferTarget = brewPrefs.getInt("xferTgt", -1);
     transferTestMode = brewPrefs.getBool("xferTest", false);
+    chamberVolume[1] = brewPrefs.getFloat("chVol1", 0.0f);
+    chamberVolume[2] = brewPrefs.getFloat("chVol2", 0.0f);
+    dryElementAlarm = brewPrefs.getBool("dryAlarm", false);
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
     minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
@@ -1211,6 +1219,10 @@ void loop() {
           transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
           transferVolumeTransferred = 0.0f;
           transferDryRunAlarm = false;
+          dryElementAlarm = false;
+          chamberVolume[0] = (hx711Status && currentWeight > 0.0f) ? currentWeight : 0.0f;
+          chamberVolume[1] = 0.0f;
+          chamberVolume[2] = 0.0f;
           actualYeastDispensedGrams = 0.0f;
           isYeastDispensingActive = false;
           isInitialPitchMixing = false;
@@ -2716,6 +2728,14 @@ void loop() {
           return;
         }
 
+        if (stageTransferTarget == 1) {
+          chamberVolume[0] = 0.0f;
+          chamberVolume[1] = transferVolumeTransferred;
+        } else if (stageTransferTarget == 2) {
+          chamberVolume[1] = 0.0f;
+          chamberVolume[2] = transferVolumeTransferred;
+        }
+
         if (transferTestMode) {
           if (stageTransferTarget == 1) {
             // Transfer 1 (Pre-Heat -> Ferm) complete in Test Mode!
@@ -3117,6 +3137,80 @@ void loop() {
       }
     } else {
       quartzOnStartMs = 0;
+    }
+
+    // Low-Level Chamber Volume Interlock & Dry Element Protection Kill-Switch
+    // Minimum 5.0 Liters required in active chamber to permit any SSR activation
+    if (dryElementAlarm) {
+      pState = LOW;
+      fState = LOW;
+      pastState = LOW;
+      currentHeatingPercent = 0;
+    } else if (activeBrewStage >= 0 && activeBrewStage <= 2) {
+      if (pState == HIGH) {
+        float preheatVol = (hx711Status && currentWeight > 0.0f) ? currentWeight : chamberVolume[0];
+        if (preheatVol < MIN_HEATER_SAFE_VOLUME) {
+          pState = LOW;
+          currentHeatingPercent = 0;
+        }
+      }
+      if (fState == HIGH) {
+        if (chamberVolume[1] < MIN_HEATER_SAFE_VOLUME) {
+          fState = LOW;
+          currentHeatingPercent = 0;
+        }
+      }
+      if (pastState == HIGH) {
+        if (chamberVolume[2] < MIN_HEATER_SAFE_VOLUME) {
+          pastState = LOW;
+          currentHeatingPercent = 0;
+        }
+      }
+    }
+
+    // Dynamic Rate-of-Rise (RoR) Thermal Cutoff (2.0 °C / sec)
+    // Dry element heating in air spikes temperature rapidly (> 2.0 °C/s vs ~0.05 °C/s in 5+ L liquid)
+    static uint32_t lastRorCheckMs = 0;
+    static float lastHeaterSampleTemp = -999.0f;
+    static int lastSampledPin = -1;
+
+    if (pState == HIGH || fState == HIGH || pastState == HIGH) {
+      if (millis() - lastRorCheckMs >= 1000) {
+        float curSampleTemp = -999.0f;
+        int currentPin = -1;
+        if (pState == HIGH) {
+          curSampleTemp = getPreheatTemp();
+          currentPin = SSR_PREHEAT;
+        } else if (fState == HIGH) {
+          curSampleTemp = getFermTemp();
+          currentPin = SSR_FERM;
+        } else if (pastState == HIGH) {
+          curSampleTemp = getPastTemp();
+          currentPin = SSR_PAST;
+        }
+
+        if (curSampleTemp > -50.0f && curSampleTemp < 125.0f && lastHeaterSampleTemp > -50.0f && currentPin == lastSampledPin) {
+          float deltaTemp = curSampleTemp - lastHeaterSampleTemp;
+          float dtSec = (millis() - lastRorCheckMs) / 1000.0f;
+          float rateOfRise = (dtSec > 0.0f) ? (deltaTemp / dtSec) : 0.0f;
+
+          if (rateOfRise >= 2.0f) {
+            dryElementAlarm = true;
+            pState = LOW;
+            fState = LOW;
+            pastState = LOW;
+            currentHeatingPercent = 0;
+            saveBrewStateToNVS();
+          }
+        }
+        lastHeaterSampleTemp = curSampleTemp;
+        lastSampledPin = currentPin;
+        lastRorCheckMs = millis();
+      }
+    } else {
+      lastRorCheckMs = millis();
+      lastHeaterSampleTemp = -999.0f;
+      lastSampledPin = -1;
     }
 
     digitalWrite(SSR_PREHEAT, pState);
