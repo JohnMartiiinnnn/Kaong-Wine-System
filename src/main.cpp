@@ -886,18 +886,18 @@ void loop() {
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
-        dispenserTestDurationSec--;
-        if (dispenserTestDurationSec < 1) dispenserTestDurationSec = 1;
+        dispenserTestDurationSec++;
+        if (dispenserTestDurationSec > 60) dispenserTestDurationSec = 60;
       } else {
-        dispenserTestSelection = (dispenserTestSelection + 1) % 3;
+        dispenserTestSelection = (dispenserTestSelection + 2) % 3;
       }
       drawDispenserTestMenu();
     } else if (currentAppState == DISPENSER_CAL_MENU) {
       if (dispenserCalSelection == 1 && dispenserCalEditing) {
-        dispenserCalWeighedGrams -= 0.1f;
-        if (dispenserCalWeighedGrams < 0.1f) dispenserCalWeighedGrams = 0.1f;
+        dispenserCalWeighedGrams += 0.1f;
+        if (dispenserCalWeighedGrams > 50.0f) dispenserCalWeighedGrams = 50.0f;
       } else {
-        dispenserCalSelection = (dispenserCalSelection + 1) % 3;
+        dispenserCalSelection = (dispenserCalSelection + 2) % 3;
       }
       drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
@@ -1055,18 +1055,18 @@ void loop() {
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
-        dispenserTestDurationSec++;
-        if (dispenserTestDurationSec > 60) dispenserTestDurationSec = 60;
+        dispenserTestDurationSec--;
+        if (dispenserTestDurationSec < 1) dispenserTestDurationSec = 1;
       } else {
-        dispenserTestSelection = (dispenserTestSelection + 2) % 3;
+        dispenserTestSelection = (dispenserTestSelection + 1) % 3;
       }
       drawDispenserTestMenu();
     } else if (currentAppState == DISPENSER_CAL_MENU) {
       if (dispenserCalSelection == 1 && dispenserCalEditing) {
-        dispenserCalWeighedGrams += 0.1f;
-        if (dispenserCalWeighedGrams > 50.0f) dispenserCalWeighedGrams = 50.0f;
+        dispenserCalWeighedGrams -= 0.1f;
+        if (dispenserCalWeighedGrams < 0.1f) dispenserCalWeighedGrams = 0.1f;
       } else {
-        dispenserCalSelection = (dispenserCalSelection + 2) % 3;
+        dispenserCalSelection = (dispenserCalSelection + 1) % 3;
       }
       drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
