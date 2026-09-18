@@ -596,7 +596,27 @@ Hold the ESTOP button for 3 seconds. A progress bar fills on the screen. Release
 
 ---
 
-## 16. Status Lights
+## 16. Hardware Safety & Dry-Fire Protection
+
+The system includes multi-tier hardware and thermal failsafes to protect heating elements and probes:
+
+### 5.0L Chamber Volume Interlock (Low-Level SSR Kill-Switch)
+* **Pre-Heat Tank (Chamber 1)**: Interlocked with HX711 scale weight. If `< 5.0 kg`, `SSR_PREHEAT` is locked to 0V (OFF).
+* **Fermentation Tank (Chamber 2)**: Interlocked with accumulated Transfer 1 volume. If `< 5.0 L`, `SSR_FERM` (quartz heater) is locked to 0V (OFF).
+* **Pasteurization Tank (Chamber 3)**: Interlocked with accumulated Transfer 2 volume. If `< 5.0 L`, `SSR_PAST` (immersion heater) is locked to 0V (OFF).
+
+### Dynamic 2.0 °C / Second Thermal Rate-of-Rise (RoR) Cutoff
+* Evaluated every 1 second across all active heating cycles regardless of baseline temperature.
+* If probe temperature increases by **>= 2.0 °C in 1 second** (detecting dry element heating in air), `dryElementAlarm` trips immediately.
+* Forces all 3 SSRs OFF, sets heating output to 0%, and stores the alarm in NVS.
+
+### 1-Wire DS18B20 Dynamic Auto-Recovery
+* Automatically re-scans the OneWire bus every 5 seconds if a probe disconnects or errors.
+* Replacing a faulty probe restores live readings seamlessly without restarting the controller.
+
+---
+
+## 17. Status Lights
 
 Three relay-driven indicator lights show the current brew stage at a glance.
 

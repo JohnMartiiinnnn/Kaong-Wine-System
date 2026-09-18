@@ -119,10 +119,32 @@ The system supports automated batch brewing with NVS memory persistence:
 * **Stage 2: Pasteurization**
   * Target: Liquid heated to 65.0 C to 72.0 C via immersion heater and held for 15 minutes to stabilize wine.
   * Cooling: Natural or assisted cooling back to ambient before bottling.
+* **Dual-Transfer Test Mode (`TRANSFER TEST`)**
+  * Enabled in New Brew Wizard.
+  * Executes back-to-back fluid transfer tests (Chamber 1 -> Chamber 2 -> Chamber 3) with zero heating, zero fans, and zero yeast dispensing to safely validate pump flow and plumbing.
 
 ---
 
-## 5. Wireless OTA & Deployment Commands
+## 5. Hardware Safety Interlocks & Thermal Protection
+
+* **5.0L Chamber Volume Interlock (Low-Level SSR Kill-Switch)**
+  * Enforced unconditionally at the hardware output layer before `digitalWrite(SSR_*, HIGH)`.
+  * **Chamber 1 (Pre-Heat)**: Requires live scale reading `>= 5.0 kg`.
+  * **Chamber 2 (Fermentation)**: Requires accumulated Transfer 1 volume `>= 5.0 L`.
+  * **Chamber 3 (Pasteurization)**: Requires accumulated Transfer 2 volume `>= 5.0 L`.
+  * If volume is `< 5.0 L`, the corresponding SSR is hard-locked to 0V (OFF) and heating percent is zeroed.
+* **Dynamic 2.0 °C / Second Thermal Rate-of-Rise (RoR) Cutoff**
+  * Active whenever any SSR is firing, across any baseline temperature.
+  * Samples heater temperature every 1 second. If temperature climbs by `>= 2.0 °C / sec` (indicating bare heating coil in empty air rather than liquid), `dryElementAlarm` trips immediately.
+  * Forces all 3 SSRs to `LOW`, shuts down heating, and persists alarm state in NVS.
+* **Quartz Heater Pulse Limiter**
+  * Fermentation quartz heater continuous ON duration is capped at **1.5 seconds max** per pulse cycle to protect insulation.
+* **1-Wire DS18B20 Dynamic Hot-Plug Auto-Recovery**
+  * Re-scans OneWire bus every 5 seconds if sensors report disconnected or invalid readings (`-127.0 °C` or `85.0 °C`), restoring live telemetry automatically upon probe replacement.
+
+---
+
+## 6. Wireless OTA, Telemetry Daemon & Cloud Sync
 
 PlatformIO CLI commands for building and uploading firmware:
 
@@ -147,11 +169,13 @@ PlatformIO CLI commands for building and uploading firmware:
   `curl -s http://192.168.1.137/data`
 
 * **Beelink 24/7 Wi-Fi Telemetry Logger Service**:
-  * Daemon location: `/home/dave/systems/winebrew-logger/winebrew_logger.py`
-  * Logs storage: `/home/dave/systems/winebrew-logger/logs/winebrew_log_YYYYMMDD.csv`
-  * Systemd service: `winebrew-logger.service` (runs under `systemctl --user`)
+  * Daemon location: `~/thesis/Kaong-Wine/logger_daemon.py` / `/home/dave/systems/winebrew-logger/winebrew_logger.py`
+  * Dynamic batch rotation: Logs active brews to `brew_wifi_YYYYMMDD_HHMMSS.csv` and standby data to `idle_telemetry.csv`.
   * Status command: `systemctl --user status winebrew-logger.service`
-  * Live log tail: `journalctl --user -u winebrew-logger.service -f`
+
+* **Google Sheets Real-Time Multi-Batch Sync**:
+  * Sync script: `~/thesis/Kaong-Wine/winebrew_sheets_sync.py`
+  * Automatically provisions tabs (`Batch 1`, `Batch 2`, `Batch 3`), inserts styled bold headers, and freezes Row 1.
 
 * **Beelink Automated One-Click OTA Deployment**:
   * Command on Beelink: `flash-winebrew` (or `~/.local/bin/flash-winebrew`)
@@ -159,7 +183,7 @@ PlatformIO CLI commands for building and uploading firmware:
 
 ---
 
-## 6. Sensor Calibration References
+## 7. Sensor Calibration References
 
 * **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation. See [CALIBRATION_GUIDE.md](file:///Users/davepatrickbulaso/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
 * **Load Cell (HX711)**: Tare and calibration coefficient stored in NVS. Available in `SYSTEM CHECK` item 10 or `SETTINGS`.
