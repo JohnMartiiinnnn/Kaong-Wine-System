@@ -3147,8 +3147,34 @@ void loop() {
 
     tft.setTextPadding(0);
 
-    if (liquid1Status || liquid2Status)
+    // Autonomous DS18B20 Liquid Sensor Polling & Dynamic Hot-Plug Recovery
+    static uint32_t lastDs18PollMs = 0;
+    static uint32_t lastDs18ScanMs = 0;
+    uint32_t nowMs = millis();
+
+    if (nowMs - lastDs18PollMs >= 1500) {
+      lastDs18PollMs = nowMs;
       sharedLiquidSensors.requestTemperatures();
+
+      float pTemp = sharedLiquidSensors.getTempCByIndex(0);
+      float phTemp = sharedLiquidSensors.getTempCByIndex(1);
+
+      if (pTemp > -55.0f && pTemp < 125.0f && pTemp != DEVICE_DISCONNECTED_C) {
+        liquid1Status = true;
+      }
+      if (phTemp > -55.0f && phTemp < 125.0f && phTemp != DEVICE_DISCONNECTED_C) {
+        liquid2Status = true;
+      }
+    }
+
+    if ((!liquid1Status || !liquid2Status) && (nowMs - lastDs18ScanMs >= 5000)) {
+      lastDs18ScanMs = nowMs;
+      sharedLiquidSensors.begin();
+      sharedLiquidSensors.setWaitForConversion(false);
+      int devCount = sharedLiquidSensors.getDeviceCount();
+      if (devCount > 0) liquid1Status = true;
+      if (devCount > 1) liquid2Status = true;
+    }
 
     if (rtcStatus && currentAppState != SENSOR_MONITOR) {
       DateTime n = rtc.now();
