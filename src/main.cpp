@@ -2680,16 +2680,11 @@ void loop() {
 
       bool transferDone = false;
 
-      // 1. Primary Completion: Flow sensor reached the full target volume
-      if (transferVolumeTransferred >= transferTargetVolume) {
-        transferDone = true;
-      }
-
-      // 2. Empty Tank / Flow Stoppage Detection (evaluated after 15s priming grace period)
-      // If 5 consecutive seconds of 0 pulses occur while pumping:
+      // 1. Full Batch Drain-To-Empty Detection
+      // Evaluated after 15s priming grace period: if 5 consecutive seconds of 0 flow pulses occur:
       if (millis() - transferStartMs >= TRANSFER_PRIMING_GRACE_MS && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
         if (transferVolumeTransferred >= 0.5f) {
-          // Flow stopped because upstream tank is drained empty
+          // Flow stopped because upstream chamber has been drained completely empty
           transferDone = true;
         } else {
           // Flow never occurred or stopped before 0.5L (dry run / clogged line)
@@ -2698,7 +2693,7 @@ void loop() {
         }
       }
 
-      // 3. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
+      // 2. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
       if (millis() - transferStartMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
       }

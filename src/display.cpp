@@ -205,7 +205,10 @@ void updateDashboardValues() {
 
     // Est. Vol. Tile (x=5, y=176, w=152, h=45)
     tft.fillRect(7, 191, 148, 28, bgCard);
-    String volStr0 = hx711Status ? String(currentWeight, 1) + " L" : "-- L";
+    float preheatVol = (stageTransferring && stageTransferTarget == 1)
+                           ? (hx711Status ? currentWeight : max(0.0f, transferStartWeight - transferVolumeTransferred))
+                           : (hx711Status ? currentWeight : chamberVolume[0]);
+    String volStr0 = (preheatVol > 0.05f) ? String(preheatVol, 1) + " L" : ((activeBrewStage > 0) ? "0.0 L" : "-- L");
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(volStr0, 81, 193, 4);
 
@@ -254,8 +257,20 @@ void updateDashboardValues() {
 
     // Est. Vol. Tile (x=5, y=171, w=152, h=40)
     tft.fillRect(7, 185, 148, 24, bgCard);
-    float fermVol = (stageTransferring && stageTransferTarget == 1) ? transferVolumeTransferred : (chamberVolume[1] > 0.0f ? chamberVolume[1] : (stageTransferring ? transferVolumeTransferred : 0.0f));
-    String volStr1 = (fermVol > 0.0f || (stageTransferring && stageTransferTarget == 1)) ? String(fermVol, 1) + " L" : (chamberVolume[1] > 0.0f ? String(chamberVolume[1], 1) + " L" : "-- L");
+    float fermVol = 0.0f;
+    if (stageTransferring && stageTransferTarget == 1) {
+      fermVol = transferVolumeTransferred;
+    } else if (stageTransferring && stageTransferTarget == 2) {
+      float baseVol = (chamberVolume[1] > 0.0f) ? chamberVolume[1] : transferTargetVolume;
+      fermVol = max(0.0f, baseVol - transferVolumeTransferred);
+    } else if (activeBrewStage == 1) {
+      fermVol = (chamberVolume[1] > 0.0f) ? chamberVolume[1] : transferVolumeTransferred;
+    } else if (activeBrewStage > 1) {
+      fermVol = 0.0f;
+    }
+    String volStr1 = (fermVol > 0.05f || (stageTransferring && stageTransferTarget == 1))
+                         ? String(fermVol, 1) + " L"
+                         : ((activeBrewStage > 1) ? "0.0 L" : "-- L");
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(volStr1, 81, 186, 4);
 
@@ -325,8 +340,12 @@ void updateDashboardValues() {
 
     // Est. Vol. Tile (x=5, y=176, w=152, h=45)
     tft.fillRect(7, 191, 148, 28, bgCard);
-    float pastVol = (stageTransferring && stageTransferTarget == 2) ? transferVolumeTransferred : (chamberVolume[2] > 0.0f ? chamberVolume[2] : (stageTransferring ? transferVolumeTransferred : 0.0f));
-    String volStr2 = (pastVol > 0.0f || (stageTransferring && stageTransferTarget == 2)) ? String(pastVol, 1) + " L" : (chamberVolume[2] > 0.0f ? String(chamberVolume[2], 1) + " L" : "-- L");
+    float pastVol = (stageTransferring && stageTransferTarget == 2)
+                        ? transferVolumeTransferred
+                        : (chamberVolume[2] > 0.0f ? chamberVolume[2] : (activeBrewStage == 2 ? transferVolumeTransferred : 0.0f));
+    String volStr2 = (pastVol > 0.05f || (stageTransferring && stageTransferTarget == 2))
+                         ? String(pastVol, 1) + " L"
+                         : ((activeBrewStage == 2 && chamberVolume[2] > 0.0f) ? String(chamberVolume[2], 1) + " L" : "-- L");
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(volStr2, 81, 193, 4);
 
