@@ -324,7 +324,6 @@ extern bool pidConfigNeedsFullRedraw;
 extern bool pidConfigEditing;
 extern int pidTestChoice;
 extern float pidTestHeatTarget;
-extern float pidTestCoolTarget;
 extern int pidTestTargetSelection;
 extern bool pidTestRunning;
 extern bool pidTestSuccess;

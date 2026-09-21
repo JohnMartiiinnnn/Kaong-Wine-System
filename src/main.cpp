@@ -163,7 +163,6 @@ bool pidConfigNeedsFullRedraw = true;
 bool pidConfigEditing = false;
 int pidTestChoice = 0;
 float pidTestHeatTarget = 40.0f;
-float pidTestCoolTarget = 28.5f;
 int pidTestTargetSelection = 0;
 bool pidTestRunning = false;
 bool pidTestSuccess = false;
@@ -923,9 +922,8 @@ void loop() {
     } else if (currentAppState == PID_CONFIG_MENU) {
       if (pidConfigEditing) {
         if (pidTestTargetSelection == 0) { pidTestHeatTarget -= 1.0f; if (pidTestHeatTarget < 20.0f) pidTestHeatTarget = 20.0f; }
-        else if (pidTestTargetSelection == 1) { pidTestCoolTarget -= 1.0f; if (pidTestCoolTarget < 10.0f) pidTestCoolTarget = 10.0f; }
       } else {
-        pidTestTargetSelection = (pidTestTargetSelection + 1) % 3;
+        pidTestTargetSelection = (pidTestTargetSelection + 1) % 2;
       }
       drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
@@ -1095,9 +1093,8 @@ void loop() {
     } else if (currentAppState == PID_CONFIG_MENU) {
       if (pidConfigEditing) {
         if (pidTestTargetSelection == 0) { pidTestHeatTarget += 1.0f; if (pidTestHeatTarget > 100.0f) pidTestHeatTarget = 100.0f; }
-        else if (pidTestTargetSelection == 1) { pidTestCoolTarget += 1.0f; if (pidTestCoolTarget > 100.0f) pidTestCoolTarget = 100.0f; }
       } else {
-        pidTestTargetSelection = (pidTestTargetSelection + 2) % 3;
+        pidTestTargetSelection = (pidTestTargetSelection + 1) % 2;
       }
       drawPidConfigMenu();
     } else if (currentAppState == FAN_TEST_PICK) {
@@ -1452,9 +1449,9 @@ void loop() {
       }
       drawDispenserCalMenu();
     } else if (currentAppState == PID_CHAMBER_PICK) {
-      if (pidTestChoice == 0) { pidTestHeatTarget = 80.0f; pidTestCoolTarget = 75.0f; }
-      else if (pidTestChoice == 1) { pidTestHeatTarget = 27.0f; pidTestCoolTarget = 29.0f; }
-      else { pidTestHeatTarget = 72.0f; pidTestCoolTarget = 68.0f; }
+      if (pidTestChoice == 0) { pidTestHeatTarget = 80.0f; }
+      else if (pidTestChoice == 1) { pidTestHeatTarget = 27.0f; }
+      else { pidTestHeatTarget = 72.0f; }
       pidTestTargetSelection = 0;
       pidConfigEditing = false;
       pidConfigNeedsFullRedraw = true;
@@ -1465,7 +1462,7 @@ void loop() {
         pidConfigEditing = false;
         pidConfigNeedsFullRedraw = true;
         drawPidConfigMenu();
-      } else if (pidTestTargetSelection == 2) {
+      } else if (pidTestTargetSelection == 1) {
         pidTrackTargetTemp = pidTestHeatTarget;
         pidTrackRunning = true;
         pidTrackStartMs = millis();
@@ -2572,12 +2569,12 @@ void loop() {
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
 
           static uint32_t fermTrackOvershootStartMs = 0;
-          if (curT > pidTestCoolTarget) {
+          if (curT > pidTrackTargetTemp) {
             if (fermTrackOvershootStartMs == 0) {
               fermTrackOvershootStartMs = millis();
             }
             uint32_t overSec = (millis() - fermTrackOvershootStartMs) / 1000;
-            float overDeg = curT - pidTestCoolTarget;
+            float overDeg = curT - pidTrackTargetTemp;
             int fanSpd = 20 + (int)(overDeg * 20.0f) + (int)(overSec * 2);
             if (fanSpd > 100) fanSpd = 100;
             setFanSpeed(fanSpd);
