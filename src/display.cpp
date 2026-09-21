@@ -2341,18 +2341,20 @@ void drawTransferTestMenu(bool valuesOnly, bool tileOnly) {
   float liters2 = (flowKFactor[1] > 0.0f) ? (float)p2 / flowKFactor[1] : 0.0f;
 
   if (valuesOnly) {
-    tft.fillRect(161, 93, 138, 56, 0xD6BA);
+    tft.fillRect(161, 93, 138, 58, 0xD6BA);
+    tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.drawCentreString("FLOW", 230, 102, 2);
+    tft.drawCentreString("FLOW", 230, 97, 1);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters1);
-    tft.drawCentreString(buf, 230, 118, 4);
+    tft.drawCentreString(buf, 230, 112, 4);
 
-    tft.fillRect(161, 290, 138, 56, 0xD6BA);
+    tft.fillRect(161, 286, 138, 58, 0xD6BA);
+    tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.drawCentreString("FLOW", 230, 299, 2);
+    tft.drawCentreString("FLOW", 230, 290, 1);
     sprintf(buf, "%.2f L", liters2);
-    tft.drawCentreString(buf, 230, 315, 4);
+    tft.drawCentreString(buf, 230, 305, 4);
     tft.setTextPadding(0);
     return;
   }
@@ -2452,10 +2454,10 @@ void drawTransferTestMenu(bool valuesOnly, bool tileOnly) {
     tft.fillRect(160, 92, 140, 60, 0xD6BA);
     tft.drawRect(160, 92, 140, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.drawCentreString("FLOW", 230, 102, 2);
+    tft.drawCentreString("FLOW", 230, 97, 1);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters1);
-    tft.drawCentreString(buf, 230, 118, 4);
+    tft.drawCentreString(buf, 230, 112, 4);
     tft.setTextPadding(0);
     tft.fillRect(10, 152, 300, 6, TFT_WHITE);
     drawCal1(transferTestSelection == 1);
@@ -2467,10 +2469,10 @@ void drawTransferTestMenu(bool valuesOnly, bool tileOnly) {
     tft.fillRect(160, 285, 140, 60, 0xD6BA);
     tft.drawRect(160, 285, 140, 60, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.drawCentreString("FLOW", 230, 295, 2);
+    tft.drawCentreString("FLOW", 230, 290, 1);
     tft.setTextPadding(130);
     sprintf(buf, "%.2f L", liters2);
-    tft.drawCentreString(buf, 230, 311, 4);
+    tft.drawCentreString(buf, 230, 305, 4);
     tft.setTextPadding(0);
     tft.fillRect(10, 345, 300, 6, TFT_WHITE);
     drawCal2(transferTestSelection == 3);
