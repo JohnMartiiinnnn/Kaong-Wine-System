@@ -550,7 +550,7 @@ void drawStartMenu() {
 }
 
 void drawLoadCellPage(bool valuesOnly) {
-  char b[32];
+  char b[48];
 
   if (!valuesOnly) {
     if (loadCellNeedsFullRedraw) {
@@ -558,49 +558,94 @@ void drawLoadCellPage(bool valuesOnly) {
       tft.fillRect(0, 0, 320, 50, 0x03E0);
       tft.fillRect(0, 50, 320, 430, TFT_WHITE);
       tft.setTextColor(TFT_WHITE);
-      tft.drawString("LOAD CELL", 10, 15, 4);
+      tft.drawString("LOAD CELL TARE", 10, 15, 4);
       loadCellNeedsFullRedraw = false;
     }
 
     // Weight display box (static frame)
-    tft.fillRect(10, 70, 300, 95, 0xCE79);
-    tft.drawRect(10, 70, 300, 95, TFT_DARKGREY);
+    tft.fillRect(10, 58, 300, 105, 0xCE79);
+    tft.drawRect(10, 58, 300, 105, TFT_DARKGREY);
     tft.setTextColor(TFT_BLACK, 0xCE79);
-    tft.drawCentreString("LIVE WEIGHT", CENTER_X, 78, 2);
+    tft.drawCentreString("NET VOLUME / WEIGHT", CENTER_X, 64, 2);
 
-    // TARE button
-    uint16_t tareBg = 0x3566; // Blue (always selected since it's the only option)
-    uint16_t tareTxt = TFT_WHITE;
-    tft.fillRect(10, 195, 300, 80, tareBg);
-    tft.drawRect(10, 195, 300, 80, TFT_DARKGREY);
-    tft.setTextColor(tareTxt, tareBg);
-    tft.drawString("TARE", 25, 221, 4);
-    tft.drawRightString("SELECT TO ZERO", 290, 227, 2);
+    // Row 0: TARE / ZERO SCALE Button
+    bool sel0 = (loadCellSelection == 0);
+    uint16_t bg0 = sel0 ? 0x3566 : 0xD6BA;
+    uint16_t txt0 = sel0 ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 172, 300, 62, bg0);
+    tft.drawRect(10, 172, 300, 62, sel0 ? TFT_WHITE : TFT_DARKGREY);
+    if (sel0) tft.drawRect(11, 173, 298, 60, TFT_WHITE);
+    tft.setTextColor(txt0, bg0);
+    tft.drawString("TARE ZERO", 22, 180, 4);
+    tft.drawRightString("[ SELECT TO ZERO ]", 295, 186, 2);
+    tft.drawCentreString("Zeros current raw platform reading", CENTER_X, 212, 1);
+
+    // Row 1: STATIC CONTAINER MODIFIER Tile
+    bool sel1 = (loadCellSelection == 1);
+    bool isEditing1 = sel1 && wizardEditing;
+    uint16_t bg1 = isEditing1 ? 0x03E0 : (sel1 ? 0x3566 : 0xD6BA);
+    uint16_t txt1 = sel1 ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 242, 300, 72, bg1);
+    tft.drawRect(10, 242, 300, 72, (isEditing1 || sel1) ? TFT_WHITE : TFT_DARKGREY);
+    if (isEditing1 || sel1) tft.drawRect(11, 243, 298, 70, TFT_WHITE);
+    tft.setTextColor(txt1, bg1);
+    if (isEditing1) {
+      sprintf(b, "CONTAINER OFFSET: < %.2f kg >", tareOffset);
+    } else {
+      sprintf(b, "CONTAINER OFFSET: %.2f kg", tareOffset);
+    }
+    tft.drawCentreString(b, CENTER_X, 250, 2);
+
+    if (isEditing1) {
+      tft.drawCentreString("[ L/R: +/-0.1 kg   UP/DN: +/-0.5 kg ]", CENTER_X, 274, 1);
+    } else if (sel1) {
+      tft.drawCentreString("[ PRESS SELECT TO EDIT CONTAINER TARE ]", CENTER_X, 274, 1);
+    } else {
+      tft.drawCentreString("[ DEDUCTS CONTAINER WEIGHT (e.g. 2.0 kg) ]", CENTER_X, 274, 1);
+    }
+    if (tareOffset > 0.0f) {
+      sprintf(b, "(Ignoring %.2f kg container weight)", tareOffset);
+      tft.drawCentreString(b, CENTER_X, 293, 1);
+    } else {
+      tft.drawCentreString("(Direct load cell reading - No container tare)", CENTER_X, 293, 1);
+    }
 
     // HX711 status bar
     uint16_t statusBg = hx711Status ? 0x0400 : TFT_RED;
-    tft.fillRect(10, 305, 300, 45, statusBg);
-    tft.drawRect(10, 305, 300, 45, TFT_DARKGREY);
+    tft.fillRect(10, 322, 300, 38, statusBg);
+    tft.drawRect(10, 322, 300, 38, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, statusBg);
-    tft.drawCentreString(hx711Status ? "HX711  OK" : "HX711  FAILED", CENTER_X,
-                         320, 2);
+    tft.drawCentreString(hx711Status ? "HX711 LOAD CELL : OK" : "HX711 LOAD CELL : FAILED", CENTER_X, 332, 2);
 
     // Navigation hints
+    tft.fillRect(0, 368, 320, 112, TFT_WHITE);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("SELECT : TARE SCALE", CENTER_X, 375, 2);
-    tft.drawCentreString("RETURN : GO BACK", CENTER_X, 450, 2);
+    if (wizardEditing) {
+      tft.drawCentreString("L/R: +/-0.1 kg   UP/DN: +/-0.5 kg", CENTER_X, 385, 2);
+      tft.drawCentreString("SELECT: SAVE CONTAINER OFFSET", CENTER_X, 412, 2);
+      tft.drawCentreString("RETURN (LEFT): DECREASE / BACK", CENTER_X, 442, 1);
+    } else {
+      tft.drawCentreString("UP/DOWN: SWITCH OPTION", CENTER_X, 385, 2);
+      tft.drawCentreString("SELECT: ZERO SCALE / EDIT OFFSET", CENTER_X, 412, 2);
+      tft.drawCentreString("RETURN (LEFT): BACK TO SETTINGS", CENTER_X, 442, 1);
+    }
   }
 
-  // Live weight value — always update
+  // Live net weight value — always update
   sprintf(b, "%.2f L", currentWeight);
   tft.setTextColor(TFT_BLACK, 0xCE79);
-  tft.setTextPadding(200);
-  tft.drawCentreString(b, CENTER_X, 100, 4);
+  tft.setTextPadding(240);
+  tft.drawCentreString(b, CENTER_X, 86, 4);
 
-  // Show raw ADC value below the live weight for debugging
-  sprintf(b, "RAW: %ld", rawHX711);
-  tft.setTextPadding(150);
-  tft.drawCentreString(b, CENTER_X, 134, 2);
+  // Live gross reading & raw ADC for verification
+  float grossVal = currentWeight + tareOffset;
+  sprintf(b, "GROSS: %.2f L  |  TARE: -%.2f kg", grossVal, tareOffset);
+  tft.setTextPadding(280);
+  tft.drawCentreString(b, CENTER_X, 120, 1);
+
+  sprintf(b, "RAW ADC: %ld", rawHX711);
+  tft.setTextPadding(200);
+  tft.drawCentreString(b, CENTER_X, 138, 1);
 
   tft.setTextPadding(0);
 }

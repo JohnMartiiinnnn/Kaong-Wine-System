@@ -48,6 +48,7 @@ long rawHX711 = 0;
 struct_message incomingData = {};
 uint32_t lastDataReceivedMillis = 0;
 float currentWeight = 0.0;
+float tareOffset = 0.0f;
 float calibrationFactor = 23012.45; // Calibrated: 9L known weight, raw=207112
 RaptLog raptLogs[10] = {};
 int raptLogCount = 0;
@@ -336,6 +337,7 @@ void saveSettingsToNVS() {
   brewPrefs.putFloat("pastTgt", stageTargetTemp[2]);
   brewPrefs.putInt("fanBase", pidFanPercent);
   brewPrefs.putFloat("dispMsG", msPerGramYeast);
+  brewPrefs.putFloat("tareOffset", tareOffset);
   brewPrefs.end();
 }
 
@@ -348,6 +350,7 @@ void loadSettingsFromNVS() {
   stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
   msPerGramYeast = brewPrefs.getFloat("dispMsG", 1764.0f);
+  tareOffset = brewPrefs.getFloat("tareOffset", 0.0f);
   brewPrefs.end();
 }
 
@@ -886,6 +889,9 @@ void loop() {
       if (!wizardEditing) {
         loadCellSelection = (loadCellSelection + 1) % 2;
         drawLoadCellPage();
+      } else if (loadCellSelection == 1) {
+        tareOffset = max(0.0f, tareOffset - 0.5f);
+        drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
       if (cDown && !ljDown && !calibRunning) {
@@ -1054,6 +1060,9 @@ void loop() {
     } else if (currentAppState == LOAD_CELL_PAGE) {
       if (!wizardEditing) {
         loadCellSelection = (loadCellSelection + 1) % 2;
+        drawLoadCellPage();
+      } else if (loadCellSelection == 1) {
+        tareOffset = min(15.0f, tareOffset + 0.5f);
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1725,10 +1734,18 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      if (hx711Status) {
-        scale.tare();
-        currentWeight = 0.0f;
-        hx711WeightSeeded = false;
+      if (loadCellSelection == 0) {
+        if (hx711Status) {
+          scale.tare();
+          currentWeight = -tareOffset;
+          hx711WeightSeeded = false;
+          drawLoadCellPage();
+        }
+      } else if (loadCellSelection == 1) {
+        wizardEditing = !wizardEditing;
+        if (!wizardEditing) {
+          saveSettingsToNVS();
+        }
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1863,7 +1880,16 @@ void loop() {
     scale.set_scale(calibrationFactor);
     drawCalibrationPage();
   }
-  // Removed LOAD_CELL_PAGE manual cal adjust from right key
+  if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE) {
+    if (loadCellSelection == 1) {
+      if (!wizardEditing) {
+        wizardEditing = true;
+      } else {
+        tareOffset = min(15.0f, tareOffset + 0.1f);
+      }
+      drawLoadCellPage();
+    }
+  }
 
   if (cRight && !ljRight && currentAppState == CALIB_WIZARD && !calibRunning) {
     if (calibSelection == 0 && wizardEditing) {
@@ -2021,13 +2047,20 @@ void loop() {
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
-      currentAppState = prevLoadCellState;
-      if (prevLoadCellState == SETTINGS_MENU) {
-        settingsNeedsFullRedraw = true;
-        drawSettingsMenu();
+      if (wizardEditing && loadCellSelection == 1) {
+        tareOffset = max(0.0f, tareOffset - 0.1f);
+        drawLoadCellPage();
       } else {
-        systemCheckNeedsFullRedraw = true;
-        drawSystemCheckMenu();
+        wizardEditing = false;
+        saveSettingsToNVS();
+        currentAppState = prevLoadCellState;
+        if (prevLoadCellState == SETTINGS_MENU) {
+          settingsNeedsFullRedraw = true;
+          drawSettingsMenu();
+        } else {
+          systemCheckNeedsFullRedraw = true;
+          drawSystemCheckMenu();
+        }
       }
     } else if (currentAppState == RAPT_TEST_MENU) {
       currentAppState = SYSTEM_CHECK_MENU;
@@ -2425,8 +2458,8 @@ void loop() {
     if (rawW < -5.0f || rawW > 70.0f) {
       Serial.printf("raw=%.4f [DISCARDED: Out of Range]\n", rawW);
     } else {
-      // 2. Allow negative drift/values through for debugging inverted load
-      float inputW = rawW;
+      // 2. Deduct static container tare modifier to compute net liquid weight/volume
+      float inputW = rawW - tareOffset;
 
       if (!hx711WeightSeeded) {
         currentWeight = inputW;
@@ -2448,7 +2481,7 @@ void loop() {
       if (currentWeight > -0.05f && currentWeight < 0.05f)
         currentWeight = 0.0f;
 
-      Serial.printf("raw=%.4f  ema=%.4f\n", rawW, currentWeight);
+      Serial.printf("raw=%.4f  ema=%.4f  offset=%.2f\n", rawW, currentWeight, tareOffset);
     }
   }
 

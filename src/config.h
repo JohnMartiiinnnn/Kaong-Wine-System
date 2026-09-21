@@ -218,6 +218,7 @@ extern bool hx711Status;
 extern struct_message incomingData;
 extern uint32_t lastDataReceivedMillis;
 extern float currentWeight;
+extern float tareOffset;
 extern float calibrationFactor;
 extern float preheatTempOffset;
 extern float pastTempOffset;
