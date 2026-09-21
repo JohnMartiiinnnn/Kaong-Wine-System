@@ -2680,58 +2680,25 @@ void loop() {
 
       bool transferDone = false;
 
-      // 1. Pre-Heat scale empty check (For Transfer 1: Pre-Heat -> Fermentation)
-      // If scale physically reads <= 0.25L, tank is completely drained
-      if (stageTransferTarget == 1 && hx711Status && currentWeight <= 0.25f && (millis() - transferStartMs >= 3000UL)) {
+      // 1. Primary Completion: Flow sensor reached the full target volume
+      if (transferVolumeTransferred >= transferTargetVolume) {
         transferDone = true;
       }
 
-      // 2. Empty Tank Detection via Flow Sensor (only evaluated after 15s priming grace period)
+      // 2. Empty Tank / Flow Stoppage Detection (evaluated after 15s priming grace period)
+      // If 5 consecutive seconds of 0 pulses occur while pumping:
       if (millis() - transferStartMs >= TRANSFER_PRIMING_GRACE_MS && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
-        if (stageTransferTarget == 1) {
-          // For Transfer 1: Pre-Heat tank has the HX711 scale
-          if (hx711Status) {
-            if (currentWeight <= 0.35f) {
-              // Scale confirms tank is empty
-              transferDone = true;
-            } else if (millis() - transferLastPulseMs >= 45000UL) {
-              // Scale says liquid is present (>0.35kg) but 45s of 0 pulses means hose clog/airlock
-              transferDryRunAlarm = true;
-              transferDone = true;
-            }
-            // Otherwise: scale confirms liquid is still in Pre-Heat, keep pump running to prime/drain!
-          } else {
-            // No scale connected: fallback to volume moved
-            if (transferVolumeTransferred >= 0.5f) {
-              transferDone = true;
-            } else {
-              transferDryRunAlarm = true;
-              transferDone = true;
-            }
-          }
+        if (transferVolumeTransferred >= 0.5f) {
+          // Flow stopped because upstream tank is drained empty
+          transferDone = true;
         } else {
-          // For Transfer 2 (Fermentation -> Pasteurization)
-          if (transferVolumeTransferred >= 0.8f * transferTargetVolume || transferVolumeTransferred >= 1.0f) {
-            transferDone = true;
-          } else {
-            transferDryRunAlarm = true;
-            transferDone = true;
-          }
-        }
-      }
-
-      // 3. Fallback: If Flow Sensor reached target volume
-      if (transferVolumeTransferred >= transferTargetVolume) {
-        if (stageTransferTarget == 1 && hx711Status) {
-          if (currentWeight <= 0.35f) {
-            transferDone = true;
-          }
-        } else {
+          // Flow never occurred or stopped before 0.5L (dry run / clogged line)
+          transferDryRunAlarm = true;
           transferDone = true;
         }
       }
 
-      // 4. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
+      // 3. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
       if (millis() - transferStartMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
       }
