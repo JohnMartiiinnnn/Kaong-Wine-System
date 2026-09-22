@@ -149,12 +149,13 @@ From the Main Menu, navigate to **SETTINGS** to configure operational parameters
 * **PREHEAT TARGET (Item 1)**: Temperature setpoint for the pre-heating immersion heater (30.0°C to 70.0°C in 0.5°C steps).
 * **PREHEAT COOL (Item 2)**: Cooling threshold before automatic transfer pump triggers (25.0°C to 45.0°C in 0.5°C steps).
 * **FERM TARGET (Item 3)**: Temperature setpoint for the fermentation chamber radiant quartz heater and cooling fan (18.0°C to 45.0°C in 0.5°C steps).
-* **FERM FAN BASELINE (Item 4)**: Idle baseline speed for the fermentation chamber exhaust fan (0% to 50% in 5% steps).
-* **SET RTC DATE & TIME (Item 5)**: Opens the 7-field DS3231 real-time clock adjustment screen.
-* **TARE LOAD CELL (Item 6)**: Instantly zeros out the vat weight sensor.
+* **PAST TARGET (Item 4)**: Temperature setpoint for the pasteurization immersion heater (60.0°C to 85.0°C in 0.5°C steps).
+* **FERM FAN BASELINE (Item 5)**: Idle baseline speed for the fermentation chamber exhaust fan (0% to 50% in 5% steps).
+* **SET RTC DATE & TIME (Item 6)**: Opens the 7-field DS3231 real-time clock adjustment screen.
+* **TARE LOAD CELL (Item 7)**: Opens the dedicated load cell utility screen with live Net and Gross weight readings, instant zero tare, and configurable static container tare offset (0.0 to 10.0 kg in 0.1/0.5 kg increments).
 
 *Editing Controls*:
-Press **SELECT** or **RIGHT** on items 0 to 4 to enter edit mode, use **UP/DOWN** or **LEFT/RIGHT** to change values, and press **SELECT** to confirm. Exiting saves all values to NVS flash memory (`brewPrefs`).
+Press **SELECT** or **RIGHT** on items 0 to 5 to enter edit mode, use **UP/DOWN** or **LEFT/RIGHT** to change values, and press **SELECT** to confirm. Exiting saves all values to NVS flash memory (`brewPrefs`).
 
 ---
 
@@ -224,7 +225,7 @@ The top bar always shows:
 5. Once the liquid is at or below 30°C, the fan turns off. The stage is ready to advance.
 
 **To advance to Fermentation:**
-Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION." The system fires the pre-heat→ferm pump relay for 10 seconds, then switches to Stage 1.
+Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION." The system energizes Pump 1, integrating volume pulses from Flow Sensor 1 (GPIO 32) independently of load cell tare. After a 15-second priming grace window, the pump executes drain-until-empty detection (shutting off after 5 consecutive seconds of zero flow pulses once >= 0.5 L has transferred, or a 5-minute safety timeout). The system dynamically increments Fermentation volume, dispenses yeast, and advances to Stage 1.
 
 **Status light:** RED on during this stage.
 
@@ -232,12 +233,12 @@ Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION
 
 ### Stage 1 — Fermentation
 
-**Goal:** Hold the liquid at fermentation temperature (27-30°C) while yeast converts sugar to alcohol.
+**Goal:** Hold the liquid at fermentation temperature (25-30°C) while yeast converts sugar to alcohol.
 
 **What happens automatically:**
-- If the liquid temperature drops below 27°C: the fermentation heater turns on at 100%.
-- If the liquid temperature rises above 30°C: the heater turns off and the fermentation fan turns on.
-- Between 27-30°C: everything stays off (idle band).
+- PID thermal control regulates the radiant quartz heater against `FERM TARGET` (default 30.0°C) using the fermentation DS18B20 liquid probe.
+- Exhaust fan runs at `FERM FAN BASELINE` (default 20%) and ramps up if liquid temperature exceeds the setpoint.
+- Live PID monitoring uses a 4-tile interface: `CURRENT TEMP`, `HEAT SETPOINT`, `POWER %`, and `STABILITY`.
 
 **Monitoring:**
 - pH is monitored continuously. If the pH drops below the target (default 3.0), a pH alert activates.
@@ -245,7 +246,7 @@ Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION
 - The mixer runs automatically in AUTO mode: 5 minutes on, then 355 minutes off, repeating.
 
 **To advance to Pasteurization:**
-This is a manual step. Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system runs the ferm→past pump relay for 10 seconds, then switches to Stage 2.
+Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system energizes Pump 2, integrating pulses from Flow Sensor 2 (GPIO 34). It runs until the fermentation vat drains empty (5-second zero-pulse dry detection, or 5-minute safety cutoff), locks the transferred volume into the pasteurizer, and switches to Stage 2.
 
 **Status light:** YELLOW on during this stage.
 
@@ -529,10 +530,10 @@ Shows all nine sensor values updated every second:
 | Row | Sensor | Source |
 |-----|--------|--------|
 | AMBIENT (PH) | Pre-heat ambient temperature | BME280 on Primary |
-| LIQUID (PH) | Pre-heat liquid temperature | DS18B20 index 1 |
+| LIQUID (PH) | Pre-heat liquid temperature | DS18B20 index 0 |
 | AMBIENT (FERM) | Fermentation ambient temperature | BME280 on Secondary |
 | LIQUID (FERM) | Fermentation liquid temperature | DS18B20 on Secondary |
-| LIQUID (PST) | Pasteurization liquid temperature | DS18B20 index 0 |
+| LIQUID (PST) | Pasteurization liquid temperature | DS18B20 index 1 |
 | S. GRAVITY | Specific gravity | BLE hydrometer via Secondary |
 | PH LEVEL | pH | PH4502C via ADS1115 on Secondary |
 | EST. VOLUME | Liquid weight in pre-heat tank | HX711 load cell |

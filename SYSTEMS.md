@@ -8,7 +8,7 @@
   * **Platform**: ESP32 DevKit v1 (4MB Flash, `min_spiffs.csv` dual-OTA partition)
   * **Network**: Soft-AP `WineBrew_System` (192.168.4.1), STA `Living-Room-WiFi` (`192.168.1.137`, mDNS `winebrew-main.local`)
   * **Status**: Active (OTA Enabled on port 3232)
-  * **Documentation**: [SYSTEM_GUIDE.md](file:///Users/davepatrickbulaso/Projects/Kaong-Wine/SYSTEM_GUIDE.md)
+  * **Documentation**: [SYSTEM_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/SYSTEM_GUIDE.md)
 
 * **Secondary Controller (Remote Sensor & Actuator Node)**
   * **Role**: Fermentation chamber node managing DS18B20 liquid probe, BME280 ambient environment, ADS1115 pH probe, BLE hydrometer telemetry, BTS7960 mixing impeller, and DRV8871 automated yeast dispenser.
@@ -16,7 +16,7 @@
   * **Platform**: ESP32 DevKit v1 / ESP32-C3
   * **Network**: Serial2 UART (115200 baud, 8N1) linked to Primary + fallback AP / STA (`winebrew-secondary.local`)
   * **Status**: Active
-  * **Documentation**: [YEAST_DISPENSER_GUIDE.md](file:///Users/davepatrickbulaso/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md)
+  * **Documentation**: [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md)
 
 * **RAPT Pill Digital Hydrometer**
   * **Role**: Floating BLE beacon broadcasting specific gravity, temperature, and RSSI every 15 to 60 seconds.
@@ -185,7 +185,7 @@ PlatformIO CLI commands for building and uploading firmware:
 
 ## 7. Sensor Calibration References
 
-* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation. See [CALIBRATION_GUIDE.md](file:///Users/davepatrickbulaso/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
+* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation. See [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
 * **Load Cell (HX711)**: Tare and calibration coefficient stored in NVS. Available in `SYSTEM CHECK` item 10 or `SETTINGS`.
 * **Flow Sensors (YF-S201 / YF-B series)**: Pulses per liter calibration stored in EEPROM/NVS.
-* **Yeast Dispenser (DRV8871)**: Milliseconds per gram delivery curve configured via `msPerGramYeast`. See [YEAST_DISPENSER_GUIDE.md](file:///Users/davepatrickbulaso/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md).
+* **Yeast Dispenser (DRV8871)**: Milliseconds per gram delivery curve configured via `msPerGramYeast`. See [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md).
