@@ -110,19 +110,38 @@ Add the following fields:
 
 ---
 
-## 3. Deployment Checklist (Post-Batch 1)
+### Phase 5: Pre-Sap UI Stability, E-Stop Persistence & Volume Warnings
+
+#### A. UI Confirmation Race Condition Guard (`src/main.cpp`)
+* **Problem**: When `LEFT` is pressed on `DASHBOARD_ACTIVE`, `returnConfirmState = 1` paints `drawReturnConfirmation()`, but `loop()` continues calling `updateDashboardValues()`, painting tiles over the modal and causing visual artifacting.
+* **Fix**: Guard background dashboard drawing:
+  ```cpp
+  if (currentAppState == DASHBOARD_ACTIVE && returnConfirmState == 0) {
+    updateDashboardValues();
+  }
+  ```
+
+#### B. E-Stop / Hard Reboot State & Tare Preservation (`src/main.cpp`)
+* **Problem**: Hardware E-stop or power flicker reboots ESP32 into `setup()`, which unconditionally executes `scale.tare(10)`, zeroing out actual liquid weight in the vat, and resets `currentAppState = START_MENU`.
+* **Fix**:
+  1. Load NVS brew state before scale initialization.
+  2. If `activeBrewStage >= 0` (brew was in progress), bypass `scale.tare(10)` to preserve the calibrated baseline.
+  3. Resume directly to `DASHBOARD_ACTIVE` instead of defaulting to `START_MENU`.
+
+#### C. Low-Volume (< 5.0 L) Visual Dashboard Banner (`src/display.cpp`)
+* **Problem**: SSR heating is silently hard-locked to 0% when chamber volume is < 5.0 L with no visual indication of why heating is idle.
+* **Fix**: Render a clear status tile/badge on the dashboard: `⚠️ VOL < 5.0L (HEATER LOCKED)` when volume is below the safety threshold.
+
+---
+
+## 3. Deployment Checklist
 
 1. [x] Apply `main.cpp` safety interlock (never advance stage or heat if transfer failed).
 2. [x] Apply `main.cpp` 15-second pump priming grace window and drain cutoff logic.
 3. [x] Apply `main.cpp` Line 2707 submerged liquid probe fix.
 4. [x] Update `server.cpp` with 28-field `/data` schema.
-5. [x] Build firmware:
-   ```bash
-   cd /home/dave/Projects/Kaong-Wine && pio run -e esp32dev
-   ```
-6. [ ] Deploy via OTA:
-   ```bash
-   flash-winebrew
-   ```
-7. [ ] Verify Transfer Test menu on device to ensure Flow Sensor 2 registers turbine pulses.
-8. [ ] Start `Batch 2` with full telemetry streaming to Google Sheets.
+5. [x] Swap 1-Wire DS18B20 index mapping for new pasteurizer probe (`Index 0: Preheat`, `Index 1: Pasteurization`).
+6. [ ] Implement Phase 5A: `returnConfirmState` guard in `updateDashboardValues()`.
+7. [ ] Implement Phase 5B: NVS boot recovery (skip auto-tare on active brew recovery).
+8. [ ] Implement Phase 5C: Low-volume (< 5.0L) on-screen warning banner.
+9. [ ] User confirmation prior to flashing firmware.
