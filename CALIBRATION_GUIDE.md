@@ -66,8 +66,8 @@ This standalone project provides a visual TFT interface to read local OneWire te
    ~/.platformio/penv/bin/pio run -t upload
    ```
 3. Use the keypad **UP / DOWN** arrows to select which probe you want to view on the screen:
-   * **Pasteurization (Index 0)**
-   * **Pre-heat (Index 1)**
+   * **Pre-heat (Index 0)**
+   * **Pasteurization (Index 1)**
    * **Fermentation (Remote UART)**
 4. **Verification**: Verify the readings in ice water (~0.0°C) or room temperature against a reference thermometer. If the readings are offset, you can add software offsets to `preheatTempOffset`, `pastTempOffset`, and `fermTempOffset` in the main `src/config.h` file.
 

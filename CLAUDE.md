@@ -56,7 +56,7 @@ src/
     *   **GPA7:** Fan Relay.
 *   **Sensors:**
     *   **BME280:** Ambient Temperature (Pre-heating area).
-    *   **DS18B20 (x2):** Liquid temperatures (Vat/Pasteurization) on a shared OneWire bus (pin 26).
+    *   **DS18B20 (x2):** Liquid temperatures on a shared OneWire bus (pin 26). Index 0 = Pre-heat (`getPreheatTemp()`), Index 1 = Pasteurization (`getPastTemp()`). Remote fermentation liquid is on Secondary ESP32 UART (`room2LiquidTemp`).
     *   **HX711:** Load cell for volume/weight measurement (DT=36, SCK=27).
     *   **DS3231 RTC:** Real-time clock for logging timestamps.
     *   **Flow Sensors:** Flow Sensor 1 (Pin 32, Pre-Heat -> Ferm) and Flow Sensor 2 (Pin 34, Ferm -> Past) with hardware interrupts.

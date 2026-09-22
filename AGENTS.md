@@ -327,6 +327,12 @@ Two separate temperature readouts are sent by the secondary controller via `inco
 *   `room2LiquidTemp`: DS18B20 (liquid probe inside the fermentation vessel). Use this for liquid monitoring.
 *Note: DS18B20 returns approximately -127°C when disconnected. Always verify `if (temp > -100.0f)` before using the data in controller routines.*
 
+### Primary Shared 1-Wire DS18B20 Bus (Pin 26)
+Both the Pre-heat and Pasteurization chambers use waterproof DS18B20 probes wired to a single shared OneWire bus on Pin 26 (`sharedLiquidSensors`). Devices are enumerated by their 64-bit hardware ROM addresses:
+*   **Index 0:** Pre-heat Chamber (`getPreheatTemp()`, `liquid2Status`)
+*   **Index 1:** Pasteurization Chamber (`getPastTemp()`, `liquid1Status`)
+*Note: Replacing physical DS18B20 probes will change the bus ROM address order. Always verify probe response by warming one sensor before final batch operation.*
+
 ---
 
 ## 7. System Check Menu (10 items, indices 0–9)
