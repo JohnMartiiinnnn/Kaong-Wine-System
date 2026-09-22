@@ -41,8 +41,8 @@ void logDataToSD() {
   const char* fanStr = isFanOn ? "PREHEAT_FAN" : (isFermFanOn ? "FERM_FAN" : "OFF");
 
   char lineBuf[256];
-  float curPreheat = liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : 0.0f;
-  float curPast = liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f;
+  float curPreheat = liquid2Status ? getPreheatTemp() : 0.0f;
+  float curPast = liquid1Status ? getPastTemp() : 0.0f;
   float curFermLiq = (incomingData.ds18Status == 1) ? incomingData.room2LiquidTemp : 0.0f;
   float ambLocal = bme1Status ? bme1.readTemperature() : 0.0f;
   float abv = (originalGravity > 0.0f && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f)

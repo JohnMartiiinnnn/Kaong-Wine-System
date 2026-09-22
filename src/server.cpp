@@ -100,7 +100,7 @@ void handleData() {
   String json = "{";
   json += "\"vol\":" + String(currentWeight) + ",";
   json += "\"la\":" + String(bme1Status ? bme1.readTemperature() : 0) + ",";
-  json += "\"ll\":" + String(liquid2Status ? sharedLiquidSensors.getTempCByIndex(1) : 0) + ",";
+  json += "\"ll\":" + String(liquid2Status ? getPreheatTemp() : 0.0f, 1) + ",";
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue) + ",";
@@ -132,7 +132,7 @@ void handleData() {
   json += "\"fan\":" + String(isFanOn ? 1 : (isFermFanOn ? 2 : 0)) + ",";
   json += "\"yd\":" + String(actualYeastDispensedGrams, 2) + ",";
   json += "\"logFile\":\"" + currentLogFile + "\",";
-  json += "\"lp\":" + String(liquid1Status ? sharedLiquidSensors.getTempCByIndex(0) : 0.0f, 1) + ",";
+  json += "\"lp\":" + String(liquid1Status ? getPastTemp() : 0.0f, 1) + ",";
 
   // Post-Batch-1 Comprehensive Telemetry Fields (Phase 4A)
   float xfer_pct = (transferTargetVolume > 0.0f) ? ((transferVolumeTransferred / transferTargetVolume) * 100.0f) : 0.0f;

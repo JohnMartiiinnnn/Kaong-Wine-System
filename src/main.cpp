@@ -3242,8 +3242,8 @@ void loop() {
       lastDs18PollMs = nowMs;
       sharedLiquidSensors.requestTemperatures();
 
-      float pTemp = sharedLiquidSensors.getTempCByIndex(0);
-      float phTemp = sharedLiquidSensors.getTempCByIndex(1);
+      float phTemp = sharedLiquidSensors.getTempCByIndex(0);
+      float pTemp = sharedLiquidSensors.getTempCByIndex(1);
 
       if (pTemp > -55.0f && pTemp < 125.0f && pTemp != DEVICE_DISCONNECTED_C) {
         liquid1Status = true;
@@ -3415,14 +3415,14 @@ void loop() {
 }
 
 float getPreheatTemp() {
-  float t = sharedLiquidSensors.getTempCByIndex(1);
+  float t = sharedLiquidSensors.getTempCByIndex(0);
   if (t == DEVICE_DISCONNECTED_C)
     return t;
   return t + preheatTempOffset;
 }
 
 float getPastTemp() {
-  float t = sharedLiquidSensors.getTempCByIndex(0);
+  float t = sharedLiquidSensors.getTempCByIndex(1);
   if (t == DEVICE_DISCONNECTED_C)
     return t;
   return t + pastTempOffset;
