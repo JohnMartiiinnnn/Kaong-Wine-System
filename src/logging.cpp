@@ -28,8 +28,8 @@ void logDataToSD() {
   if (!fileExists) {
     dataFile.println("# WineBrew Automated Wine Brewing System - Experimental Telemetry Log");
     dataFile.println("# System Architecture: Primary Controller (Master) + Secondary Node + RAPT Pill Hydrometer");
-    dataFile.println("# Legend: Date,Time,Stage,Volume_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
-    dataFile.println("Date,Time,Stage,Volume_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
+    dataFile.println("# Legend: Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
+    dataFile.println("Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
   }
 
   int h12 = now.hour() % 12;
@@ -47,12 +47,17 @@ void logDataToSD() {
   float ambLocal = bme1Status ? bme1.readTemperature() : 0.0f;
   float abv = (originalGravity > 0.0f && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f)
               ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
+  float ch0Vol = (activeBrewStage == 0 || activeBrewStage == -1) ? (hx711Status ? currentWeight : chamberVolume[0]) : chamberVolume[0];
 
-  sprintf(lineBuf, "%04d/%02d/%02d,%02d:%02d:%02d,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,%s,%d,%.2f",
+  sprintf(lineBuf, "%04d/%02d/%02d,%02d:%02d:%02d,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,%s,%d,%.2f",
           now.year(), now.month(), now.day(),
           now.hour(), now.minute(), now.second(),
           stageStr,
           currentWeight,
+          ch0Vol,
+          chamberVolume[1],
+          chamberVolume[2],
+          transferVolumeTransferred,
           ambLocal,
           curPreheat,
           curPast,

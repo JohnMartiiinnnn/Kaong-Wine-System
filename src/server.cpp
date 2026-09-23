@@ -158,7 +158,11 @@ void handleData() {
   json += "\"mix_mode\":" + String((int)currentMixerMode) + ",";
   json += "\"mix_spd\":" + String(mixerSpeedPercent) + ",";
   json += "\"mix_cyc_sec\":" + String(mix_cyc_sec) + ",";
-  json += "\"mix_tot_min\":" + String(mix_tot_min, 1);
+  json += "\"mix_tot_min\":" + String(mix_tot_min, 1) + ",";
+  float ch0Vol = (activeBrewStage == 0 || activeBrewStage == -1) ? (hx711Status ? currentWeight : chamberVolume[0]) : chamberVolume[0];
+  json += "\"ch0\":" + String(ch0Vol, 2) + ",";
+  json += "\"ch1\":" + String(chamberVolume[1], 2) + ",";
+  json += "\"ch2\":" + String(chamberVolume[2], 2);
   json += "}";
   server.send(200, "application/json", json);
 }

@@ -26,6 +26,10 @@ CSV_LEGEND = [
     ["# Time               : Sample Timestamp with Second Precision (HH:MM:SS)"],
     ["# Stage              : Active Stage (PREHEAT, FERMENTATION, PASTEURIZATION, IDLE)"],
     ["# Volume_L           : Vat / Sap Volume in Liters (HX711 Load Cell)"],
+    ["# Ch0_Preheat_L     : Preheat Chamber / Load Cell Volume in Liters"],
+    ["# Ch1_Ferm_L        : Fermentation Chamber Liquid Load in Liters"],
+    ["# Ch2_Past_L        : Pasteurization Chamber Liquid Load in Liters"],
+    ["# Transfer_L        : Transferred / In-Transit Liquid Volume via Flow Meter (Liters)"],
     ["# LocalAmbient_C     : Preheat Chamber Ambient Temperature (BME280, Celsius)"],
     ["# PreheatLiquid_C    : Preheat Chamber Liquid Temperature (DS18B20 Probe 2, Celsius)"],
     ["# PastLiquid_C       : Pasteurization Liquid Temperature (DS18B20 Probe 1, Celsius)"],
@@ -52,6 +56,10 @@ CSV_HEADERS = [
     "Time",
     "Stage",
     "Volume_L",
+    "Ch0_Preheat_L",
+    "Ch1_Ferm_L",
+    "Ch2_Past_L",
+    "Transfer_L",
     "LocalAmbient_C",
     "PreheatLiquid_C",
     "PastLiquid_C",
@@ -144,11 +152,20 @@ def main():
                 mixer_mode = data.get("mm", 0)
                 mixer_str = MIXER_MODES.get(mixer_mode, str(mixer_mode))
 
+                ch0 = data.get("ch0", data.get("vol", 0.0))
+                ch1 = data.get("ch1", 0.0)
+                ch2 = data.get("ch2", 0.0)
+                xfer = data.get("xfer_vol", data.get("v_xfer", 0.0))
+
                 row = [
                     t_now.strftime("%Y-%m-%d"),
                     t_now.strftime("%H:%M:%S"),
                     stage_str,
                     f"{data.get('vol', 0.0):.2f}",
+                    f"{float(ch0):.2f}",
+                    f"{float(ch1):.2f}",
+                    f"{float(ch2):.2f}",
+                    f"{float(xfer):.2f}",
                     f"{data.get('la', 0.0):.2f}",
                     f"{data.get('ll', 0.0):.2f}",
                     f"{data.get('lp', 0.0):.2f}",
