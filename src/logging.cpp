@@ -28,8 +28,8 @@ void logDataToSD() {
   if (!fileExists) {
     dataFile.println("# WineBrew Automated Wine Brewing System - Experimental Telemetry Log");
     dataFile.println("# System Architecture: Primary Controller (Master) + Secondary Node + RAPT Pill Hydrometer");
-    dataFile.println("# Legend: Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
-    dataFile.println("Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
+    dataFile.println("# Legend: Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer1_L,Xfer2_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
+    dataFile.println("Date,Time,Stage,Volume_L,Ch0_Preheat_L,Ch1_Ferm_L,Ch2_Past_L,Xfer1_L,Xfer2_L,LocalAmbient_C,PreheatLiquid_C,PastLiquid_C,FermAmbient_C,FermLiquid_C,pH,Gravity,ABV_pct,Heater_pct,Fan_State,MixerSpeed_pct,YeastDispensed_g");
   }
 
   int h12 = now.hour() % 12;
@@ -40,7 +40,7 @@ void logDataToSD() {
   const char* stageStr = (activeBrewStage == 0) ? "PREHEAT" : (activeBrewStage == 1 ? "FERMENTATION" : (activeBrewStage == 2 ? "PASTEURIZATION" : "IDLE"));
   const char* fanStr = isFanOn ? "PREHEAT_FAN" : (isFermFanOn ? "FERM_FAN" : "OFF");
 
-  char lineBuf[256];
+  char lineBuf[288];
   float curPreheat = liquid2Status ? getPreheatTemp() : 0.0f;
   float curPast = liquid1Status ? getPastTemp() : 0.0f;
   float curFermLiq = (incomingData.ds18Status == 1) ? incomingData.room2LiquidTemp : 0.0f;
@@ -49,7 +49,7 @@ void logDataToSD() {
               ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
   float ch0Vol = (activeBrewStage == 0 || activeBrewStage == -1) ? (hx711Status ? currentWeight : chamberVolume[0]) : chamberVolume[0];
 
-  sprintf(lineBuf, "%04d/%02d/%02d,%02d:%02d:%02d,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,%s,%d,%.2f",
+  sprintf(lineBuf, "%04d/%02d/%02d,%02d:%02d:%02d,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,%s,%d,%.2f",
           now.year(), now.month(), now.day(),
           now.hour(), now.minute(), now.second(),
           stageStr,
@@ -57,7 +57,8 @@ void logDataToSD() {
           ch0Vol,
           chamberVolume[1],
           chamberVolume[2],
-          transferVolumeTransferred,
+          transfer1Volume,
+          transfer2Volume,
           ambLocal,
           curPreheat,
           curPast,

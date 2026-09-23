@@ -430,6 +430,8 @@ extern uint32_t transferStartMs;
 extern float    transferStartWeight;
 extern float    transferTargetVolume;
 extern float    transferVolumeTransferred;
+extern float    transfer1Volume;
+extern float    transfer2Volume;
 extern bool     transferDryRunAlarm;
 const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
 const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 10000;  // 10s of zero flow pulses while pump running triggers cutoff

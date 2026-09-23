@@ -261,6 +261,8 @@ uint32_t transferStartMs = 0;
 float transferStartWeight = 10.0f;
 float transferTargetVolume = 10.0f;
 float transferVolumeTransferred = 0.0f;
+float transfer1Volume = 0.0f;
+float transfer2Volume = 0.0f;
 bool transferDryRunAlarm = false;
 uint32_t transferLastPulseMs = 0;
 
@@ -375,6 +377,8 @@ void saveBrewStateToNVS() {
   brewPrefs.putBool("xferTest", transferTestMode);
   brewPrefs.putFloat("chVol1", chamberVolume[1]);
   brewPrefs.putFloat("chVol2", chamberVolume[2]);
+  brewPrefs.putFloat("xfer1Vol", transfer1Volume);
+  brewPrefs.putFloat("xfer2Vol", transfer2Volume);
   brewPrefs.putBool("dryAlarm", dryElementAlarm);
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
   brewPrefs.putUInt("mixTotSec", mixerTotalRunSec);
@@ -391,6 +395,8 @@ void loadBrewStateFromNVS() {
     transferTestMode = brewPrefs.getBool("xferTest", false);
     chamberVolume[1] = brewPrefs.getFloat("chVol1", 0.0f);
     chamberVolume[2] = brewPrefs.getFloat("chVol2", 0.0f);
+    transfer1Volume = brewPrefs.getFloat("xfer1Vol", 0.0f);
+    transfer2Volume = brewPrefs.getFloat("xfer2Vol", 0.0f);
     dryElementAlarm = brewPrefs.getBool("dryAlarm", false);
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
@@ -422,6 +428,8 @@ void clearBrewStateInNVS() {
   brewPrefs.clear();
   brewPrefs.end();
   mixerTotalRunSec = 0;
+  transfer1Volume = 0.0f;
+  transfer2Volume = 0.0f;
 }
 
 // ---- Liquid Transfer Helper ----
@@ -1224,6 +1232,8 @@ void loop() {
           transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
           transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
           transferVolumeTransferred = 0.0f;
+          transfer1Volume = 0.0f;
+          transfer2Volume = 0.0f;
           transferDryRunAlarm = false;
           dryElementAlarm = false;
           chamberVolume[0] = (hx711Status && currentWeight > 0.0f) ? currentWeight : 0.0f;
@@ -2668,6 +2678,11 @@ void loop() {
       float kFact = (stageTransferTarget == 1) ? flowKFactor[0] : flowKFactor[1];
       if (kFact <= 0.0f) kFact = 450.0f;
       transferVolumeTransferred = (float)pulses / kFact;
+      if (stageTransferTarget == 1) {
+        transfer1Volume = transferVolumeTransferred;
+      } else if (stageTransferTarget == 2) {
+        transfer2Volume = transferVolumeTransferred;
+      }
 
       static uint32_t lastKnownPulses = 0;
       if (pulses != lastKnownPulses) {
@@ -2723,9 +2738,11 @@ void loop() {
         if (stageTransferTarget == 1) {
           chamberVolume[0] = 0.0f;
           chamberVolume[1] = transferVolumeTransferred;
+          transfer1Volume = transferVolumeTransferred;
         } else if (stageTransferTarget == 2) {
           chamberVolume[1] = 0.0f;
           chamberVolume[2] = transferVolumeTransferred;
+          transfer2Volume = transferVolumeTransferred;
         }
 
         if (transferTestMode) {
