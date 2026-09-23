@@ -68,6 +68,11 @@ const int OG_SAMPLES = 5;
 String currentLogFile = "/data_log.csv";
 char lastLogTime[10] = "--:--";
 char brewStartTime[32] = "NOT STARTED";
+char brewEndTime[32] = "--";
+float initialPH = 0.0f;
+float finalGravity = 0.0f;
+float finalPH = 0.0f;
+float finalABV = 0.0f;
 
 // ---- Actuator State ----
 int currentSpeedPercent = 0;
@@ -464,6 +469,54 @@ void clearBrewStateInNVS() {
   transfer2Volume = 0.0f;
 }
 
+void saveBrewSummaryToNVS() {
+  brewPrefs.begin("wb_summary", false);
+  brewPrefs.putUInt("elap0", stageElapsedMs[0]);
+  brewPrefs.putUInt("elap1", stageElapsedMs[1]);
+  brewPrefs.putUInt("elap2", stageElapsedMs[2]);
+  brewPrefs.putFloat("startWt", transferStartWeight);
+  brewPrefs.putFloat("xfer1Vol", transfer1Volume);
+  brewPrefs.putFloat("xfer2Vol", transfer2Volume);
+  brewPrefs.putFloat("chVol2", chamberVolume[2]);
+  brewPrefs.putFloat("yeastG", actualYeastDispensedGrams > 0.0f ? actualYeastDispensedGrams : yeastPitchGrams);
+  brewPrefs.putFloat("yeastRate", yeastPitchRate);
+  brewPrefs.putFloat("og", originalGravity);
+  brewPrefs.putFloat("fg", finalGravity);
+  brewPrefs.putFloat("initPH", initialPH);
+  brewPrefs.putFloat("finalPH", finalPH);
+  brewPrefs.putFloat("abv", finalABV);
+  brewPrefs.putUInt("mixSec", mixerTotalRunSec);
+  brewPrefs.putString("startTm", brewStartTime);
+  brewPrefs.putString("endTm", brewEndTime);
+  brewPrefs.putString("logFile", currentLogFile);
+  brewPrefs.end();
+}
+
+void loadBrewSummaryFromNVS() {
+  brewPrefs.begin("wb_summary", true);
+  stageElapsedMs[0] = brewPrefs.getUInt("elap0", stageElapsedMs[0]);
+  stageElapsedMs[1] = brewPrefs.getUInt("elap1", stageElapsedMs[1]);
+  stageElapsedMs[2] = brewPrefs.getUInt("elap2", stageElapsedMs[2]);
+  transferStartWeight = brewPrefs.getFloat("startWt", transferStartWeight);
+  transfer1Volume = brewPrefs.getFloat("xfer1Vol", transfer1Volume);
+  transfer2Volume = brewPrefs.getFloat("xfer2Vol", transfer2Volume);
+  chamberVolume[2] = brewPrefs.getFloat("chVol2", chamberVolume[2]);
+  actualYeastDispensedGrams = brewPrefs.getFloat("yeastG", actualYeastDispensedGrams);
+  yeastPitchRate = brewPrefs.getFloat("yeastRate", yeastPitchRate);
+  originalGravity = brewPrefs.getFloat("og", originalGravity);
+  finalGravity = brewPrefs.getFloat("fg", finalGravity);
+  initialPH = brewPrefs.getFloat("initPH", initialPH);
+  finalPH = brewPrefs.getFloat("finalPH", finalPH);
+  finalABV = brewPrefs.getFloat("abv", finalABV);
+  mixerTotalRunSec = brewPrefs.getUInt("mixSec", mixerTotalRunSec);
+  String st = brewPrefs.getString("startTm", "");
+  if (st.length() > 0) strncpy(brewStartTime, st.c_str(), sizeof(brewStartTime) - 1);
+  String et = brewPrefs.getString("endTm", "");
+  if (et.length() > 0) strncpy(brewEndTime, et.c_str(), sizeof(brewEndTime) - 1);
+  currentLogFile = brewPrefs.getString("logFile", currentLogFile);
+  brewPrefs.end();
+}
+
 // ---- Liquid Transfer Helper ----
 void startLiquidTransfer(int targetStage) {
   stageTransferring = true;
@@ -677,6 +730,8 @@ void setup() {
     mcp.digitalWrite(LIGHT_Y, RELAY_ON);
   } else if (activeBrewStage == 2) {
     mcp.digitalWrite(LIGHT_G, RELAY_ON);
+  } else {
+    loadBrewSummaryFromNVS();
   }
 
   delay(600);
@@ -1277,6 +1332,12 @@ void loop() {
           actualYeastDispensedGrams = 0.0f;
           isYeastDispensingActive = false;
           isInitialPitchMixing = false;
+          brewEndTime[0] = '\0';
+          initialPH = (remoteStatusReceived && incomingData.adsStatus && incomingData.phValue > 0.0f) ? incomingData.phValue : 0.0f;
+          finalGravity = 0.0f;
+          finalPH = 0.0f;
+          finalABV = 0.0f;
+          stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -2485,6 +2546,9 @@ void loop() {
         if (ogSampleCount >= OG_SAMPLES) {
           originalGravity = ogSampleSum / ogSampleCount;
           ogCapturing = false;
+          if (initialPH <= 0.0f && incomingData.adsStatus && incomingData.phValue > 0.0f) {
+            initialPH = incomingData.phValue;
+          }
         }
       }
     } else {
@@ -3064,12 +3128,34 @@ void loop() {
                 pastPid.reset();
                 // Brew complete
                 stageElapsedMs[2] = millis() - stageStartMillis;
-                activeBrewStage = -1;
+                if (incomingData.bleStatus && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f) {
+                  finalGravity = incomingData.pillGravity;
+                }
+                if (incomingData.adsStatus && incomingData.phValue > 0.0f) {
+                  finalPH = incomingData.phValue;
+                }
+                if (originalGravity > 0.0f && finalGravity > 0.0f) {
+                  finalABV = max(0.0f, (originalGravity - finalGravity) * 131.25f);
+                }
+                if (rtcStatus) {
+                  DateTime now = rtc.now();
+                  int h12 = now.hour() % 12;
+                  if (h12 == 0) h12 = 12;
+                  const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+                  sprintf(brewEndTime, "%02d/%02d %d:%02d%s", now.day(), now.month(), h12, now.minute(), ampm);
+                } else {
+                  strcpy(brewEndTime, "COMPLETED");
+                }
+                saveBrewSummaryToNVS();
                 clearBrewStateInNVS();
+                activeBrewStage = -1;
+                simRunActive = false;
                 mcp.digitalWrite(LIGHT_R, RELAY_ON);
                 mcp.digitalWrite(LIGHT_Y, RELAY_ON);
                 mcp.digitalWrite(LIGHT_G, RELAY_ON);
-                dashNeedsFullRedraw = true;
+                currentAppState = BREW_SUMMARY_MENU;
+                brewSummaryNeedsFullRedraw = true;
+                drawBrewSummaryMenu();
               }
             }
           } else {
@@ -3161,15 +3247,36 @@ void loop() {
           mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
         } else {
+          stageElapsedMs[2] = millis() - stageStartMillis;
+          if (incomingData.bleStatus && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f) {
+            finalGravity = incomingData.pillGravity;
+          }
+          if (incomingData.adsStatus && incomingData.phValue > 0.0f) {
+            finalPH = incomingData.phValue;
+          }
+          if (originalGravity > 0.0f && finalGravity > 0.0f) {
+            finalABV = max(0.0f, (originalGravity - finalGravity) * 131.25f);
+          }
+          if (rtcStatus) {
+            DateTime now = rtc.now();
+            int h12 = now.hour() % 12;
+            if (h12 == 0) h12 = 12;
+            const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+            sprintf(brewEndTime, "%02d/%02d %d:%02d%s", now.day(), now.month(), h12, now.minute(), ampm);
+          } else {
+            strcpy(brewEndTime, "COMPLETED");
+          }
+          saveBrewSummaryToNVS();
+          clearBrewStateInNVS();
           activeBrewStage = -1;
           simRunActive = false;
           mcp.digitalWrite(LIGHT_R, RELAY_ON);
           mcp.digitalWrite(LIGHT_Y, RELAY_ON);
           mcp.digitalWrite(LIGHT_G, RELAY_ON);
+          currentAppState = BREW_SUMMARY_MENU;
+          brewSummaryNeedsFullRedraw = true;
+          drawBrewSummaryMenu();
         }
-        dashNeedsFullRedraw = true;
-        if (currentAppState == DASHBOARD_ACTIVE)
-          drawDashboardLayout();
       }
     }
 

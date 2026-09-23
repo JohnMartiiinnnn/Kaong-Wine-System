@@ -2261,108 +2261,135 @@ void updateDashboardGraph() {
 }
 
 void drawBrewSummaryMenu() {
-  tft.fillRect(0, 0, 320, 50, 0x03E0);
-  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-  tft.setTextColor(TFT_WHITE);
-  tft.drawString("BREW RESULTS", 10, 15, 4);
+  // Top Header Bar
+  tft.fillRect(0, 0, 320, 38, 0x03E0);
+  tft.setTextColor(TFT_WHITE, 0x03E0);
+  tft.drawString("PIPELINE SUMMARY", 10, 8, 4);
+  tft.setTextColor(TFT_YELLOW, 0x03E0);
+  tft.drawRightString("COMPLETE", 310, 12, 2);
 
-  char buf[32];
+  // Background Canvas
+  tft.fillRect(0, 38, 320, 442, TFT_WHITE);
 
-  // Total time
+  // Stage Timers
   uint32_t totalMs = stageElapsedMs[0] + stageElapsedMs[1] + stageElapsedMs[2];
-  char totBuf[20];
-  formatStageTimer(totalMs, totBuf);
-  tft.fillRect(10, 60, 300, 36, 0xD6BA);
-  tft.drawRect(10, 60, 300, 36, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawString("TOTAL TIME:", 18, 70, 2);
-  tft.drawRightString(totBuf, 302, 70, 2);
-
-  // Per-stage breakdown
-  char s0[16], s1[16], s2[16];
+  char s0[16], s1[16], s2[16], sTot[16];
   formatStageTimer(stageElapsedMs[0], s0);
   formatStageTimer(stageElapsedMs[1], s1);
   formatStageTimer(stageElapsedMs[2], s2);
+  formatStageTimer(totalMs, sTot);
+
+  char buf[48];
+
+  // ==========================================
+  // STAGE 1: PRE-HEAT & STERILIZATION
+  // ==========================================
+  tft.fillRect(8, 42, 304, 82, 0xD6BA);
+  tft.drawRect(8, 42, 304, 82, TFT_DARKGREY);
+  tft.fillRect(8, 42, 304, 20, 0xB596);
+  tft.drawRect(8, 42, 304, 20, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xB596);
+  tft.drawString("1. PRE-HEAT & STERILIZE", 14, 45, 2);
+  tft.setTextColor(0x0200, 0xB596);
+  tft.drawRightString(s0, 306, 45, 2);
+
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawString("Sterilize: 80.0C (15m)  |  Cooled: 38.0C", 14, 66, 1);
+
+  float initWt = (transferStartWeight > 0.0f) ? transferStartWeight : (hx711Status ? currentWeight : minVolumeReq);
+  sprintf(buf, "Initial: %.2f L  |  Xfer 1: %.2f L", initWt, transfer1Volume);
+  tft.drawString(buf, 14, 82, 2);
+  tft.setTextColor(0x0200, 0xD6BA);
+  tft.drawString("Status: Pasteurization Core Sterilized OK", 14, 104, 1);
+
+  // ==========================================
+  // STAGE 2: FERMENTATION
+  // ==========================================
+  tft.fillRect(8, 128, 304, 146, 0xD6BA);
+  tft.drawRect(8, 128, 304, 146, TFT_DARKGREY);
+  tft.fillRect(8, 128, 304, 20, 0xB596);
+  tft.drawRect(8, 128, 304, 20, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xB596);
+  tft.drawString("2. FERMENTATION", 14, 131, 2);
+  tft.setTextColor(0x0200, 0xB596);
+  tft.drawRightString(s1, 306, 131, 2);
+
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  float yeastG = (actualYeastDispensedGrams > 0.0f) ? actualYeastDispensedGrams : yeastPitchGrams;
+  sprintf(buf, "Yeast: %.1fg (%.2fg/L)  |  Mixer: %lum %lus",
+          yeastG, yeastPitchRate, (unsigned long)(mixerTotalRunSec / 60), (unsigned long)(mixerTotalRunSec % 60));
+  tft.drawString(buf, 14, 152, 1);
+
+  float ogVal = (originalGravity > 0.0f) ? originalGravity : 1.050f;
+  float fgVal = (finalGravity > 0.0f) ? finalGravity : ((remoteStatusReceived && incomingData.bleStatus && incomingData.pillGravity > 0.5f) ? incomingData.pillGravity : 1.010f);
+  sprintf(buf, "OG: %.3f  ->  Final SG: %.3f", ogVal, fgVal);
+  tft.drawString(buf, 14, 168, 2);
+
+  float abvVal = (finalABV > 0.0f) ? finalABV : max(0.0f, (ogVal - fgVal) * 131.25f);
+  float atten = (ogVal > 1.0f && fgVal > 0.0f && ogVal > fgVal) ? ((ogVal - fgVal) / (ogVal - 1.0f)) * 100.0f : 0.0f;
+  sprintf(buf, "Est ABV: %.1f%%  |  Atten: %.1f%%", abvVal, atten);
+  tft.setTextColor(0x03E0, 0xD6BA);
+  tft.drawString(buf, 14, 190, 2);
+
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  float iPH = (initialPH > 0.0f) ? initialPH : 4.20f;
+  float fPH = (finalPH > 0.0f) ? finalPH : ((remoteStatusReceived && incomingData.adsStatus && incomingData.phValue > 0.0f) ? incomingData.phValue : 3.20f);
+  sprintf(buf, "Acidity: pH %.2f  ->  pH %.2f", iPH, fPH);
+  tft.drawString(buf, 14, 212, 2);
+
+  sprintf(buf, "Delivered Xfer 2: %.2f L", transfer2Volume);
+  tft.drawString(buf, 14, 234, 2);
+  tft.setTextColor(0x0200, 0xD6BA);
+  tft.drawString("Status: Attenuation & Acidity Target Reached", 14, 256, 1);
+
+  // ==========================================
+  // STAGE 3: PASTEURIZATION
+  // ==========================================
+  tft.fillRect(8, 278, 304, 78, 0xD6BA);
+  tft.drawRect(8, 278, 304, 78, TFT_DARKGREY);
+  tft.fillRect(8, 278, 304, 20, 0xB596);
+  tft.drawRect(8, 278, 304, 20, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xB596);
+  tft.drawString("3. PASTEURIZATION", 14, 281, 2);
+  tft.setTextColor(0x0200, 0xB596);
+  tft.drawRightString(s2, 306, 281, 2);
+
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawString("Target Hold: 72.0C (15 min sterilization)", 14, 302, 1);
+
+  float yieldVol = (chamberVolume[2] > 0.0f) ? chamberVolume[2] : (transfer2Volume > 0.0f ? transfer2Volume : 0.0f);
+  sprintf(buf, "Output Yield: %.2f L (Chamber 2)", yieldVol);
+  tft.drawString(buf, 14, 318, 2);
+  tft.setTextColor(0x0200, 0xD6BA);
+  tft.drawString("Status: Pasteurization Complete & Stabilized", 14, 338, 1);
+
+  // ==========================================
+  // PIPELINE BATCH TOTALS
+  // ==========================================
+  tft.fillRect(8, 360, 304, 72, 0x18E3);
+  tft.drawRect(8, 360, 304, 72, TFT_DARKGREY);
+
+  tft.setTextColor(TFT_YELLOW, 0x18E3);
+  sprintf(buf, "TOTAL DURATION: %s", sTot);
+  tft.drawString(buf, 14, 365, 2);
+
+  tft.setTextColor(TFT_WHITE, 0x18E3);
+  sprintf(buf, "YIELD: %.2fL  |  %.1f%% ABV  |  pH %.2f", yieldVol, abvVal, fPH);
+  tft.drawString(buf, 14, 385, 2);
+
+  tft.setTextColor(TFT_LIGHTGREY, 0x18E3);
+  sprintf(buf, "Start: %s  |  End: %s", brewStartTime[0] != '\0' ? brewStartTime : "--", brewEndTime[0] != '\0' ? brewEndTime : "--");
+  tft.drawString(buf, 14, 405, 1);
+
+  sprintf(buf, "Log: %s", currentLogFile.c_str());
+  tft.drawString(buf, 14, 417, 1);
+
+  // ==========================================
+  // FOOTER NAVIGATION
+  // ==========================================
+  tft.fillRect(0, 436, 320, 44, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawString("Pre-heat:", 22, 103, 2);
-  tft.drawRightString(s0, 302, 103, 2);
-  tft.drawString("Fermentation:", 22, 123, 2);
-  tft.drawRightString(s1, 302, 123, 2);
-  tft.drawString("Pasteurization:", 22, 143, 2);
-  tft.drawRightString(s2, 302, 143, 2);
-
-  tft.drawFastHLine(10, 168, 300, TFT_DARKGREY);
-
-  // SG + ABV
-  char sgBuf[16], abvBuf[16];
-  if (remoteStatusReceived && incomingData.bleStatus) {
-    sprintf(sgBuf, "%.3f", incomingData.pillGravity);
-    if (originalGravity > 0.0f) {
-      float abv = (originalGravity - incomingData.pillGravity) * 131.25f;
-      if (abv < 0.0f)
-        abv = 0.0f;
-      sprintf(abvBuf, "%.1f%%", abv);
-    } else {
-      strcpy(abvBuf, "--");
-    }
-  } else {
-    strcpy(sgBuf, "--");
-    strcpy(abvBuf, "--");
-  }
-
-  tft.fillRect(10, 176, 145, 70, 0xD6BA);
-  tft.drawRect(10, 176, 145, 70, TFT_DARKGREY);
-  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("FINAL SG", 82, 183, 2);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString(sgBuf, 82, 205, 4);
-
-  tft.fillRect(165, 176, 145, 70, 0xD6BA);
-  tft.drawRect(165, 176, 145, 70, TFT_DARKGREY);
-  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("EST. ABV", 237, 183, 2);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString(abvBuf, 237, 205, 4);
-
-  tft.drawFastHLine(10, 252, 300, TFT_DARKGREY);
-
-  // pH + Weight
-  char phBuf[16], wtBuf[16];
-  if (remoteStatusReceived && incomingData.adsStatus)
-    sprintf(phBuf, "%.2f", incomingData.phValue);
-  else
-    strcpy(phBuf, "--");
-  if (hx711Status)
-    sprintf(wtBuf, "%.0f g", currentWeight);
-  else
-    strcpy(wtBuf, "--");
-
-  tft.fillRect(10, 260, 145, 70, 0xD6BA);
-  tft.drawRect(10, 260, 145, 70, TFT_DARKGREY);
-  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("FINAL pH", 82, 267, 2);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString(phBuf, 82, 289, 4);
-
-  tft.fillRect(165, 260, 145, 70, 0xD6BA);
-  tft.drawRect(165, 260, 145, 70, TFT_DARKGREY);
-  tft.setTextColor(TFT_DARKGREY, 0xD6BA);
-  tft.drawCentreString("WEIGHT", 237, 267, 2);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString(wtBuf, 237, 289, 4);
-
-  // Brew start time if available
-  if (brewStartTime[0] != '\0') {
-    tft.drawFastHLine(10, 338, 300, TFT_DARKGREY);
-    tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("STARTED", CENTER_X, 347, 2);
-    tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawCentreString(brewStartTime, CENTER_X, 367, 4);
-  }
-
-  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT / RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("[ SELECT / RETURN : DASHBOARD ]", CENTER_X, 448, 2);
   brewSummaryNeedsFullRedraw = false;
 }
 

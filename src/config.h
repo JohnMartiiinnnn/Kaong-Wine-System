@@ -231,6 +231,13 @@ extern float ogSampleSum;
 extern String currentLogFile;
 extern char lastLogTime[10];
 extern char brewStartTime[32];
+extern char brewEndTime[32];
+extern float initialPH;
+extern float finalGravity;
+extern float finalPH;
+extern float finalABV;
+void saveBrewSummaryToNVS();
+void loadBrewSummaryFromNVS();
 
 // ---- Actuator State ----
 extern int currentSpeedPercent;
