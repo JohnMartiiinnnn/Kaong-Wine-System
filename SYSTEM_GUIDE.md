@@ -674,9 +674,14 @@ In addition to onboard SD card logging, the system supports autonomous continuou
 ### Beelink 24/7 Background Telemetry Service
 * **Service Name**: `winebrew-logger.service` (systemd user daemon on Beelink)
 * **Log Location**: `/home/dave/winebrew-logs/brew_wifi_YYYYMMDD_HHMMSS.csv`
-* **Auto-Batch Rotation**: Automatically rotates into a new CSV file whenever a new brew or transfer test starts from IDLE, while standby noise routes to `idle_telemetry.csv`.
+* **Auto-Batch Rotation & Resumption**: Automatically rotates into a new CSV file on new batch transitions from IDLE, while seamlessly resuming the ongoing batch log across service restarts/reboots to prevent batch fragmentation.
 * **Polling Interval**: Every 5 seconds via `http://192.168.1.137/data`
-* **Logged Telemetry**: 22 fields per record including timestamp, brew stage, heater states, fan PWM, vat volume, all temperatures, pH, specific gravity, ABV, setpoints, RAPT Pill battery percentage, and BLE RSSI.
+* **Logged Telemetry Structure**: 36 columns partitioned into 3 distinct sections separated by empty divider spacer columns:
+  1. *Live Sensor Telemetry* (Columns A to R): Timestamps, active stage, chamber volumes, dynamic flow transfer tallies, liquid/ambient temperatures, pH, specific gravity, estimated ABV, and active closed-loop target temperature.
+  2. *Divider Column* (Column S): 28px empty spacer separating sensor data from setpoints.
+  3. *Configured Setpoints* (Columns T to Z): Preheat target, cooling threshold, fermentation target, pasteurization setpoint, target terminal pH, target terminal gravity, and target yeast dose.
+  4. *Divider Column* (Column AA): 28px empty spacer separating setpoints from hardware telemetry.
+  5. *Actuator States & Diagnostics* (Columns AB to AJ): SSR heater duty cycle, fan state, mixer mode/speed, dispensed yeast mass, RAPT Pill battery & RSSI, mixing motor sense voltage, and active SD log reference.
 * **Service Inspection**:
   * Check status: `systemctl --user status winebrew-logger.service`
   * Live log stream: `journalctl --user -u winebrew-logger.service -f`
@@ -685,8 +690,8 @@ In addition to onboard SD card logging, the system supports autonomous continuou
 * **Service Name**: `winebrew-sheets-sync.service` (systemd user daemon on Beelink)
 * **Spreadsheet ID**: `1-sY0B5F_4n6nvDWJp9xJroC7EzBFKkt7Hdg7_S5KZBg`
 * **Functionality**:
-  * Automatically assigns sequential batch tabs (`Batch 1`, `Batch 2`, `Batch 3`, etc.) for every distinct CSV file.
-  * Formats each worksheet with custom background styling, centered alignment, dynamic 5,000-row expanding borders, and strictly frozen Row 1 headers.
+  * Automatically assigns sequential batch tabs (`Test 1`, `Test 2`, `Test 3`, etc.) for every distinct CSV batch.
+  * Formats worksheets with soft gray header styling (`#E8EAED`), pure white data cell backgrounds (`#FFFFFF`), centered alignment, 28px divider columns, auto-fitted column widths, and strictly frozen Row 1 headers.
   * Streams new rows in near-real-time every 5 seconds without duplicate entries.
 
 ### Autonomous One-Click OTA Deployment
