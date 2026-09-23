@@ -578,14 +578,22 @@ void drawLoadCellPage(bool valuesOnly) {
   static float prevOffset = -1.0f;
 
   auto drawTareTile = [&](bool sel) {
-    uint16_t bg = sel ? 0x3566 : 0xD6BA;
-    uint16_t txt = sel ? TFT_WHITE : TFT_BLACK;
+    uint16_t bg = isTareCountdownActive ? TFT_ORANGE : (sel ? 0x3566 : 0xD6BA);
+    uint16_t txt = (isTareCountdownActive || sel) ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 180, 300, 58, bg);
-    tft.drawRect(10, 180, 300, 58, sel ? TFT_WHITE : TFT_DARKGREY);
-    if (sel) tft.drawRect(11, 181, 298, 56, TFT_WHITE);
+    tft.drawRect(10, 180, 300, 58, (isTareCountdownActive || sel) ? TFT_WHITE : TFT_DARKGREY);
+    if (sel || isTareCountdownActive) tft.drawRect(11, 181, 298, 56, TFT_WHITE);
     tft.setTextColor(txt, bg);
-    tft.drawString("TARE ZERO", 25, 195, 4);
-    tft.drawRightString("[ ZERO ]", 290, 200, 2);
+    if (isTareCountdownActive) {
+      char cBuf[32];
+      sprintf(cBuf, "TARING IN %ds...", max(1, tareCountdownRemainingSec));
+      tft.drawString(cBuf, 25, 195, 4);
+      sprintf(cBuf, "[ %ds ]", max(1, tareCountdownRemainingSec));
+      tft.drawRightString(cBuf, 290, 200, 2);
+    } else {
+      tft.drawString("TARE ZERO", 25, 195, 4);
+      tft.drawRightString("[ ZERO ]", 290, 200, 2);
+    }
   };
 
   auto drawOffsetTile = [&](bool sel, bool editing) {
@@ -1207,7 +1215,13 @@ void drawCalibrationPage(bool valuesOnly) {
     tft.drawCentreString("1. EMPTY VAT & TARE", CENTER_X, 60, 2);
     tft.drawCentreString("2. ADD KNOWN WEIGHT", CENTER_X, 80, 2);
     tft.drawCentreString("3. ADJUST FACTOR", CENTER_X, 100, 2);
-    drawCalibrationValueTile(130, "TARE SCALE", "SELECT", calSelection == 0);
+    if (isTareCountdownActive && calSelection == 0) {
+      char cBuf[32];
+      sprintf(cBuf, "IN %ds...", max(1, tareCountdownRemainingSec));
+      drawCalibrationValueTile(130, "TARE SCALE", cBuf, true);
+    } else {
+      drawCalibrationValueTile(130, "TARE SCALE", "SELECT", calSelection == 0);
+    }
     sprintf(b, "%.1f", calibrationFactor);
     drawCalibrationValueTile(200, "CAL. FACTOR", b, calSelection == 1);
     tft.fillRect(10, 280, 300, 80, 0xCE79);
@@ -2695,9 +2709,17 @@ void drawCalibWizard() {
       row2Fg = TFT_WHITE;
       actionText = "DONE (SUCCESS)";
     } else if (!calibTareDone) {
-      row2Bg = 0x3566; // Blue
-      row2Fg = TFT_WHITE;
-      actionText = "STEP 1: TARE EMPTY VAT";
+      if (isTareCountdownActive) {
+        row2Bg = TFT_ORANGE;
+        row2Fg = TFT_WHITE;
+        static char tareWizBuf[48];
+        sprintf(tareWizBuf, "STEP 1: TARING IN %ds...", max(1, tareCountdownRemainingSec));
+        actionText = tareWizBuf;
+      } else {
+        row2Bg = 0x3566; // Blue
+        row2Fg = TFT_WHITE;
+        actionText = "STEP 1: TARE EMPTY VAT";
+      }
     } else {
       row2Bg = TFT_ORANGE;
       row2Fg = TFT_WHITE;

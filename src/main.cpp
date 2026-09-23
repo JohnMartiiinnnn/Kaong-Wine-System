@@ -279,6 +279,10 @@ uint32_t calibCompleteTime = 0;
 uint32_t calibStartMs = 0;
 bool calibTareDone = false;
 long calibRawTareValue = 0;
+bool isTareCountdownActive = false;
+uint32_t tareCountdownStartMs = 0;
+int tareCountdownRemainingSec = 0;
+AppState tareCountdownOriginState = SYSTEM_INIT;
 uint32_t calibLedTimer = 0;
 bool calibLedState = false;
 uint32_t calibLastPulseCount = 0;
@@ -1726,26 +1730,29 @@ void loop() {
       // Pressing SELECT inside SENSOR_MONITOR now does nothing.
     } else if (currentAppState == CALIBRATION_MODE) {
       if (calSelection == 0) {
-        if (hx711Status) {
-          scale.tare();
-          currentWeight = 0.0f;
-          hx711WeightSeeded = false;
+        if (hx711Status && !isTareCountdownActive) {
+          isTareCountdownActive = true;
+          tareCountdownStartMs = millis();
+          tareCountdownRemainingSec = 3;
+          tareCountdownOriginState = CALIBRATION_MODE;
+          drawCalibrationPage();
         }
-        drawCalibrationPage();
       } else if (calSelection == 1) {
         wizardEditing = !wizardEditing;
         drawCalibrationPage();
       } else if (calSelection == 2) {
+        isTareCountdownActive = false;
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
       }
     } else if (currentAppState == LOAD_CELL_PAGE) {
       if (loadCellSelection == 0) {
-        if (hx711Status) {
-          scale.tare();
-          currentWeight = -tareOffset;
-          hx711WeightSeeded = false;
+        if (hx711Status && !isTareCountdownActive) {
+          isTareCountdownActive = true;
+          tareCountdownStartMs = millis();
+          tareCountdownRemainingSec = 3;
+          tareCountdownOriginState = LOAD_CELL_PAGE;
           drawLoadCellPage();
         }
       } else if (loadCellSelection == 1) {
@@ -1792,14 +1799,13 @@ void loop() {
         } else {
           // Load Cell
           if (!calibTareDone) {
-            if (hx711Status) {
-              scale.tare();
-              calibRawTareValue = scale.get_value(5);
-              currentWeight = 0.0f;
-              hx711WeightSeeded = false;
-              calibTareDone = true;
+            if (hx711Status && !isTareCountdownActive) {
+              isTareCountdownActive = true;
+              tareCountdownStartMs = millis();
+              tareCountdownRemainingSec = 3;
+              tareCountdownOriginState = CALIB_WIZARD;
+              drawCalibWizard();
             }
-            drawCalibWizard();
           } else {
             if (hx711Status) {
               long rawVal = scale.get_value(5);
@@ -2049,6 +2055,7 @@ void loop() {
         scale.set_scale(calibrationFactor);
         drawCalibrationPage();
       } else {
+        isTareCountdownActive = false;
         currentAppState = SENSOR_MONITOR;
         monitorNeedsFullRedraw = true;
         drawSensorMonitorPage();
@@ -2058,6 +2065,7 @@ void loop() {
         tareOffset = max(0.0f, tareOffset - 0.1f);
         drawLoadCellPage();
       } else {
+        isTareCountdownActive = false;
         wizardEditing = false;
         saveSettingsToNVS();
         currentAppState = prevLoadCellState;
@@ -2532,6 +2540,43 @@ void loop() {
         mixerActiveDurationMs = MIXER_ON_MS;
         mixerSpeedPercent = 100;
         setMixerSpeed(100);
+      }
+    }
+  }
+
+  // ---- Tare 3-Second Countdown Handler ----
+  if (isTareCountdownActive) {
+    uint32_t elapsedMs = millis() - tareCountdownStartMs;
+    int secLeft = (elapsedMs < 3000) ? (3 - (int)(elapsedMs / 1000)) : 0;
+
+    if (secLeft != tareCountdownRemainingSec) {
+      tareCountdownRemainingSec = secLeft;
+      if (currentAppState == LOAD_CELL_PAGE) {
+        drawLoadCellPage(false);
+      } else if (currentAppState == CALIBRATION_MODE) {
+        drawCalibrationPage(false);
+      } else if (currentAppState == CALIB_WIZARD) {
+        drawCalibWizard();
+      }
+    }
+
+    if (elapsedMs >= 3000) {
+      isTareCountdownActive = false;
+      if (hx711Status) {
+        scale.tare(10);
+        hx711WeightSeeded = false;
+        if (tareCountdownOriginState == LOAD_CELL_PAGE) {
+          currentWeight = -tareOffset;
+          drawLoadCellPage(false);
+        } else if (tareCountdownOriginState == CALIBRATION_MODE) {
+          currentWeight = 0.0f;
+          drawCalibrationPage(false);
+        } else if (tareCountdownOriginState == CALIB_WIZARD) {
+          calibRawTareValue = scale.get_value(5);
+          currentWeight = 0.0f;
+          calibTareDone = true;
+          drawCalibWizard();
+        }
       }
     }
   }

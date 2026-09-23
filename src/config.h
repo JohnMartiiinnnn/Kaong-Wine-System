@@ -453,6 +453,10 @@ extern bool     calibCompleted;
 extern uint32_t calibCompleteTime;
 extern bool     calibTareDone;
 extern long     calibRawTareValue;
+extern bool     isTareCountdownActive;
+extern uint32_t tareCountdownStartMs;
+extern int      tareCountdownRemainingSec;
+extern AppState tareCountdownOriginState;
 
 // ---- Temperature Calibration Helpers ----
 float getPreheatTemp();
