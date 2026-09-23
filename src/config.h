@@ -149,6 +149,7 @@ const uint32_t PREHEAT_HOLD_MS = 15UL * 60 * 1000;  // 15 min sterilization hold
 const uint32_t PAST_HOLD_MS    = 15UL * 60 * 1000;  // 15 min pasteurization hold
 
 extern float    yeastPitchGrams;
+extern float    yeastPitchRate;
 extern uint32_t fermDurationMs;
 
 // ---- Motor Command Struct (Main -> Secondary via UART) ----

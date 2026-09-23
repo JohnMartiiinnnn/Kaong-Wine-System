@@ -197,6 +197,7 @@ float preheatCoolTarget = 38.0f;
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
+float    yeastPitchRate = 0.50f;
 uint32_t fermDurationMs  = 10UL * 60 * 1000;
 int stageParamSelection = 0;
 bool stageParamNeedsFullRedraw = true;
@@ -352,6 +353,7 @@ void saveSettingsToNVS() {
   brewPrefs.putFloat("fermOffset", fermTempOffset);
   brewPrefs.putFloat("fermPH", fermTargetPH);
   brewPrefs.putFloat("fermSG", fermTargetGravity);
+  brewPrefs.putFloat("yeastRate", yeastPitchRate);
   brewPrefs.putFloat("yeastG", yeastPitchGrams);
   brewPrefs.end();
 }
@@ -374,6 +376,7 @@ void loadSettingsFromNVS() {
   fermTempOffset = brewPrefs.getFloat("fermOffset", 0.0f);
   fermTargetPH = brewPrefs.getFloat("fermPH", 4.0f);
   fermTargetGravity = brewPrefs.getFloat("fermSG", 1.0000f);
+  yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
   yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
   brewPrefs.end();
 
@@ -394,6 +397,7 @@ void saveBrewStateToNVS() {
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
   brewPrefs.putFloat("fermTgt", stageTargetTemp[1]);
   brewPrefs.putFloat("pastTgt", stageTargetTemp[2]);
+  brewPrefs.putFloat("yeastRate", yeastPitchRate);
   brewPrefs.putFloat("yeastG", yeastPitchGrams);
   brewPrefs.putUInt("fermDur", fermDurationMs);
   brewPrefs.putFloat("og", originalGravity);
@@ -432,6 +436,7 @@ void loadBrewStateFromNVS() {
     preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
     stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
+    yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
     mixerTotalRunSec = brewPrefs.getUInt("mixTotSec", 0);
@@ -1268,6 +1273,7 @@ void loop() {
           chamberVolume[0] = (hx711Status && currentWeight > 0.0f) ? currentWeight : 0.0f;
           chamberVolume[1] = 0.0f;
           chamberVolume[2] = 0.0f;
+          yeastPitchGrams = max(0.5f, transferStartWeight * yeastPitchRate);
           actualYeastDispensedGrams = 0.0f;
           isYeastDispensingActive = false;
           isInitialPitchMixing = false;
@@ -2862,7 +2868,9 @@ void loop() {
           mcp.digitalWrite(LIGHT_R, RELAY_OFF);
           mcp.digitalWrite(LIGHT_Y, RELAY_ON);
           mcp.digitalWrite(LIGHT_G, RELAY_OFF);
-          // Auto-dispatch yeast at configured pitch rate
+          // Auto-dispatch yeast proportionally based on measured transferred volume (or initial weight)
+          float effectiveVol = (transfer1Volume > 0.5f) ? transfer1Volume : ((transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq);
+          yeastPitchGrams = max(0.5f, effectiveVol * yeastPitchRate);
           if (yeastPitchGrams > 0.0f) {
             sendMotorCommand(0, true, 2, (uint32_t)(yeastPitchGrams * 1000));
             isYeastDispensingActive = true;
