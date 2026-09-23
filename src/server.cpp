@@ -163,6 +163,9 @@ void handleData() {
   json += "\"ch0\":" + String(ch0Vol, 2) + ",";
   json += "\"ch1\":" + String(chamberVolume[1], 2) + ",";
   json += "\"ch2\":" + String(chamberVolume[2], 2) + ",";
+  json += "\"tgt_ph_val\":" + String(fermTargetPH, 2) + ",";
+  json += "\"tgt_sg_val\":" + String(fermTargetGravity, 4) + ",";
+  json += "\"ferm_dur_hr\":" + String((float)fermDurationMs / (3600.0f * 1000.0f), 1) + ",";
   json += "\"xfer1\":" + String(transfer1Volume, 2) + ",";
   json += "\"xfer2\":" + String(transfer2Volume, 2);
   json += "}";
