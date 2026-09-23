@@ -334,7 +334,7 @@ void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd, uint32_t yeastVal) {
 Preferences brewPrefs;
 
 void saveSettingsToNVS() {
-  brewPrefs.begin("winebrew", false);
+  brewPrefs.begin("wb_config", false);
   brewPrefs.putFloat("minVol", minVolumeReq);
   brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
@@ -343,11 +343,20 @@ void saveSettingsToNVS() {
   brewPrefs.putInt("fanBase", pidFanPercent);
   brewPrefs.putFloat("dispMsG", msPerGramYeast);
   brewPrefs.putFloat("tareOffset", tareOffset);
+  brewPrefs.putFloat("calFactor", calibrationFactor);
+  brewPrefs.putFloat("flowK0", flowKFactor[0]);
+  brewPrefs.putFloat("flowK1", flowKFactor[1]);
+  brewPrefs.putFloat("phOffset", preheatTempOffset);
+  brewPrefs.putFloat("pastOffset", pastTempOffset);
+  brewPrefs.putFloat("fermOffset", fermTempOffset);
+  brewPrefs.putFloat("fermPH", fermTargetPH);
+  brewPrefs.putFloat("fermSG", fermTargetGravity);
+  brewPrefs.putFloat("yeastG", yeastPitchGrams);
   brewPrefs.end();
 }
 
 void loadSettingsFromNVS() {
-  brewPrefs.begin("winebrew", true);
+  brewPrefs.begin("wb_config", true);
   minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
   stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
   preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
@@ -356,7 +365,20 @@ void loadSettingsFromNVS() {
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
   msPerGramYeast = brewPrefs.getFloat("dispMsG", 1764.0f);
   tareOffset = brewPrefs.getFloat("tareOffset", 0.0f);
+  calibrationFactor = brewPrefs.getFloat("calFactor", 23012.45f);
+  flowKFactor[0] = brewPrefs.getFloat("flowK0", 450.0f);
+  flowKFactor[1] = brewPrefs.getFloat("flowK1", 450.0f);
+  preheatTempOffset = brewPrefs.getFloat("phOffset", 0.0f);
+  pastTempOffset = brewPrefs.getFloat("pastOffset", 0.0f);
+  fermTempOffset = brewPrefs.getFloat("fermOffset", 0.0f);
+  fermTargetPH = brewPrefs.getFloat("fermPH", 4.0f);
+  fermTargetGravity = brewPrefs.getFloat("fermSG", 1.0000f);
+  yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
   brewPrefs.end();
+
+  if (hx711Status) {
+    scale.set_scale(calibrationFactor);
+  }
 }
 
 void saveBrewStateToNVS() {
@@ -547,6 +569,7 @@ void setup() {
   drawSplashScreen();
 
   Wire.begin();
+  loadSettingsFromNVS();
 
   if (rtc.begin()) {
     rtcStatus = true;
@@ -641,7 +664,6 @@ void setup() {
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
 
-  loadSettingsFromNVS();
   loadBrewStateFromNVS();
   if (activeBrewStage == 0) {
     mcp.digitalWrite(LIGHT_R, RELAY_ON);
@@ -902,6 +924,7 @@ void loop() {
         drawLoadCellPage();
       } else if (loadCellSelection == 1) {
         tareOffset = max(0.0f, tareOffset - 0.5f);
+        saveSettingsToNVS();
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1073,6 +1096,7 @@ void loop() {
         drawLoadCellPage();
       } else if (loadCellSelection == 1) {
         tareOffset = min(15.0f, tareOffset + 0.5f);
+        saveSettingsToNVS();
         drawLoadCellPage();
       }
     } else if (currentAppState == CALIB_WIZARD) {
@@ -1891,6 +1915,7 @@ void loop() {
       calSelection == 1 && wizardEditing) {
     calibrationFactor += 10.0;
     scale.set_scale(calibrationFactor);
+    saveSettingsToNVS();
     drawCalibrationPage();
   }
   if (cRight && !ljRight && currentAppState == LOAD_CELL_PAGE) {
@@ -1899,6 +1924,7 @@ void loop() {
         wizardEditing = true;
       } else {
         tareOffset = min(15.0f, tareOffset + 0.1f);
+        saveSettingsToNVS();
       }
       drawLoadCellPage();
     }
@@ -2053,6 +2079,7 @@ void loop() {
       if (calSelection == 1 && wizardEditing) {
         calibrationFactor -= 10.0;
         scale.set_scale(calibrationFactor);
+        saveSettingsToNVS();
         drawCalibrationPage();
       } else {
         isTareCountdownActive = false;
@@ -2063,6 +2090,7 @@ void loop() {
     } else if (currentAppState == LOAD_CELL_PAGE) {
       if (wizardEditing && loadCellSelection == 1) {
         tareOffset = max(0.0f, tareOffset - 0.1f);
+        saveSettingsToNVS();
         drawLoadCellPage();
       } else {
         isTareCountdownActive = false;
