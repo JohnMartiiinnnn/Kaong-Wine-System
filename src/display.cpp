@@ -576,13 +576,18 @@ void drawLoadCellPage(bool valuesOnly) {
   static int prevSel = -1;
   static bool prevEditing = false;
   static float prevOffset = -1.0f;
+  static bool prevTareCountdownActive = false;
+  static int prevTareCountdownSec = -1;
+  static bool prevTareSuccess = false;
+
+  bool tareSuccess = (millis() - tareSuccessMillis < 2000);
 
   auto drawTareTile = [&](bool sel) {
-    uint16_t bg = isTareCountdownActive ? TFT_ORANGE : (sel ? 0x3566 : 0xD6BA);
-    uint16_t txt = (isTareCountdownActive || sel) ? TFT_WHITE : TFT_BLACK;
+    uint16_t bg = isTareCountdownActive ? TFT_ORANGE : (tareSuccess ? 0x03E0 : (sel ? 0x3566 : 0xD6BA));
+    uint16_t txt = (isTareCountdownActive || tareSuccess || sel) ? TFT_WHITE : TFT_BLACK;
     tft.fillRect(10, 180, 300, 58, bg);
-    tft.drawRect(10, 180, 300, 58, (isTareCountdownActive || sel) ? TFT_WHITE : TFT_DARKGREY);
-    if (sel || isTareCountdownActive) tft.drawRect(11, 181, 298, 56, TFT_WHITE);
+    tft.drawRect(10, 180, 300, 58, (isTareCountdownActive || tareSuccess || sel) ? TFT_WHITE : TFT_DARKGREY);
+    if (sel || isTareCountdownActive || tareSuccess) tft.drawRect(11, 181, 298, 56, TFT_WHITE);
     tft.setTextColor(txt, bg);
     if (isTareCountdownActive) {
       char cBuf[32];
@@ -590,6 +595,9 @@ void drawLoadCellPage(bool valuesOnly) {
       tft.drawString(cBuf, 25, 195, 4);
       sprintf(cBuf, "[ %ds ]", max(1, tareCountdownRemainingSec));
       tft.drawRightString(cBuf, 290, 200, 2);
+    } else if (tareSuccess) {
+      tft.drawString("TARED SUCCESSFUL!", 25, 195, 4);
+      tft.drawRightString("[ OK ]", 290, 200, 2);
     } else {
       tft.drawString("TARE ZERO", 25, 195, 4);
       tft.drawRightString("[ ZERO ]", 290, 200, 2);
@@ -654,9 +662,16 @@ void drawLoadCellPage(bool valuesOnly) {
       prevSel = loadCellSelection;
       prevEditing = wizardEditing;
       prevOffset = tareOffset;
+      prevTareCountdownActive = isTareCountdownActive;
+      prevTareCountdownSec = tareCountdownRemainingSec;
+      prevTareSuccess = tareSuccess;
     } else {
       // Selective Redraw: only redraw changed tiles
-      if (prevSel != loadCellSelection || prevEditing != wizardEditing || prevOffset != tareOffset) {
+      bool tareChanged = (prevTareCountdownActive != isTareCountdownActive) ||
+                         (isTareCountdownActive && (prevTareCountdownSec != tareCountdownRemainingSec)) ||
+                         (prevTareSuccess != tareSuccess);
+
+      if (prevSel != loadCellSelection || prevEditing != wizardEditing || prevOffset != tareOffset || tareChanged) {
         drawTareTile(loadCellSelection == 0);
         drawOffsetTile(loadCellSelection == 1, wizardEditing);
         if (prevEditing != wizardEditing) {
@@ -665,6 +680,9 @@ void drawLoadCellPage(bool valuesOnly) {
         prevSel = loadCellSelection;
         prevEditing = wizardEditing;
         prevOffset = tareOffset;
+        prevTareCountdownActive = isTareCountdownActive;
+        prevTareCountdownSec = tareCountdownRemainingSec;
+        prevTareSuccess = tareSuccess;
       }
     }
   }
@@ -1219,6 +1237,8 @@ void drawCalibrationPage(bool valuesOnly) {
       char cBuf[32];
       sprintf(cBuf, "IN %ds...", max(1, tareCountdownRemainingSec));
       drawCalibrationValueTile(130, "TARE SCALE", cBuf, true);
+    } else if (millis() - tareSuccessMillis < 2000 && calSelection == 0) {
+      drawCalibrationValueTile(130, "TARE SCALE", "TARED OK!", true);
     } else {
       drawCalibrationValueTile(130, "TARE SCALE", "SELECT", calSelection == 0);
     }

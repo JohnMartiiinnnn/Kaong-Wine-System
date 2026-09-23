@@ -283,6 +283,7 @@ bool isTareCountdownActive = false;
 uint32_t tareCountdownStartMs = 0;
 int tareCountdownRemainingSec = 0;
 AppState tareCountdownOriginState = SYSTEM_INIT;
+uint32_t tareSuccessMillis = 0;
 uint32_t calibLedTimer = 0;
 bool calibLedState = false;
 uint32_t calibLastPulseCount = 0;
@@ -2593,6 +2594,7 @@ void loop() {
       if (hx711Status) {
         scale.tare(10);
         hx711WeightSeeded = false;
+        tareSuccessMillis = millis();
         if (tareCountdownOriginState == LOAD_CELL_PAGE) {
           currentWeight = -tareOffset;
           drawLoadCellPage(false);
@@ -3413,10 +3415,10 @@ void loop() {
       drawSensorMonitorPage(true);
 
     if (currentAppState == CALIBRATION_MODE)
-      drawCalibrationPage(true);
+      drawCalibrationPage(false);
 
     if (currentAppState == LOAD_CELL_PAGE)
-      drawLoadCellPage(true);
+      drawLoadCellPage(false);
 
     if (currentAppState == RAPT_TEST_MENU)
       drawRaptTestPage(true);
