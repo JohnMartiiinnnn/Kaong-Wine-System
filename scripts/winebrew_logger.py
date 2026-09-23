@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-WineBrew System - Autonomous Wi-Fi Data Logger
-Continuously streams /data from the WineBrew ESP32 controller and writes all parameters into a batch CSV file.
-Uses standard library only (urllib.request) - no external dependencies required.
+WineBrew System - Autonomous Wi-Fi Data Logger (Auto-Batch Rotating)
+Continuously streams /data from the WineBrew ESP32 controller.
+Automatically rotates CSV files on new batch start (transition from IDLE or new SD logFile).
 """
 
 import os
@@ -78,6 +78,7 @@ CSV_HEADERS = [
     "Gravity",
     "ABV_pct",
     "TargetTemp_C",
+    "",
     "Setpoint_Preheat_Temp_C",
     "Setpoint_Preheat_Cool_C",
     "Setpoint_Ferm_Temp_C",
@@ -85,6 +86,7 @@ CSV_HEADERS = [
     "Setpoint_pH",
     "Setpoint_Gravity",
     "Setpoint_Yeast_g",
+    "",
     "Heater_pct",
     "Fan_State",
     "Mixer_Mode",
@@ -127,100 +129,130 @@ def get_live_data(ip):
         return None
     return None
 
-def main():
-    parser = argparse.ArgumentParser(description="Autonomous WineBrew Wi-Fi CSV Logger")
-    parser.add_argument("--ip", default=DEFAULT_IP, help="ESP32 IP address or hostname")
-    parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL, help="Polling interval in seconds")
-    parser.add_argument("--outdir", default="logs", help="Directory to save CSV logs")
-    args = parser.parse_args()
-
-    os.makedirs(args.outdir, exist_ok=True)
-    start_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = os.path.join(args.outdir, f"brew_wifi_{start_ts}.csv")
-
-    print(f"==================================================")
-    print(f"WineBrew Autonomous Wi-Fi Logger Started")
-    print(f"Target: http://{args.ip}/data")
-    print(f"Output File: {csv_path}")
-    print(f"Interval: {args.interval}s")
-    print(f"==================================================")
-
-    file_exists = os.path.exists(csv_path)
-    with open(csv_path, mode="a", newline="", buffering=1) as f:
-        writer = csv.writer(f)
-        if not file_exists:
+def write_header_if_needed(csv_path):
+    if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+        with open(csv_path, mode="a", newline="", buffering=1) as f:
+            writer = csv.writer(f)
             for leg in CSV_LEGEND:
                 writer.writerow(leg)
             writer.writerow(CSV_HEADERS)
             f.flush()
 
-        consecutive_errors = 0
-        while True:
-            t_now = datetime.now()
-            data = get_live_data(args.ip)
+def main():
+    parser = argparse.ArgumentParser(description="Autonomous WineBrew Wi-Fi CSV Logger")
+    parser.add_argument("--ip", default=DEFAULT_IP, help="ESP32 IP address or hostname")
+    parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL, help="Polling interval in seconds")
+    parser.add_argument("--outdir", default=os.path.expanduser("~/winebrew-logs"), help="Directory to save CSV logs")
+    args = parser.parse_args()
 
-            if data:
-                consecutive_errors = 0
-                stage_code = data.get("stage", -1)
-                stage_str = STAGE_NAMES.get(stage_code, str(stage_code))
-                fan_code = data.get("fan", 0)
-                fan_str = FAN_NAMES.get(fan_code, str(fan_code))
-                mixer_mode = data.get("mm", 0)
-                mixer_str = MIXER_MODES.get(mixer_mode, str(mixer_mode))
+    os.makedirs(args.outdir, exist_ok=True)
 
-                ch0 = data.get("ch0", data.get("vol", 0.0))
-                ch1 = data.get("ch1", 0.0)
-                ch2 = data.get("ch2", 0.0)
-                xfer1 = data.get("xfer1", data.get("xfer_vol", 0.0) if stage_code == 0 else 0.0)
-                xfer2 = data.get("xfer2", data.get("xfer_vol", 0.0) if stage_code == 1 else 0.0)
+    print(f"==================================================")
+    print(f"WineBrew Auto-Rotating Wi-Fi Logger Started")
+    print(f"Target: http://{args.ip}/data")
+    print(f"Output Directory: {args.outdir}")
+    print(f"Interval: {args.interval}s")
+    print(f"==================================================")
 
-                row = [
-                    t_now.strftime("%Y-%m-%d"),
-                    t_now.strftime("%H:%M:%S"),
-                    stage_str,
-                    f"{data.get('vol', 0.0):.2f}",
-                    f"{float(ch0):.2f}",
-                    f"{float(ch1):.2f}",
-                    f"{float(ch2):.2f}",
-                    f"{float(xfer1):.2f}",
-                    f"{float(xfer2):.2f}",
-                    f"{data.get('la', 0.0):.2f}",
-                    f"{data.get('ll', 0.0):.2f}",
-                    f"{data.get('lp', 0.0):.2f}",
-                    f"{data.get('fa', 0.0):.2f}",
-                    f"{data.get('fl', 0.0):.2f}",
-                    f"{data.get('ph', 0.0):.2f}",
-                    f"{data.get('sg', 0.0):.4f}",
-                    f"{data.get('abv', 0.0):.2f}",
-                    f"{data.get('targetT', 0.0):.1f}",
-                    f"{data.get('tgt_ph', 40.0):.1f}",
-                    f"{data.get('tgt_cool', 38.0):.1f}",
-                    f"{data.get('tgt_ferm', 30.0):.1f}",
-                    f"{data.get('tgt_past', 72.0):.1f}",
-                    f"{data.get('tgt_ph_val', 4.0):.2f}",
-                    f"{data.get('tgt_sg_val', 1.000):.4f}",
-                    f"{data.get('yd_tgt', 5.0):.2f}",
-                    data.get("hp", 0),
-                    fan_str,
-                    mixer_str,
-                    data.get("msp", 0),
-                    f"{data.get('yd', 0.0):.2f}",
-                    data.get("bat", 0),
-                    data.get("rssi", 0),
-                    f"{data.get('mv', 0.0):.3f}",
-                    data.get("logFile", "")
-                ]
+    current_batch_sd_file = None
+    current_csv_path = None
+    consecutive_errors = 0
 
+    while True:
+        t_now = datetime.now()
+        data = get_live_data(args.ip)
+
+        if data:
+            consecutive_errors = 0
+            stage_code = data.get("stage", -1)
+            stage_str = STAGE_NAMES.get(stage_code, str(stage_code))
+            fan_code = data.get("fan", 0)
+            fan_str = FAN_NAMES.get(fan_code, str(fan_code))
+            mixer_mode = data.get("mm", 0)
+            mixer_str = MIXER_MODES.get(mixer_mode, str(mixer_mode))
+            sd_logfile = data.get("logFile", "")
+
+            # Check if an active batch is running
+            is_active_brew = (stage_code >= 0) or (sd_logfile.startswith("/brew_") and stage_code != -1)
+
+            if is_active_brew:
+                # If this is a new batch file or we transitioned from IDLE, create a new CSV
+                if current_batch_sd_file != sd_logfile or current_csv_path is None:
+                    current_batch_sd_file = sd_logfile
+                    start_ts = t_now.strftime("%Y%m%d_%H%M%S")
+                    current_csv_path = os.path.join(args.outdir, f"brew_wifi_{start_ts}.csv")
+                    write_header_if_needed(current_csv_path)
+                    print(f"[{t_now.strftime('%H:%M:%S')}] *** NEW BATCH DETECTED *** Created log: {current_csv_path} (SD: {sd_logfile})", flush=True)
+
+                target_file = current_csv_path
+            else:
+                # In IDLE: close active batch file and log idle heartbeat to idle_telemetry.csv
+                if current_csv_path is not None:
+                    print(f"[{t_now.strftime('%H:%M:%S')}] *** BATCH FINALIZED *** Returned to IDLE.", flush=True)
+                    current_batch_sd_file = None
+                    current_csv_path = None
+
+                target_file = os.path.join(args.outdir, "idle_telemetry.csv")
+                write_header_if_needed(target_file)
+
+            ch0 = data.get("ch0", data.get("vol", 0.0))
+            ch1 = data.get("ch1", 0.0)
+            ch2 = data.get("ch2", 0.0)
+            xfer1 = data.get("xfer1", data.get("xfer_vol", 0.0) if stage_code == 0 else 0.0)
+            xfer2 = data.get("xfer2", data.get("xfer_vol", 0.0) if stage_code == 1 else 0.0)
+
+            row = [
+                t_now.strftime("%Y-%m-%d"),
+                t_now.strftime("%H:%M:%S"),
+                stage_str,
+                f"{data.get('vol', 0.0):.2f}",
+                f"{float(ch0):.2f}",
+                f"{float(ch1):.2f}",
+                f"{float(ch2):.2f}",
+                f"{float(xfer1):.2f}",
+                f"{float(xfer2):.2f}",
+                f"{data.get('la', 0.0):.2f}",
+                f"{data.get('ll', 0.0):.2f}",
+                f"{data.get('lp', 0.0):.2f}",
+                f"{data.get('fa', 0.0):.2f}",
+                f"{data.get('fl', 0.0):.2f}",
+                f"{data.get('ph', 0.0):.2f}",
+                f"{data.get('sg', 0.0):.4f}",
+                f"{data.get('abv', 0.0):.2f}",
+                f"{data.get('targetT', 0.0):.1f}",
+                "",
+                f"{data.get('tgt_ph', 40.0):.1f}",
+                f"{data.get('tgt_cool', 38.0):.1f}",
+                f"{data.get('tgt_ferm', 30.0):.1f}",
+                f"{data.get('tgt_past', 72.0):.1f}",
+                f"{data.get('tgt_ph_val', 4.0):.2f}",
+                f"{data.get('tgt_sg_val', 1.000):.4f}",
+                f"{data.get('yd_tgt', 5.0):.2f}",
+                "",
+                data.get("hp", 0),
+                fan_str,
+                mixer_str,
+                data.get("msp", 0),
+                f"{data.get('yd', 0.0):.2f}",
+                data.get("bat", 0),
+                data.get("rssi", 0),
+                f"{data.get('mv', 0.0):.3f}",
+                sd_logfile
+            ]
+
+            with open(target_file, mode="a", newline="", buffering=1) as f:
+                writer = csv.writer(f)
                 writer.writerow(row)
                 f.flush()
 
-                print(f"[{t_now.strftime('%H:%M:%S')}] Stage: {stage_str:12} | Vol: {data.get('vol',0.0):4.1f}L | Liquid: {data.get('ll',0.0):4.1f}C | Ferm: {data.get('fl',0.0):4.1f}C | pH: {data.get('ph',0.0):4.2f} | SG: {data.get('sg',0.0):.4f} | Yeast: {data.get('yd',0.0):.1f}g", flush=True)
-            else:
-                consecutive_errors += 1
-                if consecutive_errors % 5 == 1:
-                    print(f"[{t_now.strftime('%H:%M:%S')}] Waiting for ESP32 at {args.ip}...", flush=True)
+            if is_active_brew:
+                print(f"[{t_now.strftime('%H:%M:%S')}] [{os.path.basename(target_file)}] Stage: {stage_str:12} | Vol: {data.get('vol',0.0):4.1f}L | Ferm: {data.get('fl',0.0):4.1f}C | pH: {data.get('ph',0.0):4.2f} | SG: {data.get('sg',0.0):.4f}", flush=True)
+        else:
+            consecutive_errors += 1
+            if consecutive_errors % 12 == 1:
+                print(f"[{t_now.strftime('%H:%M:%S')}] Waiting for ESP32 at {args.ip}...", flush=True)
 
-            time.sleep(args.interval)
+        time.sleep(args.interval)
 
 if __name__ == "__main__":
     main()
