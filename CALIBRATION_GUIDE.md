@@ -4,23 +4,32 @@ Before starting a production brew, all analog and digital sensors must be calibr
 
 ---
 
-## 1. Load Cell (HX711) Calibration
+## 1. Load Cell (HX711) Calibration & Dedicated Tare Utility
 
-This standalone project tares and calculates the calibration factor for the weight/volume scale.
+The system provides two methods to calibrate and zero the HX711 scale: directly on the Primary ESP32 TFT screen, or via the standalone calibration project.
 
-### How to Run
-1. Navigate to the directory:
-   ```bash
-   cd /Users/gian/Coding/Kaong-Wine-System/LoadCell_Calibration
-   ```
-2. Flash the firmware and open the Serial Monitor at **115200** baud:
-   ```bash
-   ~/.platformio/penv/bin/pio run -t upload
-   ~/.platformio/penv/bin/pio device monitor
-   ```
-3. **Tare the scale**: Empty the scale platform completely, type `t` in the monitor, and press Enter.
-4. **Calibrate**: Place a known weight (e.g., a 1000g calibration weight) on the scale, type `c`, press Enter, and input the weight in grams (`1000`).
-5. **Update code**: Open `src/config.h` in the main codebase and update `calibrationFactor` with the output value.
+### Method A: On-Device TFT Calibration & Tare Screen (Recommended)
+1. **Access Dedicated Screen**: Navigate to **Main Menu → SETTINGS → TARE LOAD CELL (Item 7)**.
+2. **Tare Scale (Zero Reference)**:
+   - Select **TARE ZERO (Row 0)** and press **SELECT**.
+   - The UI runs a 3-second non-blocking countdown (`"TARING IN 3s..."` → `"1s"`) with an orange indicator.
+   - Takes 10 hardware samples to zero the HX711 baseline.
+   - Displays bright green **`"TARED SUCCESSFUL!" [ OK ]`** for 2 seconds upon completion.
+3. **Static Container Offset (Optional)**:
+   - Select **OFFSET (Row 1)** and press **SELECT** to enter edit mode.
+   - Adjust offset from `0.00 kg` to `15.00 kg` using **LEFT / RIGHT** (±0.10 kg) or **UP / DOWN** (±0.50 kg).
+   - Press **SELECT** or **LEFT (Return)** to save. All offsets automatically persist in NVS flash (`"wb_config"` namespace).
+4. **Adjust Calibration Factor**:
+   - Navigate to **Main Menu → SENSOR VALUES → SELECT** (`CALIBRATION_MODE`).
+   - Select **CAL. FACTOR (Row 1)** and press **SELECT**.
+   - Press **RIGHT** (+10.0) or **LEFT** (-10.0) while observing the live reading against a known test mass. All adjustments save directly to NVS flash (`"wb_config"`).
+
+### Method B: Standalone PlatformIO Calibration Project
+1. Navigate to directory: `cd LoadCell_Calibration`
+2. Flash and monitor: `pio run -t upload && pio device monitor`
+3. Tare: Type `t` and press Enter.
+4. Calibrate: Type `c`, place reference mass (e.g. 1000g), and input weight.
+5. Save: Update `calibrationFactor` in `src/config.h` (or adjust via TFT screen).
 
 ---
 

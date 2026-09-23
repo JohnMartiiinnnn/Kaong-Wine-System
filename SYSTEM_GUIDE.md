@@ -152,10 +152,10 @@ From the Main Menu, navigate to **SETTINGS** to configure operational parameters
 * **PAST TARGET (Item 4)**: Temperature setpoint for the pasteurization immersion heater (60.0°C to 85.0°C in 0.5°C steps).
 * **FERM FAN BASELINE (Item 5)**: Idle baseline speed for the fermentation chamber exhaust fan (0% to 50% in 5% steps).
 * **SET RTC DATE & TIME (Item 6)**: Opens the 7-field DS3231 real-time clock adjustment screen.
-* **TARE LOAD CELL (Item 7)**: Opens the dedicated load cell utility screen with live Net and Gross weight readings, instant zero tare, and configurable static container tare offset (0.0 to 10.0 kg in 0.1/0.5 kg increments).
+* **TARE LOAD CELL (Item 7)**: Opens the dedicated load cell utility screen with live Net and Gross weight readings, 3-second non-blocking countdown tare with success confirmation, and configurable static container tare offset (0.0 to 15.0 kg in 0.1/0.5 kg increments).
 
 *Editing Controls*:
-Press **SELECT** or **RIGHT** on items 0 to 5 to enter edit mode, use **UP/DOWN** or **LEFT/RIGHT** to change values, and press **SELECT** to confirm. Exiting saves all values to NVS flash memory (`brewPrefs`).
+Press **SELECT** or **RIGHT** on items 0 to 5 to enter edit mode, use **UP/DOWN** or **LEFT/RIGHT** to change values, and press **SELECT** to confirm. Exiting saves all values to NVS flash memory (`wb_config` namespace).
 
 ---
 
@@ -499,25 +499,36 @@ Run another known volume through and watch the liter display. It should match cl
 
 ---
 
-## 12. Load Cell Calibration (Manual)
+## 12. Load Cell Calibration & Dedicated Tare Utility
 
 The load cell measures the weight of liquid in the pre-heat tank and converts it to liters (1 kg ≈ 1 L for kaong sap).
 
-Access: Main Menu → SENSOR VALUES → SELECT (goes to Load Cell page).
+### Dedicated Load Cell Screen (`LOAD_CELL_PAGE`)
+Access: **Main Menu → SETTINGS → TARE LOAD CELL (Item 7)** or **SYSTEM CHECK → Item 7**.
 
-### Tare (Zero)
+* **Live Weight Display**: Shows real-time **NET VOLUME** in liters (`currentWeight = raw - tareOffset`) and **GROSS VOLUME** (`currentWeight + tareOffset`).
+* **Row 0: TARE ZERO**:
+  - Pressing **SELECT** initiates a 3-second non-blocking countdown (`"TARING IN 3s..."` → `"2s"` → `"1s"`) with an orange indicator.
+  - Takes 10 raw samples to zero the HX711 hardware baseline.
+  - Displays bright green **`"TARED SUCCESSFUL!" [ OK ]`** for 2 seconds upon completion.
+* **Row 1: STATIC OFFSET**:
+  - Pressing **SELECT** enters offset edit mode.
+  - Adjust container tare offset from **0.00 kg to 15.00 kg**:
+    - **LEFT / RIGHT**: Adjusts by ±0.10 kg (fine tune).
+    - **UP / DOWN**: Adjusts by ±0.50 kg (coarse tune).
+  - Automatically persists to NVS flash (`wb_config` namespace) on every adjustment and on exit.
 
-With the tank empty (or with an empty container on the scale), navigate to the TARE row and press SELECT. This sets the zero point. Any previous weight is ignored from this point.
+### Manual Scale Calibration Mode (`CALIBRATION_MODE`)
+Access: **Main Menu → SENSOR VALUES → SELECT**.
 
-### Calibration Factor
-
-If the liter reading does not match the known volume:
-- Navigate to the CAL FACTOR row.
-- RIGHT increases the factor by 10.
-- LEFT decreases the factor by 10.
-- The live weight display updates immediately. Adjust until the display matches a known reference.
-
-The default calibration factor is **23012.45**, measured with a 9-liter reference weight.
+* **Step 1 (Tare Scale)**: Press **SELECT** on `TARE SCALE` to initiate the 3-second countdown tare. Displays `"TARED OK!"` upon completion.
+* **Step 2 (Add Known Weight)**: Place a calibrated reference mass (e.g. 9.0 kg reference).
+* **Step 3 (Adjust Factor)**:
+  - Select `CAL. FACTOR` and press **SELECT** to enter editing mode.
+  - **RIGHT**: Increases factor by +10.0 (decreases displayed volume).
+  - **LEFT**: Decreases factor by -10.0 (increases displayed volume).
+  - Automatically commits changes to NVS flash (`wb_config` namespace).
+  - Default calibrated factor: **23012.45** (calibrated against 9L known volume).
 
 ---
 
@@ -687,6 +698,23 @@ Firmware updates can be compiled and flashed directly from the Beelink server ov
   3. Deploys over ArduinoOTA port 3232 to `192.168.1.137`.
   4. Automatically pings `/data` after reboot to verify operational health.
 * **Command**: Run `flash-winebrew` from any shell on the Beelink server.
+
+---
+
+## 19. Non-Volatile Storage (NVS) Namespace Architecture
+
+The ESP32 firmware partitions Non-Volatile Storage (NVS) into two strictly isolated namespaces to prevent batch resets from destroying permanent hardware calibrations:
+
+* **Hardware Configuration Namespace (`"wb_config"`)**:
+  - Persists permanent calibration factors, temperature sensor offsets, tare offsets, and user-configured hardware setpoints.
+  - Stored keys: `tareOffset`, `calFactor`, `flowK0`, `flowK1`, `phOffset`, `pastOffset`, `fermOffset`, `fermPH`, `fermSG`, `yeastG`, `minVol`, `phTgt`, `phCoolTgt`, `fermTgt`, `pastTgt`, `fanBase`, `dispMsG`.
+  - Loaded immediately at boot after `Wire.begin()` in `setup()` before hardware sensors initialize.
+  - Never wiped by batch resets or system restarts.
+
+* **Active Batch Runtime Namespace (`"winebrew"`)**:
+  - Tracks ephemeral batch run status, active stage indexes, elapsed timers, and active CSV log filenames.
+  - Stored keys: `stage`, `stg0_ms`, `stg1_ms`, `stg2_ms`, `logFile`, `v_start`, `v_xfer`, `xfer1`, `xfer2`.
+  - Cleared upon batch completion or reset via `clearBrewStateInNVS()` (`brewPrefs.begin("winebrew", false); brewPrefs.clear();`).
 
 ---
 

@@ -77,14 +77,14 @@ src/
 ### Software Logic State Machine
 *   `SYSTEM_INIT` → `START_MENU` (after splash screen).
 *   `NEW_BREW_WIZARD`: Minimum volume safety check (locked if volume requirement is not met) and option to disable preheat immersion heater.
-*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; configure minimum volume, preheat heater toggle, fermentation baseline fan speed, RTC date/time shortcut, and scale tare shortcut.
+*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; 8 configurable items: minimum volume, preheat target, preheat cool, fermentation target, pasteurization target, fermentation baseline fan speed, RTC date/time shortcut, and dedicated scale tare shortcut. All persisted in isolated NVS flash (`"wb_config"` namespace).
 *   `RTC_SET_MENU`: 7-field D-pad navigation (YEAR, MONTH, DAY, HOUR, MIN, SAVE & EXIT, CANCEL); RIGHT increases (+), LEFT decreases (-).
 *   `DASHBOARD_ACTIVE`: Three sub-views — Pre-Heating, Fermentation, Pasteurization.
 *   `COOLING_MENU`: Manual/Auto fan control.
 *   `MIXER_MENU`: Mixing impeller control — OFF / MANUAL (speed adjust) / AUTO (5 min ON, 355 min OFF).
 *   `SENSOR_MONITOR`: Raw value display for debugging (accessed via SENSOR VALUES on Main Menu).
-*   `LOAD_CELL_PAGE`: Simple scale tare utility, now located as item #11 inside `SYSTEM CHECK` menu.
-*   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, now located as item #12 inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
+*   `LOAD_CELL_PAGE`: Dedicated load cell utility (`SETTINGS_MENU` item 7 / `SYSTEM_CHECK` item 7); features Net/Gross live readings, 3s non-blocking tare countdown with green success feedback (`"TARED SUCCESSFUL!"`), and 0.0 to 15.0 kg static container tare offset auto-saved to `"wb_config"`.
+*   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, located inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
 *   **Data Logging:** Records all sensor data to `/data_log.csv` every 60 seconds.
 *   **Web Dashboard:** Soft-AP `WineBrew_System` (pass: `12345678`), mDNS `winebrew.local`. Live JSON at `/data`, UI at `/`.
 

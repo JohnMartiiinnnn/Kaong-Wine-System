@@ -93,14 +93,14 @@ src/
 ### Software Logic State Machine
 *   `SYSTEM_INIT` → `START_MENU` (after splash screen).
 *   `NEW_BREW_WIZARD`: Minimum volume safety check (locked if volume requirement is not met) and option to disable preheat immersion heater.
-*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; 7 configurable items: MIN VOLUME (1.0 to 50.0 L), PREHEAT TARGET (30.0 to 70.0 C), PREHEAT COOL (25.0 to 45.0 C), FERM TARGET (18.0 to 45.0 C), FERM FAN BASELINE (0 to 50%), RTC date/time shortcut, and scale tare shortcut. All persisted in NVS flash ("winebrew" namespace).
+*   `SETTINGS_MENU`: Replaces Continue Brew on Main Menu; 8 configurable items: MIN VOLUME (1.0 to 50.0 L), PREHEAT TARGET (30.0 to 70.0 C), PREHEAT COOL (25.0 to 45.0 C), FERM TARGET (18.0 to 45.0 C), PAST TARGET (60.0 to 85.0 C), FERM FAN BASELINE (0 to 50%), RTC date/time shortcut, and dedicated load cell tare shortcut. All persisted in isolated NVS flash (`"wb_config"` namespace).
 *   `RTC_SET_MENU`: 7-field D-pad navigation (YEAR, MONTH, DAY, HOUR, MIN, SAVE & EXIT, CANCEL); RIGHT increases (+), LEFT decreases (-).
 *   `DASHBOARD_ACTIVE`: Three sub-views — Pre-Heating, Fermentation, Pasteurization.
 *   `COOLING_MENU`: Manual/Auto fan control.
 *   `MIXER_MENU`: Mixing impeller control — OFF / MANUAL (speed adjust) / AUTO (5 min ON, 355 min OFF).
 *   `SENSOR_MONITOR`: Raw value display for debugging (accessed via SENSOR VALUES on Main Menu).
-*   `LOAD_CELL_PAGE`: Simple scale tare utility, now located as item #11 inside `SYSTEM CHECK` menu.
-*   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, now located as item #12 inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
+*   `LOAD_CELL_PAGE`: Dedicated load cell utility (`SETTINGS_MENU` item 7 / `SYSTEM_CHECK` item 7); features Net/Gross live readings, 3s non-blocking tare countdown with green success feedback (`"TARED SUCCESSFUL!"`), and 0.0 to 15.0 kg static container tare offset auto-saved to `"wb_config"`.
+*   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, located inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
 *   **Data Logging & Persistence**:
     *   **On-Board SD Logging**: Automatically creates batch-named CSV files (e.g. `/brew_YYYYMMDD_HHMM.csv`) capturing all 21 system parameters every 60 seconds.
     *   **Wi-Fi Log Export**: Web server routes `/log.csv` and `/download` stream the active batch CSV directly to browser/clients over Wi-Fi.
