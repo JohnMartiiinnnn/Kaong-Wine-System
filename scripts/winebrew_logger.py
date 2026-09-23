@@ -129,6 +129,27 @@ def get_live_data(ip):
         return None
     return None
 
+import glob
+
+def find_existing_active_batch_csv(outdir, sd_logfile):
+    """Find an existing CSV file for the active batch if daemon restarted while brew was running."""
+    if not os.path.exists(outdir):
+        return None
+    candidates = sorted(glob.glob(os.path.join(outdir, "brew_wifi_*.csv")), key=os.path.getmtime, reverse=True)
+    for c in candidates:
+        if time.time() - os.path.getmtime(c) < 86400:
+            try:
+                with open(c, "r") as f:
+                    lines = f.readlines()
+                    for l in reversed(lines[-10:]):
+                        if not l.startswith("#") and not l.startswith("Date"):
+                            parts = l.strip().split(",")
+                            if len(parts) >= 20 and parts[-1] == sd_logfile:
+                                return c
+            except Exception:
+                pass
+    return None
+
 def write_header_if_needed(csv_path):
     if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
         with open(csv_path, mode="a", newline="", buffering=1) as f:
@@ -176,13 +197,18 @@ def main():
             is_active_brew = (stage_code >= 0) or (sd_logfile.startswith("/brew_") and stage_code != -1)
 
             if is_active_brew:
-                # If this is a new batch file or we transitioned from IDLE, create a new CSV
                 if current_batch_sd_file != sd_logfile or current_csv_path is None:
-                    current_batch_sd_file = sd_logfile
-                    start_ts = t_now.strftime("%Y%m%d_%H%M%S")
-                    current_csv_path = os.path.join(args.outdir, f"brew_wifi_{start_ts}.csv")
-                    write_header_if_needed(current_csv_path)
-                    print(f"[{t_now.strftime('%H:%M:%S')}] *** NEW BATCH DETECTED *** Created log: {current_csv_path} (SD: {sd_logfile})", flush=True)
+                    existing_csv = find_existing_active_batch_csv(args.outdir, sd_logfile) if current_csv_path is None else None
+                    if existing_csv:
+                        current_batch_sd_file = sd_logfile
+                        current_csv_path = existing_csv
+                        print(f"[{t_now.strftime('%H:%M:%S')}] *** RESUMED EXISTING BATCH *** Appending to: {current_csv_path} (SD: {sd_logfile})", flush=True)
+                    else:
+                        current_batch_sd_file = sd_logfile
+                        start_ts = t_now.strftime("%Y%m%d_%H%M%S")
+                        current_csv_path = os.path.join(args.outdir, f"brew_wifi_{start_ts}.csv")
+                        write_header_if_needed(current_csv_path)
+                        print(f"[{t_now.strftime('%H:%M:%S')}] *** NEW BATCH DETECTED *** Created log: {current_csv_path} (SD: {sd_logfile})", flush=True)
 
                 target_file = current_csv_path
             else:
