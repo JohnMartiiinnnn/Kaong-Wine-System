@@ -219,7 +219,17 @@ void updateDashboardValues() {
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 0) {
-      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 190, 2);
+      if (transferDryRunAlarm) {
+        tft.drawCentreString("DRY ALARM", 239, 190, 2);
+      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+        uint32_t idle = millis() - transferLastPulseMs;
+        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        char drainBuf[32];
+        sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
+        tft.drawCentreString(drainBuf, 239, 190, 2);
+      } else {
+        tft.drawCentreString("TRANSFERRING", 239, 190, 2);
+      }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
 
@@ -299,7 +309,17 @@ void updateDashboardValues() {
     float fermT = (incomingData.ds18Status == 1) ? getFermTemp() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 1) {
-      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 228, 2);
+      if (transferDryRunAlarm) {
+        tft.drawCentreString("DRY ALARM", 239, 228, 2);
+      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+        uint32_t idle = millis() - transferLastPulseMs;
+        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        char drainBuf[32];
+        sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
+        tft.drawCentreString(drainBuf, 239, 228, 2);
+      } else {
+        tft.drawCentreString("TRANSFERRING", 239, 228, 2);
+      }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 243, 1);
 
@@ -356,7 +376,17 @@ void updateDashboardValues() {
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
     if (stageTransferring && activeBrewStage == 2) {
-      tft.drawCentreString(transferDryRunAlarm ? "DRY ALARM" : "TRANSFERRING", 239, 190, 2);
+      if (transferDryRunAlarm) {
+        tft.drawCentreString("DRY ALARM", 239, 190, 2);
+      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+        uint32_t idle = millis() - transferLastPulseMs;
+        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        char drainBuf[32];
+        sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
+        tft.drawCentreString(drainBuf, 239, 190, 2);
+      } else {
+        tft.drawCentreString("TRANSFERRING", 239, 190, 2);
+      }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
 

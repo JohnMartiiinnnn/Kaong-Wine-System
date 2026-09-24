@@ -101,6 +101,11 @@ src/
 *   `SENSOR_MONITOR`: Raw value display for debugging (accessed via SENSOR VALUES on Main Menu).
 *   `LOAD_CELL_PAGE`: Dedicated load cell utility (`SETTINGS_MENU` item 7 / `SYSTEM_CHECK` item 7); features Net/Gross live readings, 3s non-blocking tare countdown with green success feedback (`"TARED SUCCESSFUL!"`), and 0.0 to 15.0 kg static container tare offset auto-saved to `"wb_config"`.
 *   `RAPT_TEST_MENU`: RAPT Pill telemetry logs test screen, located inside `SYSTEM CHECK` menu. Logs specific gravity and time logged, ignoring duplicate packets received within 15 seconds.
+*   **Liquid Transfer Drain-to-Empty Protocol**:
+    *   Both automated pump transfers (Preheat -> Ferm, Ferm -> Past) rely **100% on flow sensor pulse activity** to verify fluid displacement.
+    *   **Priming Grace**: 15 seconds of run time allowed before zero-pulse checks start.
+    *   **Drain-to-Empty Confirmation**: Once liquid is exhausted and the flow sensor records 0 pulse changes for **60 consecutive seconds (1 minute)**, the former chamber is confirmed completely evacuated and the system advances to the next stage.
+    *   **Minimum Volume Safety Check**: A transfer is only declared successful if `transferVolumeTransferred >= minVolumeReq * 0.85f` (or >= 0.5L in test mode). If 60 seconds of zero pulses elapse with < 0.5L moved, `transferDryRunAlarm` trips immediately, stopping pumps, locking heaters to 0%, and preventing stage advancement.
 *   **Data Logging & Persistence**:
     *   **On-Board SD Logging**: Automatically creates batch-named CSV files (e.g. `/brew_YYYYMMDD_HHMM.csv`) capturing all 21 system parameters every 60 seconds.
     *   **Wi-Fi Log Export**: Web server routes `/log.csv` and `/download` stream the active batch CSV directly to browser/clients over Wi-Fi.

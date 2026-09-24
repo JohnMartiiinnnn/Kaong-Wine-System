@@ -109,13 +109,13 @@ The system supports automated batch brewing with NVS memory persistence:
 * **Stage 0: Pre-Heating & Sterilization**
   * Target: Liquid heated to setpoint (e.g. 40.0 C for testing, 72.0 C for standard production).
   * Cool-down: Active fan cooling reduces temperature to transfer threshold (e.g. 38.0 C for testing, 30.0 C for pitch).
-  * Auto-Transfer: Pump 1 energizes, transferring liquid to the fermentation tank monitored by Flow Sensor 1 and Load Cell weight delta.
+  * Auto-Transfer: Pump 1 energizes, transferring liquid to the fermentation tank governed strictly by Flow Sensor 1 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the pre-heat chamber is confirmed completely evacuated and the system initializes Fermentation.
 * **Stage 1: Fermentation**
   * Inoculation: Automated yeast dispenser dispenses exact weighed grams or pulse duration.
   * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (e.g. 38.0 C testing / 28.0 C production).
   * Agitation: Mixing impeller executes scheduled cycles (5 minutes ON, 355 minutes OFF) or manual continuous speed override.
   * Completion: Monitors specific gravity progression, pH drop, and elapsed fermentation duration.
-  * Auto-Transfer: Pump 2 transfers fermented wine to the pasteurization tank monitored by Flow Sensor 2.
+  * Auto-Transfer: Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
 * **Stage 2: Pasteurization**
   * Target: Liquid heated to 65.0 C to 72.0 C via immersion heater and held for 15 minutes to stabilize wine.
   * Cooling: Natural or assisted cooling back to ambient before bottling.
@@ -127,6 +127,11 @@ The system supports automated batch brewing with NVS memory persistence:
 
 ## 5. Hardware Safety Interlocks & Thermal Protection
 
+* **Flow-Sensor Drain-to-Empty & 60-Second Settling Verification**
+  * All inter-chamber liquid transfers rely 100% on flow sensor pulse activity to verify liquid movement and complete emptying.
+  * A 15-second pump priming grace period prevents false stall detection while lines fill.
+  * When liquid runs out and the flow sensor detects zero pulse changes for 60 consecutive seconds (1 minute), the former chamber is confirmed completely drained and the next stage initializes.
+  * Minimum volume transfer validation ensures at least 85% of `minVolumeReq` (or >= 0.5L in test mode) moved before advancing; zero pulses with < 0.5L transferred immediately trips `transferDryRunAlarm` and halts stage advancement.
 * **5.0L Chamber Volume Interlock (Low-Level SSR Kill-Switch)**
   * Enforced unconditionally at the hardware output layer before `digitalWrite(SSR_*, HIGH)`.
   * **Chamber 1 (Pre-Heat)**: Requires live scale reading `>= 5.0 kg`.

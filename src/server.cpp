@@ -146,6 +146,9 @@ void handleData() {
   json += "\"xfer_vol\":" + String(transferVolumeTransferred, 2) + ",";
   json += "\"xfer_tgt\":" + String(transferTargetVolume, 2) + ",";
   json += "\"xfer_pct\":" + String(xfer_pct, 1) + ",";
+  uint32_t xfer_idle_sec = (stageTransferring && transferLastPulseMs > 0 && millis() >= transferLastPulseMs)
+                           ? ((millis() - transferLastPulseMs) / 1000UL) : 0;
+  json += "\"xfer_idle_sec\":" + String(xfer_idle_sec) + ",";
   json += "\"p1\":" + String(p1) + ",";
   json += "\"p2\":" + String(p2) + ",";
   json += "\"tgt_ph\":" + String(stageTargetTemp[0], 1) + ",";

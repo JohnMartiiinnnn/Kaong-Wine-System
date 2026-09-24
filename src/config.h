@@ -435,6 +435,7 @@ extern int      tempHistoryCount;
 extern bool     stageTransferring;
 extern int      stageTransferTarget;
 extern uint32_t transferStartMs;
+extern uint32_t transferLastPulseMs;
 extern float    transferStartWeight;
 extern float    transferTargetVolume;
 extern float    transferVolumeTransferred;
@@ -442,8 +443,10 @@ extern float    transfer1Volume;
 extern float    transfer2Volume;
 extern bool     transferDryRunAlarm;
 const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
-const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 10000;  // 10s of zero flow pulses while pump running triggers cutoff
-const uint32_t  TRANSFER_MAX_SAFETY_MS     = 300000; // 5 minutes absolute maximum pump runtime
+const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 60000;  // 60s (1 min) of zero flow pulse change assumes chamber is completely drained
+const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 60000;  // Backward compatibility alias
+const uint32_t  TRANSFER_MAX_SAFETY_MS     = 900000; // 15 minutes absolute maximum pump runtime for full batch transfers
+
 
 
 // ---- Physical Test Run Settings ----

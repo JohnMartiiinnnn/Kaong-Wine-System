@@ -532,7 +532,8 @@ void startLiquidTransfer(int targetStage) {
     transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
   } else if (targetStage == 2) {
     flowPulse2 = 0;
-    transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
+    float fermVol = (chamberVolume[1] > 0.5f) ? chamberVolume[1] : ((transfer1Volume > 0.5f) ? transfer1Volume : transferStartWeight);
+    transferTargetVolume = (fermVol > 0.5f) ? fermVol : minVolumeReq;
   }
 
   mcp.digitalWrite(LIGHT_R, RELAY_OFF);
@@ -2830,29 +2831,49 @@ void loop() {
       }
 
       static uint32_t lastKnownPulses = 0;
+      static int lastTransferTarget = -1;
+      if (lastTransferTarget != stageTransferTarget) {
+        lastTransferTarget = stageTransferTarget;
+        lastKnownPulses = pulses;
+        transferLastPulseMs = millis();
+      }
+
       if (pulses != lastKnownPulses) {
         transferLastPulseMs = millis();
         lastKnownPulses = pulses;
       }
 
       bool transferDone = false;
+      uint32_t nowMs = millis();
+      uint32_t runMs = nowMs - transferStartMs;
+      uint32_t idleMs = nowMs - transferLastPulseMs;
 
-      // 1. Full Batch Drain-To-Empty Detection
-      // Evaluated after 15s priming grace period: if 5 consecutive seconds of 0 flow pulses occur:
-      if (millis() - transferStartMs >= TRANSFER_PRIMING_GRACE_MS && (millis() - transferLastPulseMs >= TRANSFER_DRYRUN_TIMEOUT_MS)) {
-        if (transferVolumeTransferred >= 0.5f) {
+      // 1. Flow-Sensor Pulse Drain-to-Empty Detection:
+      // Transfers rely 100% on flow sensor pulse activity to verify liquid movement.
+      // Once the source chamber is emptied, liquid ceases and pulses stop.
+      // After a 15s initial priming grace period, if no new pulses are detected for 60 seconds (1 minute):
+      if (runMs >= TRANSFER_PRIMING_GRACE_MS && idleMs >= TRANSFER_DRAIN_TIMEOUT_MS) {
+        float minRequired = (minVolumeReq > 1.0f) ? (minVolumeReq * 0.85f) : 0.5f;
+        if (transferTestMode) minRequired = 0.5f;
+
+        if (transferVolumeTransferred >= minRequired) {
           // Flow stopped because upstream chamber has been drained completely empty
+          // All liquids from former chamber have successfully transferred into destination chamber
           transferDone = true;
+          transferDryRunAlarm = false;
         } else {
-          // Flow never occurred or stopped before 0.5L (dry run / clogged line)
+          // Flow never occurred or stopped before minimum volume requirement (dry run / pump failure / line clogged)
           transferDryRunAlarm = true;
           transferDone = true;
         }
       }
 
-      // 2. Maximum pump safety cutoff (5 minutes) to protect motor from overheating
-      if (millis() - transferStartMs >= TRANSFER_MAX_SAFETY_MS) {
+      // 2. Maximum pump safety cutoff (15 minutes) to protect motor from overheating
+      if (runMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
+        if (transferVolumeTransferred < 0.5f) {
+          transferDryRunAlarm = true;
+        }
       }
 
       if (transferDone) {
