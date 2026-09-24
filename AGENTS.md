@@ -104,8 +104,8 @@ src/
 *   **Liquid Transfer Drain-to-Empty Protocol**:
     *   Both automated pump transfers (Preheat -> Ferm, Ferm -> Past) rely **100% on flow sensor pulse activity** to verify fluid displacement.
     *   **Priming Grace**: 15 seconds of run time allowed before zero-pulse checks start.
-    *   **Drain-to-Empty Confirmation**: Once liquid is exhausted and the flow sensor records 0 pulse changes for **60 consecutive seconds (1 minute)**, the former chamber is confirmed completely evacuated and the system advances to the next stage.
-    *   **Minimum Volume Safety Check**: A transfer is only declared successful if `transferVolumeTransferred >= minVolumeReq * 0.85f` (or >= 0.5L in test mode). If 60 seconds of zero pulses elapse with < 0.5L moved, `transferDryRunAlarm` trips immediately, stopping pumps, locking heaters to 0%, and preventing stage advancement.
+    *   **Drain-to-Empty Confirmation**: Once liquid is exhausted, intermittent cavitation bubbles and residual droplets occur. The system monitors volume change over a 20-second window (`TRANSFER_DRAIN_TIMEOUT_MS = 20000UL`); if volume increase is under 0.15 L (`TRANSFER_DRAIN_MAX_DELTA_L = 0.15f`), the former chamber is confirmed completely evacuated and the system advances to the next stage.
+    *   **Minimum Volume Safety Check**: A transfer is only declared successful if `transferVolumeTransferred >= minVolumeReq * 0.85f` (or >= 0.5L in test mode). If the settle window elapses with < 0.5L moved, `transferDryRunAlarm` trips immediately, stopping pumps, locking heaters to 0%, and preventing stage advancement.
 *   **Data Logging & Persistence**:
     *   **On-Board SD Logging**: Automatically creates batch-named CSV files (e.g. `/brew_YYYYMMDD_HHMM.csv`) capturing all 21 system parameters every 60 seconds.
     *   **Wi-Fi Log Export**: Web server routes `/log.csv` and `/download` stream the active batch CSV directly to browser/clients over Wi-Fi.

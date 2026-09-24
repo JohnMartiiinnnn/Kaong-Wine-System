@@ -2830,39 +2830,54 @@ void loop() {
         transfer2Volume = transferVolumeTransferred;
       }
 
-      static uint32_t lastKnownPulses = 0;
       static int lastTransferTarget = -1;
-      if (lastTransferTarget != stageTransferTarget) {
-        lastTransferTarget = stageTransferTarget;
-        lastKnownPulses = pulses;
-        transferLastPulseMs = millis();
-      }
+      static uint32_t drainWindowStartMs = 0;
+      static float drainWindowStartVol = 0.0f;
 
-      if (pulses != lastKnownPulses) {
-        transferLastPulseMs = millis();
-        lastKnownPulses = pulses;
-      }
-
-      bool transferDone = false;
       uint32_t nowMs = millis();
       uint32_t runMs = nowMs - transferStartMs;
-      uint32_t idleMs = nowMs - transferLastPulseMs;
 
-      // 1. Flow-Sensor Pulse Drain-to-Empty Detection:
-      // Transfers rely 100% on flow sensor pulse activity to verify liquid movement.
-      // Once the source chamber is emptied, liquid ceases and pulses stop.
-      // After a 15s initial priming grace period, if no new pulses are detected for 60 seconds (1 minute):
-      if (runMs >= TRANSFER_PRIMING_GRACE_MS && idleMs >= TRANSFER_DRAIN_TIMEOUT_MS) {
+      if (lastTransferTarget != stageTransferTarget) {
+        lastTransferTarget = stageTransferTarget;
+        drainWindowStartMs = nowMs;
+        drainWindowStartVol = transferVolumeTransferred;
+        transferLastPulseMs = nowMs;
+      }
+
+      if (drainWindowStartMs == 0) {
+        drainWindowStartMs = nowMs;
+        drainWindowStartVol = transferVolumeTransferred;
+      }
+
+      // Track volume increase in current settle window:
+      float windowDeltaVol = transferVolumeTransferred - drainWindowStartVol;
+      if (windowDeltaVol < 0.0f) windowDeltaVol = 0.0f;
+
+      // If active flow is observed (volume increases by >= 0.15L in the window),
+      // slide the window forward because solid liquid is still being pumped!
+      if (windowDeltaVol >= TRANSFER_DRAIN_MAX_DELTA_L) {
+        drainWindowStartMs = nowMs;
+        drainWindowStartVol = transferVolumeTransferred;
+      }
+
+      transferLastPulseMs = drainWindowStartMs;
+      uint32_t drainElapsedMs = nowMs - drainWindowStartMs;
+      bool transferDone = false;
+
+      // 1. Drain-to-Empty Verification:
+      // After priming grace period (15s), if volume change remains < 0.15L for 20 continuous seconds,
+      // the chamber has run dry (filters out intermittent 0.1L air bursts, bubbles, and drips):
+      if (runMs >= TRANSFER_PRIMING_GRACE_MS && drainElapsedMs >= TRANSFER_DRAIN_TIMEOUT_MS) {
         float minRequired = (minVolumeReq > 1.0f) ? (minVolumeReq * 0.85f) : 0.5f;
         if (transferTestMode) minRequired = 0.5f;
 
         if (transferVolumeTransferred >= minRequired) {
-          // Flow stopped because upstream chamber has been drained completely empty
-          // All liquids from former chamber have successfully transferred into destination chamber
+          // Flow has ceased / dropped to negligible air cavitation after transferring required volume.
+          // Former chamber is completely evacuated!
           transferDone = true;
           transferDryRunAlarm = false;
         } else {
-          // Flow never occurred or stopped before minimum volume requirement (dry run / pump failure / line clogged)
+          // Flow ceased or never started without meeting the minimum liquid requirement (dry run / pump failure / line clogged)
           transferDryRunAlarm = true;
           transferDone = true;
         }

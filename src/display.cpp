@@ -221,7 +221,7 @@ void updateDashboardValues() {
     if (stageTransferring && activeBrewStage == 0) {
       if (transferDryRunAlarm) {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
-      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+      } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
         uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
         char drainBuf[32];
@@ -311,7 +311,7 @@ void updateDashboardValues() {
     if (stageTransferring && activeBrewStage == 1) {
       if (transferDryRunAlarm) {
         tft.drawCentreString("DRY ALARM", 239, 228, 2);
-      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+      } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
         uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
         char drainBuf[32];
@@ -378,7 +378,7 @@ void updateDashboardValues() {
     if (stageTransferring && activeBrewStage == 2) {
       if (transferDryRunAlarm) {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
-      } else if (millis() - transferLastPulseMs >= 5000UL && transferVolumeTransferred >= 0.5f) {
+      } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
         uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
         char drainBuf[32];
