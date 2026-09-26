@@ -19,10 +19,10 @@
 | 22 | I2C SCL | RTC DS3231 + MCP23017 |
 | 23 | SPI MOSI | Shared: SD, TFT, Touchscreen |
 | 25 | Heater/Fan PWM (`PWM_PIN`) | LEDC ch0, 25 kHz, 8-bit |
-| 26 | OneWire Bus (`ONE_WIRE_BUS`) | DS18B20 (shared bus, both liquid temp sensors) |
+| 26 | OneWire Pre-heat (`ONE_WIRE_PREHEAT`) | DS18B20 Pre-heat liquid temp sensor; 4.7 kΩ pull-up to 3.3V |
 | 27 | HX711 SCK (`HX711_SCK_PIN`) | Load cell clock |
 | 32 | Flow Sensor 1 (`FLOW_PREHEAT_FERM`) | Pre-heat → Ferm tank flow; INPUT_PULLUP, interrupt on RISING |
-| 33 | Touchscreen CS | SPI (touch not used in firmware) |
+| 33 | OneWire Pasteurization (`ONE_WIRE_PAST`) | DS18B20 Pasteurization liquid temp sensor; 4.7 kΩ pull-up to 3.3V (touchscreen removed) |
 | 34 | Flow Sensor 2 (`FLOW_FERM_PAST`) | Ferm → Past tank flow; input-only pin, interrupt on RISING |
 | 36 | HX711 DT (`HX711_DT_PIN`) | Load cell data (input-only pin) |
 | 0 | Motor PWM (`MOTOR_PWM_PIN`) | TB6612FN PWMA — LEDC ch1, 1 kHz; boot-strap pin, disconnect driver during flashing |

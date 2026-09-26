@@ -25,7 +25,9 @@ const int SSR_FERM    = 12;   // Fermentation tank heater SSR (was DIM1_CH2)
 const int SSR_PAST    = 14;   // Pasteurization tank heater SSR (was DIM1_CH1)
 const int FLOW_PREHEAT_FERM = 32; // Flow sensor: pre-heat → fermentation (was AC_ZC_PIN)
 const int FLOW_FERM_PAST   = 34; // Flow sensor: fermentation → pasteurization (input-only pin)
-const int ONE_WIRE_BUS = 26;
+const int ONE_WIRE_PREHEAT = 26; // Dedicated DS18B20 bus: Pre-heat liquid temp
+const int ONE_WIRE_PAST    = 33; // Dedicated DS18B20 bus: Pasteurization liquid temp
+const int ONE_WIRE_BUS     = 26; // Backward compatibility alias
 
 // MCP23017 pin numbers (GPA = 0-7, GPB = 8-15)
 static const int RELAY_PINS[8] = {8, 9, 10, 11, 12, 13, 14, 15};
@@ -201,8 +203,10 @@ extern Adafruit_MCP23X17 mcp;
 extern RTC_DS3231 rtc;
 extern TFT_eSPI tft;
 extern Adafruit_BME280 bme1;
-extern OneWire sharedOneWire;
-extern DallasTemperature sharedLiquidSensors;
+extern OneWire oneWirePreheat;
+extern DallasTemperature preheatSensors;
+extern OneWire oneWirePast;
+extern DallasTemperature pastSensors;
 extern HX711 scale;
 extern WebServer server;
 
@@ -443,10 +447,10 @@ extern float    transfer1Volume;
 extern float    transfer2Volume;
 extern bool     transferDryRunAlarm;
 const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
-const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 20000;  // 20s of sub-threshold flow (< 0.15L delta) confirms chamber is completely drained during bulk transfer
-const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 10000;  // 10s of sub-threshold flow confirms chamber drained once bulk target volume reached
-const float     TRANSFER_DRAIN_MAX_DELTA_L = 0.15f;  // Max volume increase allowed in drain window to be considered empty (filters foam/trickle)
-const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 20000;  // Backward compatibility alias
+const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 30000;  // 30s of sub-threshold flow (< 0.05L delta) confirms chamber is completely drained during bulk transfer
+const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 25000;  // 25s of sub-threshold flow confirms chamber drained once bulk target volume reached
+const float     TRANSFER_DRAIN_MAX_DELTA_L = 0.05f;  // 50mL threshold ensures any active liquid transfer (>0.12 L/min) prevents premature cutoff
+const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 30000;  // Backward compatibility alias
 const uint32_t  TRANSFER_MAX_SAFETY_MS     = 900000; // 15 minutes absolute maximum pump runtime for full batch transfers
 
 

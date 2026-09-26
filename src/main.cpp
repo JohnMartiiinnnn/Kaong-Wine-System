@@ -1,10 +1,10 @@
 /*
  * WIRING FOR MAIN ESP32:
  * SD Card: CS->5, MISO->19 (LCD MISO Disconnected), MOSI->23, SCLK->18
- * OneWire (Liquid Temps, shared bus): Data->26
+ * OneWire Preheat Liquid Temp: GPIO26
+ * OneWire Past Liquid Temp: GPIO33
  * RTC (DS3231): SDA->21, SCL->22
  * TFT LCD: CS->15, DC->2, RST->4, MOSI->23, SCLK->18
- * TOUCHSCREEN: CS->33, CLK->18, DIN->23, DO->19
  * SSR PREHEAT:  GPIO13
  * SSR FERM:     GPIO12
  * SSR PAST:     GPIO14
@@ -29,8 +29,10 @@ Adafruit_MCP23X17 mcp;
 RTC_DS3231 rtc;
 TFT_eSPI tft = TFT_eSPI();
 Adafruit_BME280 bme1;
-OneWire sharedOneWire(ONE_WIRE_BUS);
-DallasTemperature sharedLiquidSensors(&sharedOneWire);
+OneWire oneWirePreheat(ONE_WIRE_PREHEAT);
+DallasTemperature preheatSensors(&oneWirePreheat);
+OneWire oneWirePast(ONE_WIRE_PAST);
+DallasTemperature pastSensors(&oneWirePast);
 HX711 scale;
 WebServer server(80);
 
@@ -607,10 +609,8 @@ void IRAM_ATTR flowISR2() {
   // Minimum 14ms between pulses corresponds to ~71.4 Hz (~9.5 L/min maximum pump rate)
   // Filters out EMI noise spikes, contact bounce, and air-spinning on input-only GPIO 34
   if ((now - lastPulse2Micros) >= 14000) {
-    if (digitalRead(FLOW_FERM_PAST) == HIGH) {
-      flowPulse2++;
-      lastPulse2Micros = now;
-    }
+    flowPulse2++;
+    lastPulse2Micros = now;
   }
 }
 
@@ -626,8 +626,6 @@ void setup() {
   Serial.begin(115200);
   pinMode(15, OUTPUT);
   digitalWrite(15, HIGH);
-  pinMode(33, OUTPUT);
-  digitalWrite(33, HIGH);
   pinMode(SD_CS_PIN, OUTPUT);
   digitalWrite(SD_CS_PIN, HIGH);
   pinMode(19, INPUT_PULLUP);
@@ -655,14 +653,17 @@ void setup() {
   if (bme1.begin(0x76))
     bme1Status = true;
 
-  sharedLiquidSensors.begin();
-  sharedLiquidSensors.setWaitForConversion(false);
-  int deviceCount = sharedLiquidSensors.getDeviceCount();
-  if (deviceCount > 0)
-    liquid1Status = true;
-  if (deviceCount > 1)
+  preheatSensors.begin();
+  preheatSensors.setWaitForConversion(false);
+  if (preheatSensors.getDeviceCount() > 0)
     liquid2Status = true;
-  sharedLiquidSensors.requestTemperatures();
+  preheatSensors.requestTemperatures();
+
+  pastSensors.begin();
+  pastSensors.setWaitForConversion(false);
+  if (pastSensors.getDeviceCount() > 0)
+    liquid1Status = true;
+  pastSensors.requestTemperatures();
 
   scale.begin(HX711_DT_PIN, HX711_SCK_PIN);
   {
@@ -2895,12 +2896,20 @@ void loop() {
       float effectiveTarget = (transferTargetVolume > 0.5f) ? transferTargetVolume : minRequired;
 
       // Maximum plausible volume ceiling (Anti-Runaway Guard):
-      float maxPlausibleVol = max(maxCapVolume * 1.25f + 0.5f, maxCapVolume + 1.0f);
+      float maxPlausibleVol = max(maxCapVolume * 1.50f + 1.0f, maxCapVolume + 2.0f);
 
-      // Settle drain timeout: 20s during bulk flow, 10s once >= 90% of target liquid is transferred
+      // Settle drain timeout: 30s during bulk flow, 25s once >= 90% of target liquid is transferred
       uint32_t requiredDrainTimeout = (rawFlowVol >= effectiveTarget * 0.90f)
                                       ? TRANSFER_DRAIN_SETTLE_MS
                                       : TRANSFER_DRAIN_TIMEOUT_MS;
+
+      static uint32_t lastXferLogMs = 0;
+      if (nowMs - lastXferLogMs >= 2000) {
+        lastXferLogMs = nowMs;
+        Serial.printf("[XFER%d] Flow: %.2fL/%.2fL (raw: %.2fL, pulses: %lu, delta: %.3fL, drainElapsed: %lus/%lus)\n",
+                      stageTransferTarget, transferVolumeTransferred, effectiveTarget, rawFlowVol,
+                      (unsigned long)pulses, windowDeltaVol, (unsigned long)(drainElapsedMs / 1000), (unsigned long)(requiredDrainTimeout / 1000));
+      }
 
       // 1. Drain-to-Empty Verification:
       if (runMs >= TRANSFER_PRIMING_GRACE_MS && drainElapsedMs >= requiredDrainTimeout) {
@@ -3539,26 +3548,36 @@ void loop() {
 
     if (nowMs - lastDs18PollMs >= 1500) {
       lastDs18PollMs = nowMs;
-      sharedLiquidSensors.requestTemperatures();
+      preheatSensors.requestTemperatures();
+      pastSensors.requestTemperatures();
 
-      float phTemp = sharedLiquidSensors.getTempCByIndex(0);
-      float pTemp = sharedLiquidSensors.getTempCByIndex(1);
+      float phTemp = preheatSensors.getTempCByIndex(0);
+      float pTemp = pastSensors.getTempCByIndex(0);
 
       if (pTemp > -55.0f && pTemp < 125.0f && pTemp != DEVICE_DISCONNECTED_C) {
         liquid1Status = true;
+      } else {
+        liquid1Status = false;
       }
       if (phTemp > -55.0f && phTemp < 125.0f && phTemp != DEVICE_DISCONNECTED_C) {
         liquid2Status = true;
+      } else {
+        liquid2Status = false;
       }
     }
 
     if ((!liquid1Status || !liquid2Status) && (nowMs - lastDs18ScanMs >= 5000)) {
       lastDs18ScanMs = nowMs;
-      sharedLiquidSensors.begin();
-      sharedLiquidSensors.setWaitForConversion(false);
-      int devCount = sharedLiquidSensors.getDeviceCount();
-      if (devCount > 0) liquid1Status = true;
-      if (devCount > 1) liquid2Status = true;
+      if (!liquid2Status) {
+        preheatSensors.begin();
+        preheatSensors.setWaitForConversion(false);
+        if (preheatSensors.getDeviceCount() > 0) liquid2Status = true;
+      }
+      if (!liquid1Status) {
+        pastSensors.begin();
+        pastSensors.setWaitForConversion(false);
+        if (pastSensors.getDeviceCount() > 0) liquid1Status = true;
+      }
     }
 
     if (rtcStatus && currentAppState != SENSOR_MONITOR) {
@@ -3714,14 +3733,14 @@ void loop() {
 }
 
 float getPreheatTemp() {
-  float t = sharedLiquidSensors.getTempCByIndex(0);
+  float t = preheatSensors.getTempCByIndex(0);
   if (t == DEVICE_DISCONNECTED_C)
     return t;
   return t + preheatTempOffset;
 }
 
 float getPastTemp() {
-  float t = sharedLiquidSensors.getTempCByIndex(1);
+  float t = pastSensors.getTempCByIndex(0);
   if (t == DEVICE_DISCONNECTED_C)
     return t;
   return t + pastTempOffset;
