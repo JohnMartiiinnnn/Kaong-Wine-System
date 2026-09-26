@@ -40,6 +40,8 @@ WebServer server(80);
 bool bme1Status = false;
 bool liquid1Status = false;
 bool liquid2Status = false;
+float lastValidPreheatTemp = 25.0f;
+float lastValidPastTemp = 25.0f;
 bool remoteStatusReceived = false;
 bool rtcStatus = false;
 bool sdStatus = false;
@@ -3544,6 +3546,8 @@ void loop() {
     // Autonomous DS18B20 Liquid Sensor Polling & Dynamic Hot-Plug Recovery
     static uint32_t lastDs18PollMs = 0;
     static uint32_t lastDs18ScanMs = 0;
+    static uint8_t preheatFailCount = 0;
+    static uint8_t pastFailCount = 0;
     uint32_t nowMs = millis();
 
     if (nowMs - lastDs18PollMs >= 1500) {
@@ -3557,13 +3561,24 @@ void loop() {
 
       if (pTemp > -55.0f && pTemp < 125.0f && pTemp != DEVICE_DISCONNECTED_C) {
         liquid1Status = true;
+        pastFailCount = 0;
+        lastValidPastTemp = pTemp;
       } else {
-        liquid1Status = false;
+        pastFailCount++;
+        if (pastFailCount >= 3) {
+          liquid1Status = false;
+        }
       }
+
       if (phTemp > -55.0f && phTemp < 125.0f && phTemp != DEVICE_DISCONNECTED_C) {
         liquid2Status = true;
+        preheatFailCount = 0;
+        lastValidPreheatTemp = phTemp;
       } else {
-        liquid2Status = false;
+        preheatFailCount++;
+        if (preheatFailCount >= 3) {
+          liquid2Status = false;
+        }
       }
     }
 
@@ -3572,12 +3587,20 @@ void loop() {
       if (!liquid2Status) {
         preheatSensors.begin();
         preheatSensors.setWaitForConversion(false);
-        if (preheatSensors.getDeviceCount() > 0) liquid2Status = true;
+        if (preheatSensors.getDeviceCount() > 0) {
+          liquid2Status = true;
+          preheatFailCount = 0;
+          preheatSensors.requestTemperatures();
+        }
       }
       if (!liquid1Status) {
         pastSensors.begin();
         pastSensors.setWaitForConversion(false);
-        if (pastSensors.getDeviceCount() > 0) liquid1Status = true;
+        if (pastSensors.getDeviceCount() > 0) {
+          liquid1Status = true;
+          pastFailCount = 0;
+          pastSensors.requestTemperatures();
+        }
       }
     }
 
@@ -3735,16 +3758,26 @@ void loop() {
 
 float getPreheatTemp() {
   float t = preheatSensors.getTempCByIndex(0);
-  if (t == DEVICE_DISCONNECTED_C)
-    return t;
-  return t + preheatTempOffset;
+  if (t > -55.0f && t < 125.0f && t != DEVICE_DISCONNECTED_C) {
+    lastValidPreheatTemp = t;
+    return t + preheatTempOffset;
+  }
+  if (liquid2Status && lastValidPreheatTemp > -55.0f) {
+    return lastValidPreheatTemp + preheatTempOffset;
+  }
+  return DEVICE_DISCONNECTED_C;
 }
 
 float getPastTemp() {
   float t = pastSensors.getTempCByIndex(0);
-  if (t == DEVICE_DISCONNECTED_C)
-    return t;
-  return t + pastTempOffset;
+  if (t > -55.0f && t < 125.0f && t != DEVICE_DISCONNECTED_C) {
+    lastValidPastTemp = t;
+    return t + pastTempOffset;
+  }
+  if (liquid1Status && lastValidPastTemp > -55.0f) {
+    return lastValidPastTemp + pastTempOffset;
+  }
+  return DEVICE_DISCONNECTED_C;
 }
 
 float getFermTemp() {
