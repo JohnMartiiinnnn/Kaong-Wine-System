@@ -127,10 +127,12 @@ The system supports automated batch brewing with NVS memory persistence:
 
 ## 5. Hardware Safety Interlocks & Thermal Protection
 
-* **Flow-Sensor Drain-to-Empty & 20-Second Settle Verification (< 0.15L Delta)**
+* **Flow-Sensor Drain-to-Empty and Dual-Stage Settle Verification (< 0.15L Delta)**
   * All inter-chamber liquid transfers rely 100% on flow sensor pulse activity to verify liquid movement and complete emptying.
   * A 15-second pump priming grace period prevents false stall detection while lines fill.
-  * When bulk liquid is evacuated, pump cavitation produces intermittent bubbles and droplets. The drain algorithm tracks volume change over a 20-second rolling window (`TRANSFER_DRAIN_TIMEOUT_MS = 20000UL`). If volume increase remains below 0.15 L (`TRANSFER_DRAIN_MAX_DELTA_L = 0.15f`, corresponding to `< 0.45 L/min`), the chamber is verified completely empty.
+  * Microsecond ISR filtering rejects pulse intervals under 14ms (flow rate > 9.5 L/min) and tests pin state HIGH, stopping motor EMI and empty-pipe turbine spinning on GPIO 34.
+  * When bulk liquid is evacuated, pump cavitation produces intermittent bubbles and droplets. During bulk transfer, a 20-second rolling window (`TRANSFER_DRAIN_TIMEOUT_MS = 20000UL`) detects stalls. Once 90% of expected batch volume is moved, a 10-second window (`TRANSFER_DRAIN_SETTLE_MS = 10000UL`) confirms complete chamber evacuation if volume change is under 0.15 L (`TRANSFER_DRAIN_MAX_DELTA_L = 0.15f`).
+  * Anti-runaway ceiling terminates transfer cleanly when volume reaches `max(target * 1.25 + 0.5L, target + 1.0L)` and clamps destination chamber volume, preventing dry-run loops.
   * Minimum volume transfer validation ensures at least 85% of `minVolumeReq` (or >= 0.5L in test mode) moved before advancing; zero/trickle flow with < 0.5L transferred immediately trips `transferDryRunAlarm` and halts stage advancement.
 * **5.0L Chamber Volume Interlock (Low-Level SSR Kill-Switch)**
   * Enforced unconditionally at the hardware output layer before `digitalWrite(SSR_*, HIGH)`.

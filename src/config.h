@@ -443,7 +443,8 @@ extern float    transfer1Volume;
 extern float    transfer2Volume;
 extern bool     transferDryRunAlarm;
 const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
-const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 20000;  // 20s of sub-threshold flow (< 0.15L delta) confirms chamber is completely drained
+const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 20000;  // 20s of sub-threshold flow (< 0.15L delta) confirms chamber is completely drained during bulk transfer
+const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 10000;  // 10s of sub-threshold flow confirms chamber drained once bulk target volume reached
 const float     TRANSFER_DRAIN_MAX_DELTA_L = 0.15f;  // Max volume increase allowed in drain window to be considered empty (filters foam/trickle)
 const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 20000;  // Backward compatibility alias
 const uint32_t  TRANSFER_MAX_SAFETY_MS     = 900000; // 15 minutes absolute maximum pump runtime for full batch transfers

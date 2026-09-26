@@ -376,6 +376,8 @@ void loadSettingsFromNVS() {
   calibrationFactor = brewPrefs.getFloat("calFactor", 23012.45f);
   flowKFactor[0] = brewPrefs.getFloat("flowK0", 450.0f);
   flowKFactor[1] = brewPrefs.getFloat("flowK1", 450.0f);
+  if (flowKFactor[0] < 200.0f || flowKFactor[0] > 1000.0f || isnan(flowKFactor[0])) flowKFactor[0] = 450.0f;
+  if (flowKFactor[1] < 200.0f || flowKFactor[1] > 1000.0f || isnan(flowKFactor[1])) flowKFactor[1] = 450.0f;
   preheatTempOffset = brewPrefs.getFloat("phOffset", 0.0f);
   pastTempOffset = brewPrefs.getFloat("pastOffset", 0.0f);
   fermTempOffset = brewPrefs.getFloat("fermOffset", 0.0f);
@@ -582,22 +584,30 @@ void setRelayTestChannel(int idx, bool state) {
 void IRAM_ATTR flowISR1() {
   if (!sysPump1Active)
     return;
-  static uint32_t lastPulse1 = 0;
-  uint32_t now = millis();
-  if (now - lastPulse1 > 5) {
-    flowPulse1++;
-    lastPulse1 = now;
+  static uint32_t lastPulse1Micros = 0;
+  uint32_t now = micros();
+  // Minimum 14ms between pulses corresponds to ~71.4 Hz (~9.5 L/min maximum pump rate)
+  // Filters out EMI noise spikes, contact bounce, and air-spinning
+  if ((now - lastPulse1Micros) >= 14000) {
+    if (digitalRead(FLOW_PREHEAT_FERM) == HIGH) {
+      flowPulse1++;
+      lastPulse1Micros = now;
+    }
   }
 }
 
 void IRAM_ATTR flowISR2() {
   if (!sysPump2Active)
     return;
-  static uint32_t lastPulse2 = 0;
-  uint32_t now = millis();
-  if (now - lastPulse2 > 5) {
-    flowPulse2++;
-    lastPulse2 = now;
+  static uint32_t lastPulse2Micros = 0;
+  uint32_t now = micros();
+  // Minimum 14ms between pulses corresponds to ~71.4 Hz (~9.5 L/min maximum pump rate)
+  // Filters out EMI noise spikes, contact bounce, and air-spinning on input-only GPIO 34
+  if ((now - lastPulse2Micros) >= 14000) {
+    if (digitalRead(FLOW_FERM_PAST) == HIGH) {
+      flowPulse2++;
+      lastPulse2Micros = now;
+    }
   }
 }
 
@@ -691,7 +701,7 @@ void setup() {
     mcp.pinMode(BTN_SELECT_PIN, INPUT_PULLUP);
   }
   pinMode(FLOW_PREHEAT_FERM, INPUT_PULLUP);
-  pinMode(FLOW_FERM_PAST, INPUT_PULLUP);
+  pinMode(FLOW_FERM_PAST, INPUT);
   attachInterrupt(digitalPinToInterrupt(FLOW_PREHEAT_FERM), flowISR1, RISING);
   attachInterrupt(digitalPinToInterrupt(FLOW_FERM_PAST), flowISR2, RISING);
 
@@ -1702,8 +1712,13 @@ void loop() {
           flowPulse2 = 0;
       } else if (flowCalSelection == 2) {
         uint32_t pulses = (flowCalSensor == 0) ? flowPulse1 : flowPulse2;
-        if (pulses > 0 && flowCalKnownVolume > 0.0f)
-          flowKFactor[flowCalSensor] = (float)pulses / flowCalKnownVolume;
+        if (pulses > 0 && flowCalKnownVolume > 0.0f) {
+          float computedK = (float)pulses / flowCalKnownVolume;
+          if (computedK >= 200.0f && computedK <= 1000.0f) {
+            flowKFactor[flowCalSensor] = computedK;
+            saveSettingsToNVS();
+          }
+        }
         flowCalNeedsFullRedraw = true;
       }
       drawFlowCalMenu();
@@ -2822,7 +2837,7 @@ void loop() {
     if (stageTransferring) {
       uint32_t pulses = (stageTransferTarget == 1) ? flowPulse1 : flowPulse2;
       float kFact = (stageTransferTarget == 1) ? flowKFactor[0] : flowKFactor[1];
-      if (kFact <= 0.0f) kFact = 450.0f;
+      if (kFact < 200.0f || kFact > 1000.0f || isnan(kFact)) kFact = 450.0f;
       transferVolumeTransferred = (float)pulses / kFact;
       if (stageTransferTarget == 1) {
         transfer1Volume = transferVolumeTransferred;
@@ -2864,13 +2879,23 @@ void loop() {
       uint32_t drainElapsedMs = nowMs - drainWindowStartMs;
       bool transferDone = false;
 
-      // 1. Drain-to-Empty Verification:
-      // After priming grace period (15s), if volume change remains < 0.15L for 20 continuous seconds,
-      // the chamber has run dry (filters out intermittent 0.1L air bursts, bubbles, and drips):
-      if (runMs >= TRANSFER_PRIMING_GRACE_MS && drainElapsedMs >= TRANSFER_DRAIN_TIMEOUT_MS) {
-        float minRequired = (minVolumeReq > 1.0f) ? (minVolumeReq * 0.85f) : 0.5f;
-        if (transferTestMode) minRequired = 0.5f;
+      // Target volume and safety boundaries:
+      float minRequired = (minVolumeReq > 1.0f) ? (minVolumeReq * 0.85f) : 0.5f;
+      if (transferTestMode) minRequired = 0.5f;
+      float effectiveTarget = (transferTargetVolume > 0.5f) ? transferTargetVolume : minRequired;
 
+      // Maximum plausible volume ceiling (Anti-Runaway Guard):
+      // A chamber can never yield more liquid than initial contents + 25% margin (+0.5L).
+      // Any pulses beyond this limit are 100% empty-turbine air spinning or motor noise!
+      float maxPlausibleVol = max(effectiveTarget * 1.25f + 0.5f, effectiveTarget + 1.0f);
+
+      // Settle drain timeout: 20s during bulk flow, 10s once >= 90% of target liquid is transferred
+      uint32_t requiredDrainTimeout = (transferVolumeTransferred >= effectiveTarget * 0.90f)
+                                      ? TRANSFER_DRAIN_SETTLE_MS
+                                      : TRANSFER_DRAIN_TIMEOUT_MS;
+
+      // 1. Drain-to-Empty Verification:
+      if (runMs >= TRANSFER_PRIMING_GRACE_MS && drainElapsedMs >= requiredDrainTimeout) {
         if (transferVolumeTransferred >= minRequired) {
           // Flow has ceased / dropped to negligible air cavitation after transferring required volume.
           // Former chamber is completely evacuated!
@@ -2883,7 +2908,13 @@ void loop() {
         }
       }
 
-      // 2. Maximum pump safety cutoff (15 minutes) to protect motor from overheating
+      // 2. Maximum Plausible Volume Ceiling (Anti-Runaway Guard):
+      if (runMs >= TRANSFER_PRIMING_GRACE_MS && transferVolumeTransferred >= maxPlausibleVol) {
+        transferDone = true;
+        transferDryRunAlarm = false;
+      }
+
+      // 3. Maximum pump runtime safety cutoff (15 minutes) to protect motor from overheating
       if (runMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
         if (transferVolumeTransferred < 0.5f) {
@@ -2916,14 +2947,17 @@ void loop() {
           return;
         }
 
+        // Clamp destination chamber volume to physically plausible ceiling:
+        float finalVol = min(transferVolumeTransferred, maxPlausibleVol);
+
         if (stageTransferTarget == 1) {
           chamberVolume[0] = 0.0f;
-          chamberVolume[1] = transferVolumeTransferred;
-          transfer1Volume = transferVolumeTransferred;
+          chamberVolume[1] = finalVol;
+          transfer1Volume = finalVol;
         } else if (stageTransferTarget == 2) {
           chamberVolume[1] = 0.0f;
-          chamberVolume[2] = transferVolumeTransferred;
-          transfer2Volume = transferVolumeTransferred;
+          chamberVolume[2] = finalVol;
+          transfer2Volume = finalVol;
         }
 
         if (transferTestMode) {

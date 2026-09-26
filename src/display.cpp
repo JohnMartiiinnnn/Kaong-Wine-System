@@ -223,7 +223,8 @@ void updateDashboardValues() {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
       } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
-        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        uint32_t activeTimeout = (transferVolumeTransferred >= transferTargetVolume * 0.90f) ? TRANSFER_DRAIN_SETTLE_MS : TRANSFER_DRAIN_TIMEOUT_MS;
+        uint32_t remSec = (idle < activeTimeout) ? ((activeTimeout - idle) / 1000UL) : 0;
         char drainBuf[32];
         sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
         tft.drawCentreString(drainBuf, 239, 190, 2);
@@ -313,7 +314,8 @@ void updateDashboardValues() {
         tft.drawCentreString("DRY ALARM", 239, 228, 2);
       } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
-        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        uint32_t activeTimeout = (transferVolumeTransferred >= transferTargetVolume * 0.90f) ? TRANSFER_DRAIN_SETTLE_MS : TRANSFER_DRAIN_TIMEOUT_MS;
+        uint32_t remSec = (idle < activeTimeout) ? ((activeTimeout - idle) / 1000UL) : 0;
         char drainBuf[32];
         sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
         tft.drawCentreString(drainBuf, 239, 228, 2);
@@ -380,7 +382,8 @@ void updateDashboardValues() {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
       } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
-        uint32_t remSec = (idle < TRANSFER_DRAIN_TIMEOUT_MS) ? ((TRANSFER_DRAIN_TIMEOUT_MS - idle) / 1000UL) : 0;
+        uint32_t activeTimeout = (transferVolumeTransferred >= transferTargetVolume * 0.90f) ? TRANSFER_DRAIN_SETTLE_MS : TRANSFER_DRAIN_TIMEOUT_MS;
+        uint32_t remSec = (idle < activeTimeout) ? ((activeTimeout - idle) / 1000UL) : 0;
         char drainBuf[32];
         sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
         tft.drawCentreString(drainBuf, 239, 190, 2);
