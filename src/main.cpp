@@ -530,12 +530,15 @@ void startLiquidTransfer(int targetStage) {
 
   if (targetStage == 1) {
     flowPulse1 = 0;
-    transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
+    if (transferStartWeight <= 0.5f) {
+      transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
+    }
     transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
   } else if (targetStage == 2) {
     flowPulse2 = 0;
     float fermVol = (chamberVolume[1] > 0.5f) ? chamberVolume[1] : ((transfer1Volume > 0.5f) ? transfer1Volume : transferStartWeight);
-    transferTargetVolume = (fermVol > 0.5f) ? fermVol : minVolumeReq;
+    if (transferStartWeight > 0.5f && fermVol > transferStartWeight) fermVol = transferStartWeight;
+    transferTargetVolume = (fermVol > 0.5f) ? fermVol : ((transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq);
   }
 
   mcp.digitalWrite(LIGHT_R, RELAY_OFF);
@@ -2838,7 +2841,14 @@ void loop() {
       uint32_t pulses = (stageTransferTarget == 1) ? flowPulse1 : flowPulse2;
       float kFact = (stageTransferTarget == 1) ? flowKFactor[0] : flowKFactor[1];
       if (kFact < 200.0f || kFact > 1000.0f || isnan(kFact)) kFact = 450.0f;
-      transferVolumeTransferred = (float)pulses / kFact;
+      float rawFlowVol = (float)pulses / kFact;
+
+      // Master volume cap: strictly capped at what load cell measured after initialization
+      float maxCapVolume = (transferStartWeight > 0.5f) ? transferStartWeight : ((transferTargetVolume > 0.5f) ? transferTargetVolume : minVolumeReq);
+
+      // Capped live transferred volume
+      transferVolumeTransferred = min(rawFlowVol, maxCapVolume);
+
       if (stageTransferTarget == 1) {
         transfer1Volume = transferVolumeTransferred;
       } else if (stageTransferTarget == 2) {
@@ -2855,24 +2865,24 @@ void loop() {
       if (lastTransferTarget != stageTransferTarget) {
         lastTransferTarget = stageTransferTarget;
         drainWindowStartMs = nowMs;
-        drainWindowStartVol = transferVolumeTransferred;
+        drainWindowStartVol = rawFlowVol;
         transferLastPulseMs = nowMs;
       }
 
       if (drainWindowStartMs == 0) {
         drainWindowStartMs = nowMs;
-        drainWindowStartVol = transferVolumeTransferred;
+        drainWindowStartVol = rawFlowVol;
       }
 
-      // Track volume increase in current settle window:
-      float windowDeltaVol = transferVolumeTransferred - drainWindowStartVol;
+      // Track volume increase in current settle window using raw flow volume:
+      float windowDeltaVol = rawFlowVol - drainWindowStartVol;
       if (windowDeltaVol < 0.0f) windowDeltaVol = 0.0f;
 
       // If active flow is observed (volume increases by >= 0.15L in the window),
       // slide the window forward because solid liquid is still being pumped!
       if (windowDeltaVol >= TRANSFER_DRAIN_MAX_DELTA_L) {
         drainWindowStartMs = nowMs;
-        drainWindowStartVol = transferVolumeTransferred;
+        drainWindowStartVol = rawFlowVol;
       }
 
       transferLastPulseMs = drainWindowStartMs;
@@ -2885,18 +2895,16 @@ void loop() {
       float effectiveTarget = (transferTargetVolume > 0.5f) ? transferTargetVolume : minRequired;
 
       // Maximum plausible volume ceiling (Anti-Runaway Guard):
-      // A chamber can never yield more liquid than initial contents + 25% margin (+0.5L).
-      // Any pulses beyond this limit are 100% empty-turbine air spinning or motor noise!
-      float maxPlausibleVol = max(effectiveTarget * 1.25f + 0.5f, effectiveTarget + 1.0f);
+      float maxPlausibleVol = max(maxCapVolume * 1.25f + 0.5f, maxCapVolume + 1.0f);
 
       // Settle drain timeout: 20s during bulk flow, 10s once >= 90% of target liquid is transferred
-      uint32_t requiredDrainTimeout = (transferVolumeTransferred >= effectiveTarget * 0.90f)
+      uint32_t requiredDrainTimeout = (rawFlowVol >= effectiveTarget * 0.90f)
                                       ? TRANSFER_DRAIN_SETTLE_MS
                                       : TRANSFER_DRAIN_TIMEOUT_MS;
 
       // 1. Drain-to-Empty Verification:
       if (runMs >= TRANSFER_PRIMING_GRACE_MS && drainElapsedMs >= requiredDrainTimeout) {
-        if (transferVolumeTransferred >= minRequired) {
+        if (rawFlowVol >= minRequired) {
           // Flow has ceased / dropped to negligible air cavitation after transferring required volume.
           // Former chamber is completely evacuated!
           transferDone = true;
@@ -2909,7 +2917,7 @@ void loop() {
       }
 
       // 2. Maximum Plausible Volume Ceiling (Anti-Runaway Guard):
-      if (runMs >= TRANSFER_PRIMING_GRACE_MS && transferVolumeTransferred >= maxPlausibleVol) {
+      if (runMs >= TRANSFER_PRIMING_GRACE_MS && rawFlowVol >= maxPlausibleVol) {
         transferDone = true;
         transferDryRunAlarm = false;
       }
@@ -2917,7 +2925,7 @@ void loop() {
       // 3. Maximum pump runtime safety cutoff (15 minutes) to protect motor from overheating
       if (runMs >= TRANSFER_MAX_SAFETY_MS) {
         transferDone = true;
-        if (transferVolumeTransferred < 0.5f) {
+        if (rawFlowVol < 0.5f) {
           transferDryRunAlarm = true;
         }
       }
@@ -2932,7 +2940,7 @@ void loop() {
         // CRITICAL HEATER SAFETY INTERLOCK:
         // If transfer triggered a dry-run alarm or virtually no liquid was moved (< 0.5L),
         // DO NOT advance stage and NEVER turn on heating!
-        if (transferDryRunAlarm || transferVolumeTransferred < 0.5f) {
+        if (transferDryRunAlarm || rawFlowVol < 0.5f) {
           currentHeatingPercent = 0;
           digitalWrite(SSR_PREHEAT, LOW);
           digitalWrite(SSR_FERM, LOW);
@@ -2947,17 +2955,31 @@ void loop() {
           return;
         }
 
-        // Clamp destination chamber volume to physically plausible ceiling:
-        float finalVol = min(transferVolumeTransferred, maxPlausibleVol);
+        // Clamp destination chamber volume strictly to the load cell initialization measurement:
+        float finalVol = min(maxCapVolume, max(transferVolumeTransferred, minRequired));
+        if (rawFlowVol >= minRequired) {
+          finalVol = maxCapVolume;
+        }
+        transferVolumeTransferred = finalVol;
 
         if (stageTransferTarget == 1) {
           chamberVolume[0] = 0.0f;
           chamberVolume[1] = finalVol;
           transfer1Volume = finalVol;
+          if (pulses > 0 && maxCapVolume > 0.5f) {
+            float empiricalK = (float)pulses / maxCapVolume;
+            Serial.printf("[XFER1] Measured: %.2f L, Pulses: %lu, Empirical K: %.1f p/L (Config K: %.1f)\n",
+                          maxCapVolume, (unsigned long)pulses, empiricalK, flowKFactor[0]);
+          }
         } else if (stageTransferTarget == 2) {
           chamberVolume[1] = 0.0f;
           chamberVolume[2] = finalVol;
           transfer2Volume = finalVol;
+          if (pulses > 0 && maxCapVolume > 0.5f) {
+            float empiricalK = (float)pulses / maxCapVolume;
+            Serial.printf("[XFER2] Measured: %.2f L, Pulses: %lu, Empirical K: %.1f p/L (Config K: %.1f)\n",
+                          maxCapVolume, (unsigned long)pulses, empiricalK, flowKFactor[1]);
+          }
         }
 
         if (transferTestMode) {
