@@ -187,6 +187,12 @@ void setup() {
       while (WiFi.status() != WL_CONNECTED && millis() - t < 4000)
         delay(100);
     }
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin("Infinix Hot 60 Pro", "aaaaaaaa");
+      t = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - t < 4000)
+        delay(100);
+    }
   }
   ArduinoOTA.onStart([]() {
     if (pBLEScan) {

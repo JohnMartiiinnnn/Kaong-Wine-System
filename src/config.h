@@ -16,6 +16,7 @@
 #include <TFT_eSPI.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <Wire.h>
 #include <Preferences.h>
 
@@ -209,6 +210,7 @@ extern OneWire oneWirePast;
 extern DallasTemperature pastSensors;
 extern HX711 scale;
 extern WebServer server;
+extern WiFiMulti wifiMulti;
 
 // ---- Sensor Status ----
 extern bool bme1Status;

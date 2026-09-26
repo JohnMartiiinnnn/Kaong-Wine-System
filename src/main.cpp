@@ -35,6 +35,7 @@ OneWire oneWirePast(ONE_WIRE_PAST);
 DallasTemperature pastSensors(&oneWirePast);
 HX711 scale;
 WebServer server(80);
+WiFiMulti wifiMulti;
 
 // ---- Sensor Status ----
 bool bme1Status = false;
@@ -730,7 +731,9 @@ void setup() {
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
-  WiFi.begin("Living-Room-WiFi", "BulasoFam27&");
+  wifiMulti.addAP("Living-Room-WiFi", "BulasoFam27&");
+  wifiMulti.addAP("Infinix Hot 60 Pro", "aaaaaaaa");
+  wifiMulti.run(5000);
 
   if (MDNS.begin("winebrew"))
     MDNS.addService("http", "tcp", 80);
@@ -762,6 +765,12 @@ void setup() {
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
+
+  static uint32_t lastWifiCheckMs = 0;
+  if (WiFi.status() != WL_CONNECTED && millis() - lastWifiCheckMs >= 15000UL) {
+    lastWifiCheckMs = millis();
+    wifiMulti.run(1500);
+  }
 
   // ---- Calibration Wizard LED UI ----
   if (currentAppState == CALIB_WIZARD) {
