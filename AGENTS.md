@@ -8,6 +8,7 @@ This document serves as the single source of truth for the Automated Wine Brewin
 
 Whenever an AGY instance is started in this repository:
 * **Upload Policy (STRICT)**: NEVER run an upload command (`pio run -t upload`, OTA, or USB) unless Dave Patrick explicitly commands you to upload in that turn. Code compilation checks (`pio run`) are allowed to verify builds, but firmware flashing is strictly prohibited without explicit user command.
+* **Pre-Flight Git Sync (STRICT)**: Before inspecting, modifying, or compiling code, ALWAYS run `git fetch` (and fast-forward `git pull` if behind and working tree is clean) to ensure local code matches remote HEAD. Never assume local tracking refs are up to date.
 * **Autonomous Skill Invocations**:
   * `adhd`: Direct answers, concise bounded steps, no em-dashes, no double-hyphens, no markdown tables.
   * `system-sync`: Clean git checkpoints upon completing changes.
