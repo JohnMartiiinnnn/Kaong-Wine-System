@@ -29,7 +29,7 @@ This guide documents the hardware specifications, DRV8871 motor driver configura
 const int DRV8871_IN1_PIN_CFG = 4;
 const int DRV8871_IN2_PIN_CFG = 5;
 const uint8_t MAX_YEAST_MOTOR_DUTY = 128;       // 50% duty cap (6.0V max for 6V motor on 11.93V rail)
-const float DEFAULT_MS_PER_GRAM_YEAST = 1764.0f; // Empirical calibration fit: 0.567 g/s (1764 ms/g, R2=0.98)
+const float DEFAULT_MS_PER_GRAM_YEAST = 1845.0f; // Empirical calibration fit: 0.542 g/s (1845 ms/g, R²=0.9966)
 const uint32_t YEAST_DISPENSE_TIMEOUT_MS = 30000UL; // Safety cutoff timeout
 const uint16_t YEAST_BRAKE_DURATION_MS = 200;   // Active braking duration
 ```
@@ -62,9 +62,17 @@ The Yeast Dispenser module is available on both the Primary ESP32 (`src/`) and S
 ## 4. Empirical Calibration & Fermentation Pitch Mixing
 
 ### Empirical Calibration Model
-From 21 bench trials across pulse durations of 3s to 25s:
-* **Flow Rate**: $0.567\text{ g/s}$ ($\approx 1764.0\text{ ms/g}$)
-* **Linear Fit ($R^2 = 0.98$)**: $\text{Output (g)} = 0.567 \times \text{Time (s)}$
+From 20 physical bench trials across 5s (10 trials), 8s (5 trials), and 12s (5 trials):
+* **Steady-State Delivery Rate**: $0.542\text{ g/s}$ ($\approx 1845.0\text{ ms/g}$)
+* **Linear Calibration Fit ($R^2 = 0.9966$)**:
+  $$\text{Mass (g)} = 0.5573 \times \text{Time (s)} - 0.1908$$
+* **Dispense Duration Formula**:
+  $$\text{Duration (ms)} = \text{grams} \times 1794.4\text{ ms/g} + 342.0\text{ ms}$$
+* **Consistency & Repeatability**:
+  - 5s: Mean $2.52\text{ g}$, $CV = 11.95\%$ ($SD = 0.30\text{ g}$)
+  - 8s: Mean $4.40\text{ g}$, $CV = 4.82\%$ ($SD = 0.21\text{ g}$)
+  - 12s: Mean $6.44\text{ g}$, $CV = 2.08\%$ ($SD = 0.13\text{ g}$)
+  Variability cuts dramatically past 8 seconds as the motor startup transient ($342\text{ ms}$) is amortized.
 
 ### Proportional Pitch Mixing
 When transitioning into the Fermentation stage (`activeBrewStage == 1`), the system runs the mixing impeller for **10 seconds per 1 gram** of dispensed yeast:

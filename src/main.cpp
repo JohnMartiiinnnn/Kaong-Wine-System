@@ -375,8 +375,10 @@ void loadSettingsFromNVS() {
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
   stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
-  msPerGramYeast = brewPrefs.getFloat("dispMsG", 1764.0f);
-  tareOffset = brewPrefs.getFloat("tareOffset", 0.0f);
+  msPerGramYeast = brewPrefs.getFloat("dispMsG", DEFAULT_MS_PER_GRAM_YEAST);
+  if (fabs(msPerGramYeast - 1764.0f) < 1.0f) {
+    msPerGramYeast = DEFAULT_MS_PER_GRAM_YEAST;
+  }
   calibrationFactor = brewPrefs.getFloat("calFactor", 23012.45f);
   flowKFactor[0] = brewPrefs.getFloat("flowK0", 450.0f);
   flowKFactor[1] = brewPrefs.getFloat("flowK1", 450.0f);
