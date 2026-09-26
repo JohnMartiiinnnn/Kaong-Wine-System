@@ -27,8 +27,7 @@ Automated liquid transfers between chambers (Pre-Heat -> Fermentation and Fermen
 1. **Flow Sensor Priority**: Fluid displacement continues until the upstream chamber physically drains dry.
 2. **Priming Grace Window**: Pumps run for 15 seconds (`TRANSFER_PRIMING_GRACE_MS = 15000UL`) before stall detection activates.
 3. **Dual-Stage Drain Settling Verification**:
-   * During bulk pumping, 30 seconds of volume delta < 0.05L indicates a stall (`TRANSFER_DRAIN_TIMEOUT_MS = 30000UL`).
-   * Once 90% of target liquid is transferred, a 25-second settle window (`TRANSFER_DRAIN_SETTLE_MS = 25000UL`) with < 0.05L delta confirms complete chamber evacuation. Threshold lowered from 0.15L to 0.05L so flow rates as low as 0.12 L/min keep pumps running.
+   * A 15-second settle window (`TRANSFER_DRAIN_TIMEOUT_MS = 15000UL`, `TRANSFER_DRAIN_SETTLE_MS = 15000UL`) with < 0.05L delta confirms complete chamber evacuation once liquid transfer finishes. Threshold set to 0.05L so flow rates as low as 0.12 L/min keep pumps running.
 4. **Hardware Glitch and Noise Filtering**: Interrupt routines enforce a 14 ms microsecond debounce ceiling (maximum 71.4 Hz / ~9.5 L/min pump rate) to eliminate pump motor EMI and dry-air turbine cavitation on input-only GPIO 34.
 5. **Anti-Runaway Volume Ceiling**: Pumping terminates automatically if transferred volume reaches `max(target * 1.50 + 1.0L, target + 2.0L)`, preventing premature cutoff from sensor K-factor discrepancies.
 6. **Master Volume Clamping to Load Cell Ground Truth**: All live and final transferred liquid volume values (`transferVolumeTransferred`, `transfer1Volume`, `transfer2Volume`, and destination `chamberVolume`) are strictly clamped to the initial load cell weight (`transferStartWeight`) captured after initialization.

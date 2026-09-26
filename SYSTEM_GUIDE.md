@@ -225,7 +225,7 @@ The top bar always shows:
 5. Once the liquid is at or below 30°C, the fan turns off. The stage is ready to advance.
 
 **To advance to Fermentation:**
-Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION." The system energizes Pump 1, integrating volume pulses from Flow Sensor 1 (GPIO 32) independently of load cell tare. After a 15-second priming grace window, the pump executes drain-until-empty detection (shutting off after 5 consecutive seconds of zero flow pulses once >= 0.5 L has transferred, or a 5-minute safety timeout). The system dynamically increments Fermentation volume, dispenses yeast, and advances to Stage 1.
+Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION." The system energizes Pump 1, integrating volume pulses from Flow Sensor 1 (GPIO 32) independently of load cell tare. After a 15-second priming grace window, the pump executes drain-until-empty detection (shutting off after a 15-second settle window of sub-threshold flow < 0.05L once >= 0.5 L has transferred, or a 15-minute safety timeout). The system dynamically increments Fermentation volume, dispenses yeast, and advances to Stage 1.
 
 **Status light:** RED on during this stage.
 
@@ -246,7 +246,7 @@ Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION
 - The mixer runs automatically in AUTO mode: 5 minutes on, then 355 minutes off, repeating.
 
 **To advance to Pasteurization:**
-Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system energizes Pump 2, integrating pulses from Flow Sensor 2 (GPIO 34). It runs until the fermentation vat drains empty (5-second zero-pulse dry detection, or 5-minute safety cutoff), locks the transferred volume into the pasteurizer, and switches to Stage 2.
+Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system energizes Pump 2, integrating pulses from Flow Sensor 2 (GPIO 34). It runs until the fermentation vat drains empty (15-second sub-threshold flow dry detection, or 15-minute safety cutoff), locks the transferred volume into the pasteurizer, and switches to Stage 2.
 
 **Status light:** YELLOW on during this stage.
 
