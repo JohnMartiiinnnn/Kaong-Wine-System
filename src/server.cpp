@@ -104,6 +104,7 @@ void handleData() {
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue) + ",";
+  json += "\"ads\":" + String((int)incomingData.adsStatus) + ",";
   json += "\"sg\":" + String(incomingData.pillGravity) + ",";
   json += "\"bat\":" + String(incomingData.pillBattery) + ",";
   json += "\"rssi\":" + String(incomingData.pillRSSI) + ",";

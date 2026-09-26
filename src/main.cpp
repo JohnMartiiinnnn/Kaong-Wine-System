@@ -3548,11 +3548,12 @@ void loop() {
 
     if (nowMs - lastDs18PollMs >= 1500) {
       lastDs18PollMs = nowMs;
-      preheatSensors.requestTemperatures();
-      pastSensors.requestTemperatures();
 
       float phTemp = preheatSensors.getTempCByIndex(0);
       float pTemp = pastSensors.getTempCByIndex(0);
+
+      preheatSensors.requestTemperatures();
+      pastSensors.requestTemperatures();
 
       if (pTemp > -55.0f && pTemp < 125.0f && pTemp != DEVICE_DISCONNECTED_C) {
         liquid1Status = true;

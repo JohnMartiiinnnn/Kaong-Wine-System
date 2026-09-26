@@ -288,7 +288,7 @@ void updateDashboardValues() {
     // pH Level Tile (x=163, y=171, w=152, h=40)
     tft.fillRect(165, 185, 148, 24, bgCard);
     char phBuf[16];
-    if (incomingData.adsStatus == 1) dtostrf(incomingData.phValue, 4, 2, phBuf);
+    if (incomingData.adsStatus == 1 || (incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f)) dtostrf(incomingData.phValue, 4, 2, phBuf);
     else strcpy(phBuf, "--");
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(phBuf, 239, 186, 4);
@@ -1292,6 +1292,8 @@ void drawCalibrationPage(bool valuesOnly) {
 }
 
 void drawSensorMonitorPage(bool valuesOnly) {
+  static int8_t prevRowErr[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+
   if (!valuesOnly) {
     if (monitorNeedsFullRedraw) {
       tft.fillRect(0, 0, 320, 50, TFT_NAVY);
@@ -1301,113 +1303,145 @@ void drawSensorMonitorPage(bool valuesOnly) {
       tft.setTextColor(TFT_BLACK);
       tft.drawCentreString("RETURN: BACK", CENTER_X, 450, 1);
       monitorNeedsFullRedraw = false;
+      for (int i = 0; i < 9; i++) prevRowErr[i] = -1;
     }
     int yStart = 60, yGap = 47;
     char b[32];
     if (bme1Status) {
       sprintf(b, "%.1f C", bme1.readTemperature());
-      drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)", b, false);
-    } else
-      drawValueTile(5, yStart + yGap * 0, "AMBIENT (PH)", "FAILED", true);
+      drawValueTile(5, yStart + yGap * 0, "AMBIENT (PRE)", b, false);
+      prevRowErr[0] = 0;
+    } else {
+      drawValueTile(5, yStart + yGap * 0, "AMBIENT (PRE)", "FAILED", true);
+      prevRowErr[0] = 1;
+    }
     if (liquid2Status) {
       sprintf(b, "%.1f C", getPreheatTemp());
-      drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)", b, false);
-    } else
-      drawValueTile(5, yStart + yGap * 1, "LIQUID (PH)", "FAILED", true);
+      drawValueTile(5, yStart + yGap * 1, "LIQUID (PRE)", b, false);
+      prevRowErr[1] = 0;
+    } else {
+      drawValueTile(5, yStart + yGap * 1, "LIQUID (PRE)", "FAILED", true);
+      prevRowErr[1] = 1;
+    }
     if (incomingData.sensor2Status > 0) {
       sprintf(b, "%.1f C", incomingData.room2Temp);
       drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", b, false);
-    } else
+      prevRowErr[2] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 2, "AMBIENT (FERM)", "FAILED", true);
+      prevRowErr[2] = 1;
+    }
     if (incomingData.ds18Status == 1) {
       sprintf(b, "%.1f C", getFermTemp());
       drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)", b, false);
-    } else
+      prevRowErr[3] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 3, "LIQUID (FERM)", "FAILED", true);
+      prevRowErr[3] = 1;
+    }
     if (liquid1Status) {
       sprintf(b, "%.1f C", getPastTemp());
       drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)", b, false);
-    } else
+      prevRowErr[4] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 4, "LIQUID (PST)", "FAILED", true);
+      prevRowErr[4] = 1;
+    }
     if (incomingData.pillGravity > 0.1) {
       sprintf(b, "%.4f SG", incomingData.pillGravity);
       drawValueTile(5, yStart + yGap * 5, "S. GRAVITY", b, false);
-    } else
+      prevRowErr[5] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 5, "S. GRAVITY", "FAILED", true);
-    if (incomingData.adsStatus == 1) {
+      prevRowErr[5] = 1;
+    }
+    bool phOk = (incomingData.adsStatus == 1) || (incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f);
+    if (phOk) {
       sprintf(b, "%.2f pH", incomingData.phValue);
       drawValueTile(5, yStart + yGap * 6, "PH LEVEL", b, false);
-    } else
+      prevRowErr[6] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 6, "PH LEVEL", "FAILED", true);
+      prevRowErr[6] = 1;
+    }
     if (hx711Status) {
       sprintf(b, "%.1f L", currentWeight);
       drawValueTile(5, yStart + yGap * 7, "EST. VOLUME", b, false);
-    } else
+      prevRowErr[7] = 0;
+    } else {
       drawValueTile(5, yStart + yGap * 7, "EST. VOLUME", "FAILED", true);
+      prevRowErr[7] = 1;
+    }
     sprintf(b, "R:%d L:%d U:%d D:%d S:%d HX:%d", ljRight, ljLeft, ljUp, ljDown,
             ljSelect, (int)hx711Status);
     drawValueTile(5, yStart + yGap * 8, "RAW DEBUG", b, false);
+    prevRowErr[8] = 0;
     return;
   }
 
   // Values-only: overwrite just the right-side text of each tile, no
-  // border/label redraws
+  // border/label redraws unless error state changes
   int yStart = 60, yGap = 47;
   char b[32];
-  tft.setTextPadding(160);
 
-  auto rv = [&](int row, const char *val, bool isErr) {
+  auto rv = [&](int row, const char *label, const char *val, bool isErr) {
     int y = yStart + yGap * row;
-    uint16_t bg = isErr ? TFT_RED : 0x3566;
-    tft.setTextColor(TFT_WHITE, bg);
-    tft.drawRightString(val, 298, y + 13, 2);
+    if (prevRowErr[row] != (int8_t)isErr) {
+      drawValueTile(5, y, label, val, isErr);
+      prevRowErr[row] = (int8_t)isErr;
+    } else {
+      uint16_t bg = isErr ? TFT_RED : 0x3566;
+      tft.setTextPadding(160);
+      tft.setTextColor(TFT_WHITE, bg);
+      tft.drawRightString(val, 298, y + 13, 2);
+      tft.setTextPadding(0);
+    }
   };
 
   if (bme1Status) {
     sprintf(b, "%.1f C", bme1.readTemperature());
-    rv(0, b, false);
+    rv(0, "AMBIENT (PRE)", b, false);
   } else
-    rv(0, "FAILED", true);
+    rv(0, "AMBIENT (PRE)", "FAILED", true);
   if (liquid2Status) {
     sprintf(b, "%.1f C", getPreheatTemp());
-    rv(1, b, false);
+    rv(1, "LIQUID (PRE)", b, false);
   } else
-    rv(1, "FAILED", true);
+    rv(1, "LIQUID (PRE)", "FAILED", true);
   if (incomingData.sensor2Status > 0) {
     sprintf(b, "%.1f C", incomingData.room2Temp);
-    rv(2, b, false);
+    rv(2, "AMBIENT (FERM)", b, false);
   } else
-    rv(2, "FAILED", true);
+    rv(2, "AMBIENT (FERM)", "FAILED", true);
   if (incomingData.ds18Status == 1) {
     sprintf(b, "%.1f C", getFermTemp());
-    rv(3, b, false);
+    rv(3, "LIQUID (FERM)", b, false);
   } else
-    rv(3, "FAILED", true);
+    rv(3, "LIQUID (FERM)", "FAILED", true);
   if (liquid1Status) {
     sprintf(b, "%.1f C", getPastTemp());
-    rv(4, b, false);
+    rv(4, "LIQUID (PST)", b, false);
   } else
-    rv(4, "FAILED", true);
+    rv(4, "LIQUID (PST)", "FAILED", true);
   if (incomingData.pillGravity > 0.1) {
     sprintf(b, "%.4f SG", incomingData.pillGravity);
-    rv(5, b, false);
+    rv(5, "S. GRAVITY", b, false);
   } else
-    rv(5, "FAILED", true);
-  if (incomingData.adsStatus == 1) {
+    rv(5, "S. GRAVITY", "FAILED", true);
+  bool phOk = (incomingData.adsStatus == 1) || (incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f);
+  if (phOk) {
     sprintf(b, "%.2f pH", incomingData.phValue);
-    rv(6, b, false);
+    rv(6, "PH LEVEL", b, false);
   } else
-    rv(6, "FAILED", true);
+    rv(6, "PH LEVEL", "FAILED", true);
   if (hx711Status) {
     sprintf(b, "%.1f L", currentWeight);
-    rv(7, b, false);
+    rv(7, "EST. VOLUME", b, false);
   } else
-    rv(7, "FAILED", true);
+    rv(7, "EST. VOLUME", "FAILED", true);
   sprintf(b, "R:%d L:%d U:%d D:%d S:%d HX:%d", ljRight, ljLeft, ljUp, ljDown,
           ljSelect, (int)hx711Status);
-  rv(8, b, false);
-
-  tft.setTextPadding(0);
+  rv(8, "RAW DEBUG", b, false);
 }
 
 void drawMixerMenu() {
@@ -2967,7 +3001,7 @@ void drawPhFermMenu(bool valuesOnly) {
   }
 
   // pH panel (y=100, h=148): value fill 125px + status 22px
-  bool adsOk = (incomingData.adsStatus == 1);
+  bool adsOk = (incomingData.adsStatus == 1) || (incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f);
   uint16_t phBg = adsOk ? 0x2124 : 0x4208;
   tft.fillRect(11, 101, 298, 125, phBg);
   tft.setTextColor(TFT_WHITE, phBg);
