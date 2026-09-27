@@ -38,10 +38,11 @@ Use the PlatformIO CLI commands for building and uploading the primary firmware:
 # Flash code locally via USB (auto-detect port)
 ~/.platformio/penv/bin/pio run -t upload
 
-# Flash code locally over Wi-Fi (OTA)
+# Flash code locally over Wi-Fi (OTA via LAN IP or mDNS)
 ~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.1.137
+~/.platformio/penv/bin/pio run -t upload --upload-port winebrew-main.local
 
-# One-Click Autonomous OTA Flash from Beelink Server (pulls latest git, compiles, flashes)
+# One-Click Autonomous OTA Flash from Beelink Server (pulls latest git, compiles, flashes, verifies telemetry)
 flash-winebrew
 ```
 
@@ -499,8 +500,8 @@ Sensor calibration is handled over the board's inter-controller UART connection 
 *   **Duty Cap & Protection:** Maximum PWM duty cycle must be capped at 50% (`MAX_YEAST_MOTOR_DUTY = 128/255`) to limit peak output to ~6.0V.
 *   **PWM Mode:** 1 kHz frequency, Fast-Decay mode (`IN1=PWM, IN2=0`).
 *   **Calibration Formula & Empirical Constant:**
-    $$\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}} = 1764.0\text{ ms/g}$$
-    *   **Empirical Flow Rate:** $0.567\text{ g/s}$ ($\approx 1.764\text{ s/g}$, 21-trial linear fit with $R^2 = 0.98$).
+    $$\text{msPerGramYeast} = \frac{\text{testDurationMs}}{\text{weighedGrams}} = 1845.0\text{ ms/g}$$
+    *   **Empirical Flow Rate:** $0.542\text{ g/s}$ ($\approx 1.845\text{ s/g}$, 20 bench trials linear fit with $R^2 = 0.9966$).
 *   **System Check UI (Index 10: DISPENSER TEST):**
     *   **Tile 0 (Action)**: Start/Stop action card with live countdown (`%ds`) and real-time dispensed grams tracking (`LIVE: ~%.2fg / %.2fg` when running, `EST. YEAST: ~%.2f g` when stopped).
     *   **Tile 1 (Pulse Duration)**: Pulse duration setting (1s to 60s, UP/DOWN adjust in edit mode, recalculates target yield immediately).

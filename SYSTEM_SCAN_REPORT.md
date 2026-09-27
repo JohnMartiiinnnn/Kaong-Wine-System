@@ -1,10 +1,10 @@
 # Kaong Wine Brewing System: System Scan and Upgrade Report
 
-**Updated**: September 26, 2026  
-**Repository**: `/Users/gian/Coding/Kaong-Wine-System`  
-**Git Status**: Synchronized with `origin/main` (commits `1154165` and `a315381` merged)  
-**Compilation Status**:  
-* Primary Firmware (`src/`): PlatformIO `esp32dev`: **SUCCESS** (RAM: 17.3%, Flash: 54.0%)  
+**Updated**: September 27, 2026  
+**Repository**: `/home/dave/Projects/Kaong-Wine`  
+**Git Status**: Synchronized with `origin/main` (latest commit `c10283f` flashed and verified via OTA)  
+**Compilation & OTA Deployment Status**:  
+* Primary Firmware (`src/`): PlatformIO `esp32dev`: **SUCCESS** (RAM: 17.3%, Flash: 54.3%) — **OTA Deployed to `192.168.1.137` / `winebrew-main.local`**  
 * Secondary Firmware (`Secondary_Transmitter/`): PlatformIO `esp32dev` & `calibration`: **SUCCESS** (RAM: 6.7%, Flash: 22.5%)
 
 ---
@@ -143,7 +143,14 @@ Automated liquid transfers between chambers (Pre-Heat -> Fermentation and Fermen
 ## 6. Implementation Status Checklist
 
 * **Liquid Transfer Drain-to-Empty Protocol**: COMPLETED and VERIFIED.
+* **15s Calibrated Drain Settle Window (`TRANSFER_DRAIN_SETTLE_MS = 15000UL`)**: COMPLETED and VERIFIED.
 * **SD Card Hardware Format Specification**: COMPLETED (FAT32, MBR partition table, 32KB cluster).
+* **Multi-AP Wi-Fi Failover (`WiFiMulti` + Hotspot Fallback)**: COMPLETED and VERIFIED.
+* **15-Second Background Wi-Fi Auto-Reconnect**: COMPLETED and VERIFIED.
+* **Yeast Dispenser Delivery Rate Calibration (1,845 ms/g)**: COMPLETED and VERIFIED.
+* **DS18B20 3-Cycle Glitch Debounce & Last-Valid Caching**: COMPLETED and VERIFIED.
+* **1-Wire Dedicated Pin Separation (GPIO 26 & GPIO 33)**: COMPLETED and VERIFIED.
+* **Autonomous Wi-Fi OTA Deployment via Beelink**: COMPLETED and VERIFIED (Flashed & telemetry verified).
 * **Bypass Scale Auto-Tare on Active Brew Reboot**: PENDING APPROVAL.
 * **Guard Return Confirmation Modal Repaint Race**: PENDING APPROVAL.
 * **Low-Volume Locked Heater Status Banner**: PENDING APPROVAL.
@@ -151,4 +158,3 @@ Automated liquid transfers between chambers (Pre-Heat -> Fermentation and Fermen
 * **UI Spatial Bounds and Navigation Alignment**: PENDING APPROVAL.
 * **Soft-AP Web Monitor Telemetry Parity**: PENDING APPROVAL.
 * **SD Card CSV Log Buffer snprintf Safety**: PENDING APPROVAL.
-* **1-Wire Dedicated Pin Separation (GPIO 26 & GPIO 33)**: COMPLETED and VERIFIED.

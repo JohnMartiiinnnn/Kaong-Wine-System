@@ -23,7 +23,12 @@ Production and thesis repository for the automated, sensor-monitored Kaong (Suga
 
 ### Primary ESP32 (Wireless OTA)
 ```bash
+# Automated one-click OTA deployment from Beelink (pulls git, compiles, flashes, verifies telemetry)
+flash-winebrew
+
+# Direct PlatformIO OTA via LAN IP or mDNS
 ~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.1.137
+~/.platformio/penv/bin/pio run -t upload --upload-port winebrew-main.local
 ```
 
 ### Primary ESP32 (USB Auto-Detect)
@@ -39,4 +44,6 @@ Production and thesis repository for the automated, sensor-monitored Kaong (Suga
 ### Live Telemetry (CLI)
 ```bash
 curl -s http://192.168.1.137/data
+curl -s http://winebrew-main.local/data
 ```
+

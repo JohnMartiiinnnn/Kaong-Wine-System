@@ -671,11 +671,27 @@ Logging requires both the RTC and SD card to be working. If either fails, loggin
 
 In addition to onboard SD card logging, the system supports autonomous continuous logging over the local Wi-Fi network to the dedicated 24/7 Beelink Mini PC server.
 
+### Network Architecture & Multi-AP Hotspot Fallback
+Both Primary and Secondary microcontrollers operate in dual station / access point mode (`WIFI_AP_STA`) with autonomous multi-network failover via `WiFiMulti`:
+* **Multi-AP STA Priorities**:
+  1. `Living-Room-WiFi` (WPA2: `BulasoFam27&`) — Primary LAN router connection (`192.168.1.137`).
+  2. `Infinix Hot 60 Pro` (WPA2: `aaaaaaaa`) — Seamless mobile hotspot fallback for laboratory, outdoor, or remote deployments.
+* **Background Auto-Reconnect**:
+  * Main event loop checks `WiFi.status()` every 15 seconds (`millis() - lastWifiCheckMs >= 15000UL`).
+  * If disconnected, automatically runs `wifiMulti.run(1500)` to scan and attach to the strongest configured AP without blocking actuator control loops.
+* **Soft-AP Emergency Recovery**:
+  * Primary broadcasts `WineBrew_System` (WPA2: `12345678`) at static IP `192.168.4.1`.
+  * Secondary broadcasts `Secondary uController` (Open) at static IP `192.168.4.1`.
+  * Allows direct field diagnostics, calibration, and OTA recovery if neither router nor hotspot is available.
+* **mDNS Hostname Resolution**:
+  * Primary: `winebrew-main.local` (Port 80 HTTP, Port 3232 ArduinoOTA).
+  * Secondary: `winebrew-secondary.local`.
+
 ### Beelink 24/7 Background Telemetry Service
 * **Service Name**: `winebrew-logger.service` (systemd user daemon on Beelink)
 * **Log Location**: `/home/dave/winebrew-logs/brew_wifi_YYYYMMDD_HHMMSS.csv`
 * **Auto-Batch Rotation & Resumption**: Automatically rotates into a new CSV file on new batch transitions from IDLE, while seamlessly resuming the ongoing batch log across service restarts/reboots to prevent batch fragmentation.
-* **Polling Interval**: Every 5 seconds via `http://192.168.1.137/data`
+* **Polling Interval**: Every 5 seconds via `http://192.168.1.137/data` or `http://winebrew-main.local/data`
 * **Logged Telemetry Structure**: 36 columns partitioned into 3 distinct sections separated by empty divider spacer columns:
   1. *Live Sensor Telemetry* (Columns A to R): Timestamps, active stage, chamber volumes, dynamic flow transfer tallies, liquid/ambient temperatures, pH, specific gravity, estimated ABV, and active closed-loop target temperature.
   2. *Divider Column* (Column S): 28px empty spacer separating sensor data from setpoints.
@@ -700,9 +716,12 @@ Firmware updates can be compiled and flashed directly from the Beelink server ov
 * **Workflow**:
   1. Pulls the latest commits from GitHub main branch.
   2. Compiles the firmware locally using cached PlatformIO libraries in under 5 seconds.
-  3. Deploys over ArduinoOTA port 3232 to `192.168.1.137`.
+  3. Deploys over ArduinoOTA port 3232 to target IP (`192.168.1.137` or `winebrew-main.local`).
   4. Automatically pings `/data` after reboot to verify operational health.
-* **Command**: Run `flash-winebrew` from any shell on the Beelink server.
+* **Execution**:
+  * Default LAN deployment: `flash-winebrew`
+  * Custom target IP / Hotspot: `flash-winebrew <TARGET_IP>`
+  * Direct PlatformIO CLI: `~/.platformio/penv/bin/pio run -t upload --upload-port winebrew-main.local`
 
 ---
 
