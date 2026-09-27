@@ -6,7 +6,7 @@
   * **Role**: Orchestrates UI, thermal profiles, SSR heater PWM, relay manifolds, flow tracking, load cell measurement, SD logging, and Wi-Fi AP / STA web server.
   * **Location**: `src/`
   * **Platform**: ESP32 DevKit v1 (4MB Flash, `min_spiffs.csv` dual-OTA partition)
-  * **Network**: Soft-AP `WineBrew_System` (192.168.4.1), STA `Living-Room-WiFi` (`192.168.1.137`, mDNS `winebrew-main.local`)
+  * **Network**: Multi-AP STA via WiFiMulti (`Living-Room-WiFi` + `Infinix Hot 60 Pro` hotspot fallback `aaaaaaaa`, mDNS `winebrew-main.local`) + Soft-AP `WineBrew_System` (`192.168.4.1`)
   * **Status**: Active (OTA Enabled on port 3232)
   * **Documentation**: [SYSTEM_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/SYSTEM_GUIDE.md)
 
@@ -14,7 +14,7 @@
   * **Role**: Fermentation chamber node managing DS18B20 liquid probe, BME280 ambient environment, ADS1115 pH probe, BLE hydrometer telemetry, BTS7960 mixing impeller, and DRV8871 automated yeast dispenser.
   * **Location**: `Secondary_Transmitter/`
   * **Platform**: ESP32 DevKit v1 / ESP32-C3
-  * **Network**: Serial2 UART (115200 baud, 8N1) linked to Primary + fallback AP / STA (`winebrew-secondary.local`)
+  * **Network**: Serial2 UART (115200 baud, 8N1) linked to Primary + Multi-AP STA (`Living-Room-WiFi`, `Ejerciatdo Residence`, and `Infinix Hot 60 Pro` fallback `aaaaaaaa`, mDNS `winebrew-secondary.local`) + Soft-AP `Secondary uController` (Open, `192.168.4.1`)
   * **Status**: Active
   * **Documentation**: [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md)
 
