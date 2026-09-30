@@ -733,6 +733,7 @@ void setup() {
   WiFi.softAP("WineBrew_System", "12345678");
   wifiMulti.addAP("Living-Room-WiFi", "BulasoFam27&");
   wifiMulti.addAP("Infinix Hot 60 Pro", "aaaaaaaa");
+  wifiMulti.addAP("CvSU-ICT-WiFi", "#cvsuictfreewifi");
   wifiMulti.run(5000);
 
   if (MDNS.begin("winebrew"))

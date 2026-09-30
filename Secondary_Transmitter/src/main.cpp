@@ -193,6 +193,12 @@ void setup() {
       while (WiFi.status() != WL_CONNECTED && millis() - t < 4000)
         delay(100);
     }
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin("CvSU-ICT-WiFi", "#cvsuictfreewifi");
+      t = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - t < 4000)
+        delay(100);
+    }
   }
   ArduinoOTA.onStart([]() {
     if (pBLEScan) {
