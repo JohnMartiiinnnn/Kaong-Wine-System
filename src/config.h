@@ -448,6 +448,9 @@ extern float    transferVolumeTransferred;
 extern float    transfer1Volume;
 extern float    transfer2Volume;
 extern bool     transferDryRunAlarm;
+extern bool     transferErrorActive;
+extern bool     preHeatCompleted;
+extern bool     fermCompleted;
 const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
 const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 15000;  // 15s of sub-threshold flow (< 0.05L delta) confirms chamber is completely drained during bulk transfer
 const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 15000;  // 15s of sub-threshold flow confirms chamber drained once bulk target volume reached
@@ -485,9 +488,12 @@ float getFermTemp();
 
 // ---- Motor & Yeast Dispenser Command Sender ----
 void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd = 0, uint32_t yeastVal = 0);
+void setMixerSpeed(int percent);
 
 // ---- Liquid Transfer Helper ----
 void startLiquidTransfer(int targetStage);
+void completeLiquidTransfer(float finalVol);
+void acknowledgeAndAdvanceTransfer();
 
 // ---- Brew State NVS Persistence ----
 void saveBrewStateToNVS();

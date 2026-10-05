@@ -205,10 +205,15 @@ void updateDashboardValues() {
 
     // Est. Vol. Tile (x=5, y=176, w=152, h=45)
     tft.fillRect(7, 191, 148, 28, bgCard);
-    float preheatVol = (stageTransferring && stageTransferTarget == 1)
-                           ? (hx711Status ? currentWeight : max(0.0f, transferStartWeight - transferVolumeTransferred))
-                           : (hx711Status ? currentWeight : chamberVolume[0]);
-    String volStr0 = (preheatVol > 0.05f) ? String(preheatVol, 1) + " L" : ((activeBrewStage > 0) ? "0.0 L" : "-- L");
+    float preheatVol = 0.0f;
+    if (preHeatCompleted) {
+      preheatVol = 0.0f;
+    } else if (stageTransferring && stageTransferTarget == 1) {
+      preheatVol = (hx711Status ? currentWeight : max(0.0f, transferStartWeight - transferVolumeTransferred));
+    } else {
+      preheatVol = (hx711Status ? currentWeight : chamberVolume[0]);
+    }
+    String volStr0 = (preHeatCompleted) ? "0.0 L" : ((preheatVol > 0.05f) ? String(preheatVol, 1) + " L" : ((activeBrewStage > 0) ? "0.0 L" : "-- L"));
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(volStr0, 81, 193, 4);
 
@@ -218,8 +223,8 @@ void updateDashboardValues() {
     float curT = liquid2Status ? getPreheatTemp() : 0.0f;
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
-    if (stageTransferring && activeBrewStage == 0) {
-      if (transferDryRunAlarm) {
+    if (stageTransferring && stageTransferTarget == 1) {
+      if (transferDryRunAlarm || transferErrorActive) {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
       } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
@@ -229,10 +234,14 @@ void updateDashboardValues() {
         sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
         tft.drawCentreString(drainBuf, 239, 190, 2);
       } else {
-        tft.drawCentreString("TRANSFERRING", 239, 190, 2);
+        tft.drawCentreString("DRAINING", 239, 190, 2);
       }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
+
+    } else if (preHeatCompleted) {
+      tft.drawCentreString("COMPLETE", 239, 190, 2);
+      tft.drawCentreString("TRANSFERRED", 239, 206, 1);
 
     } else if (preHeatSterilized && isFanOn) {
       tft.drawCentreString("COOLING", 239, 190, 2);
@@ -269,7 +278,9 @@ void updateDashboardValues() {
     // Est. Vol. Tile (x=5, y=171, w=152, h=40)
     tft.fillRect(7, 185, 148, 24, bgCard);
     float fermVol = 0.0f;
-    if (stageTransferring && stageTransferTarget == 1) {
+    if (fermCompleted) {
+      fermVol = 0.0f;
+    } else if (stageTransferring && stageTransferTarget == 1) {
       fermVol = transferVolumeTransferred;
     } else if (stageTransferring && stageTransferTarget == 2) {
       float baseVol = (chamberVolume[1] > 0.0f) ? chamberVolume[1] : transferTargetVolume;
@@ -279,9 +290,9 @@ void updateDashboardValues() {
     } else if (activeBrewStage > 1) {
       fermVol = 0.0f;
     }
-    String volStr1 = (fermVol > 0.05f || (stageTransferring && stageTransferTarget == 1))
+    String volStr1 = (fermCompleted) ? "0.0 L" : ((fermVol > 0.05f || (stageTransferring && stageTransferTarget == 1))
                          ? String(fermVol, 1) + " L"
-                         : ((activeBrewStage > 1) ? "0.0 L" : "-- L");
+                         : ((activeBrewStage > 1) ? "0.0 L" : "-- L"));
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawCentreString(volStr1, 81, 186, 4);
 
@@ -309,8 +320,17 @@ void updateDashboardValues() {
     tft.setTextColor(TFT_BLACK, bgCard);
     float fermT = (incomingData.ds18Status == 1) ? getFermTemp() : 0.0f;
 
-    if (stageTransferring && activeBrewStage == 1) {
-      if (transferDryRunAlarm) {
+    if (stageTransferring && stageTransferTarget == 1) {
+      if (transferDryRunAlarm || transferErrorActive) {
+        tft.drawCentreString("DRY ALARM", 239, 228, 2);
+      } else {
+        tft.drawCentreString("RECEIVING", 239, 228, 2);
+      }
+      sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
+      tft.drawCentreString(subBuf, 239, 243, 1);
+
+    } else if (stageTransferring && stageTransferTarget == 2) {
+      if (transferDryRunAlarm || transferErrorActive) {
         tft.drawCentreString("DRY ALARM", 239, 228, 2);
       } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
         uint32_t idle = millis() - transferLastPulseMs;
@@ -320,10 +340,14 @@ void updateDashboardValues() {
         sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
         tft.drawCentreString(drainBuf, 239, 228, 2);
       } else {
-        tft.drawCentreString("TRANSFERRING", 239, 228, 2);
+        tft.drawCentreString("DRAINING", 239, 228, 2);
       }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 243, 1);
+
+    } else if (fermCompleted) {
+      tft.drawCentreString("COMPLETE", 239, 228, 2);
+      tft.drawCentreString("TRANSFERRED", 239, 243, 1);
 
     } else if (isYeastDispensingActive) {
       tft.drawCentreString("DISPENSING", 239, 228, 2);
@@ -377,18 +401,11 @@ void updateDashboardValues() {
     float curT = liquid1Status ? getPastTemp() : 0.0f;
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
-    if (stageTransferring && activeBrewStage == 2) {
-      if (transferDryRunAlarm) {
+    if (stageTransferring && stageTransferTarget == 2) {
+      if (transferDryRunAlarm || transferErrorActive) {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
-      } else if (millis() - transferLastPulseMs >= 3000UL && transferVolumeTransferred >= 0.5f) {
-        uint32_t idle = millis() - transferLastPulseMs;
-        uint32_t activeTimeout = (transferVolumeTransferred >= transferTargetVolume * 0.90f) ? TRANSFER_DRAIN_SETTLE_MS : TRANSFER_DRAIN_TIMEOUT_MS;
-        uint32_t remSec = (idle < activeTimeout) ? ((activeTimeout - idle) / 1000UL) : 0;
-        char drainBuf[32];
-        sprintf(drainBuf, "DRAINING (%lus)", (unsigned long)remSec);
-        tft.drawCentreString(drainBuf, 239, 190, 2);
       } else {
-        tft.drawCentreString("TRANSFERRING", 239, 190, 2);
+        tft.drawCentreString("RECEIVING", 239, 190, 2);
       }
       sprintf(subBuf, "%.1fL / %.1fL", transferVolumeTransferred, transferTargetVolume);
       tft.drawCentreString(subBuf, 239, 206, 1);
@@ -526,7 +543,13 @@ void drawDashboardLayout() {
     tft.fillRect(0, 444, 320, 36, TFT_WHITE);
     tft.drawFastHLine(0, 444, 320, TFT_DARKGREY);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    tft.drawCentreString("RIGHT: NEXT PHASE   DOWN: SELECT GRAPH   ENTER: MENU", CENTER_X, 458, 1);
+    if (transferDryRunAlarm || transferErrorActive) {
+      tft.drawCentreString("XFER ALARM   ENTER: ADVANCE   UP: RETRY", CENTER_X, 458, 1);
+    } else if (stageTransferring) {
+      tft.drawCentreString("XFER ACTIVE   ENTER: FORCE ADVANCE", CENTER_X, 458, 1);
+    } else {
+      tft.drawCentreString("RIGHT: NEXT PHASE   DOWN: SELECT GRAPH   ENTER: MENU", CENTER_X, 458, 1);
+    }
   }
 }
 
@@ -559,13 +582,13 @@ void updateDashboardTimers() {
   if (stageTransferring) {
     char cbuf[16];
     sprintf(cbuf, "%.1f L", transferVolumeTransferred);
-    tft.setTextColor(transferDryRunAlarm ? TFT_RED : TFT_NAVY, TFT_WHITE);
+    tft.setTextColor((transferDryRunAlarm || transferErrorActive) ? TFT_RED : TFT_NAVY, TFT_WHITE);
     tft.setTextPadding(180);
     tft.drawCentreString(cbuf, CENTER_X, 360, 6);
     char pctBuf[32];
     int pct = (transferTargetVolume > 0.0f) ? (int)((transferVolumeTransferred / transferTargetVolume) * 100.0f) : 0;
     if (pct > 100) pct = 100;
-    sprintf(pctBuf, "%s%d%% (TGT %.1fL)", transferDryRunAlarm ? "DRY! " : "", pct, transferTargetVolume);
+    sprintf(pctBuf, "%s%d%% (TGT %.1fL)", (transferDryRunAlarm || transferErrorActive) ? "DRY! " : "", pct, transferTargetVolume);
     tft.drawCentreString(pctBuf, CENTER_X, 415, 2);
     tft.setTextPadding(0);
   }
