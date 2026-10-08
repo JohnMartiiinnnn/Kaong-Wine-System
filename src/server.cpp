@@ -103,15 +103,15 @@ void handleData() {
   json += "\"ll\":" + String(liquid2Status ? getPreheatTemp() : 0.0f, 1) + ",";
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
-  json += "\"ph\":" + String(incomingData.phValue) + ",";
+  json += "\"ph\":" + String(incomingData.phValue, 2) + ",";
   json += "\"ads\":" + String((int)incomingData.adsStatus) + ",";
-  json += "\"sg\":" + String(incomingData.pillGravity) + ",";
+  json += "\"sg\":" + String(incomingData.pillGravity, 4) + ",";
   json += "\"bat\":" + String(incomingData.pillBattery) + ",";
   json += "\"rssi\":" + String(incomingData.pillRSSI) + ",";
   json += "\"pt\":" + String(incomingData.pillTemp, 1) + ",";
   float abv = (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0)
               ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
-  json += "\"abv\":" + String(abv) + ",";
+  json += "\"abv\":" + String(abv, 2) + ",";
   json += "\"mv\":" + String(incomingData.motorSenseVolts, 3) + ",";
   json += "\"msp\":" + String(mixerSpeedPercent) + ",";
   json += "\"mto\":" + String(motorTestOn ? 1 : 0) + ",";
