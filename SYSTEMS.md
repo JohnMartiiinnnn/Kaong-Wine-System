@@ -22,7 +22,6 @@
   * **Role**: Floating BLE beacon broadcasting specific gravity, temperature, and RSSI every 15 to 60 seconds.
   * **Interface**: Bluetooth Low Energy (NimBLE beacon decoder on Secondary ESP32)
   * **Telemetry**: Specific gravity range 0.980 to 1.150, real-time ABV calculation.
-  * **Temperature Calibration**: Calibrated using Thermco Products Correction Table for 60°F / 15.56°C Hydrometers. Baseline offset is +0.0029 at 30.0 C fermentation target temperature, dynamically adjusted based on live fermentation liquid temperature probe.
 
 ---
 

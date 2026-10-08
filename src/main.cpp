@@ -2675,11 +2675,7 @@ void loop() {
     if (t.signature == 0xDEADBEEF && calc_cs == t.checksum) {
       incomingData = t;
       uartPacketCount++;
-      if (incomingData.pillGravity > 0.1f) {
-        float fTemp = getFermTemp();
-        float tempForCorr = (fTemp > -50.0f && fTemp < 100.0f) ? fTemp : stageTargetTemp[1];
-        incomingData.pillGravity += getHydrometerTempOffset(incomingData.pillGravity, tempForCorr);
-      }
+      incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
       // Maintain continuous motor heartbeat to Secondary ESP32 based on active state
@@ -3877,26 +3873,4 @@ float getFermTemp() {
   if (t < -100.0f)
     return t;
   return t + fermTempOffset;
-}
-
-// Temperature correction for specific gravity hydrometer calibrated at 60°F / 15.56°C
-// Reference: Thermco Products, Inc. "Correction Table for Specific Gravity Hydrometers 60°F/60°F (15.56°C/15.56°C)"
-float getHydrometerTempOffset(float sg, float tempC) {
-  if (tempC <= 15.56f)
-    return 0.0f;
-  if (tempC < 18.0f || tempC > 50.0f)
-    return GRAVITY_OFFSET;
-
-  // Linear interpolation based on Thermco Products Correction Table (60°F / 15.56°C Reference):
-  // 20°C: +0.0007, 25°C: +0.0018, 30°C: +0.0029, 35°C: +0.0040 (+0.00022/°C)
-  float offset;
-  if (tempC < 25.0f) {
-    offset = 0.0007f + (tempC - 20.0f) * 0.00022f;
-  } else {
-    offset = 0.0018f + (tempC - 25.0f) * 0.00022f;
-  }
-  if (sg > 1.05f) {
-    offset += 0.0001f;
-  }
-  return offset;
 }
