@@ -176,11 +176,17 @@ void setup() {
   }
 
   // 5. WiFi + OTA
-  WiFi.begin("Living-Room-WiFi", "BulasoFam27&");
+  WiFi.begin("Bedroom Deco", "AcDbFeJPaSs14&");
   {
     uint32_t t = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t < 5000)
       delay(100);
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin("Living-Room-WiFi", "BulasoFam27&");
+      t = millis();
+      while (WiFi.status() != WL_CONNECTED && millis() - t < 5000)
+        delay(100);
+    }
     if (WiFi.status() != WL_CONNECTED) {
       WiFi.begin("Ejerciatdo Residence", "Ejercitado05");
       t = millis();

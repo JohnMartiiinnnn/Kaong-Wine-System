@@ -875,6 +875,7 @@ void setup() {
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("WineBrew_System", "12345678");
+  wifiMulti.addAP("Bedroom Deco", "AcDbFeJPaSs14&");
   wifiMulti.addAP("Living-Room-WiFi", "BulasoFam27&");
   wifiMulti.addAP("Infinix Hot 60 Pro", "aaaaaaaa");
   wifiMulti.addAP("CvSU-ICT-WiFi", "#cvsuictfreewifi");
