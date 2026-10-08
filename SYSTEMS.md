@@ -197,3 +197,11 @@ PlatformIO CLI commands for building and uploading firmware:
 * **Load Cell (HX711)**: Tare and calibration coefficient stored in NVS. Available in `SYSTEM CHECK` item 10 or `SETTINGS`.
 * **Flow Sensors (YF-S201 / YF-B series)**: Pulses per liter calibration stored in EEPROM/NVS.
 * **Yeast Dispenser (DRV8871)**: Milliseconds per gram delivery curve configured via `msPerGramYeast`. See [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md).
+* **RAPT Pill Digital Hydrometer**: Factory tilt polynomial with baseline offset `GRAVITY_OFFSET = 0.0` in `src/config.h`. Real-time ABV formula: $\text{ABV} = (\text{OG} - \text{Current SG}) \times 131.25$.
+
+---
+
+## 8. Cloud Documentation & Testing Suite Links
+
+* **Unit Testing Results Summary (Google Docs)**: [Document ID: 1TdKe0Ygd1bP5T2hY_mMDWM0W08jVHOgA0ob_WVM859s](https://docs.google.com/document/d/1TdKe0Ygd1bP5T2hY_mMDWM0W08jVHOgA0ob_WVM859s/edit) — Complete Tables 1–14 covering thermal PID, load cells, pH buffers, RAPT Pill hydrometer, motors, and power supplies.
+* **Master Testing Drive & Media Appendix (Google Drive)**: [Folder ID: 1gLMDlSQZZn5nWdEj_Dr1nRaH9bT77idU](https://drive.google.com/drive/folders/1gLMDlSQZZn5nWdEj_Dr1nRaH9bT77idU) (`TISIS TESTING`) — Complete 28-folder structured repository across Unit, Integration, System, and Stakeholder Evaluation phases.
