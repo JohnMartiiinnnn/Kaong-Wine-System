@@ -48,7 +48,10 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
-#define GRAVITY_OFFSET 0.0
+
+// ---- Specific Gravity Temperature Correction (Thermco Products Table, 60°F/15.56°C Reference) ----
+// Nominal fermentation liquid setpoint is 30.0°C (SG ~1.000 to 1.020). Table value is +2.9 -> +0.0029
+#define GRAVITY_OFFSET 0.0029f
 
 // ---- DRV8871 Yeast Dispenser Pinout & Calibration Parameters ----
 const int DRV8871_IN1_PIN_CFG = 5; // DRV8871 IN1 -> ESP32-C3 GPIO 5 (D5)
@@ -485,6 +488,7 @@ extern uint32_t tareSuccessMillis;
 float getPreheatTemp();
 float getPastTemp();
 float getFermTemp();
+float getHydrometerTempOffset(float sg, float tempC);
 
 // ---- Motor & Yeast Dispenser Command Sender ----
 void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd = 0, uint32_t yeastVal = 0);
