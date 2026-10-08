@@ -48,7 +48,7 @@ const int BTN_SELECT_PIN = 4;    // GPA4
 
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
-#define GRAVITY_OFFSET 0.009
+#define GRAVITY_OFFSET 0.0
 
 // ---- DRV8871 Yeast Dispenser Pinout & Calibration Parameters ----
 const int DRV8871_IN1_PIN_CFG = 5; // DRV8871 IN1 -> ESP32-C3 GPIO 5 (D5)
