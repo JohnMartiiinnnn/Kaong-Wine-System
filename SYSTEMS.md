@@ -6,8 +6,8 @@
   * **Role**: Orchestrates UI, thermal profiles, SSR heater PWM, relay manifolds, flow tracking, load cell measurement, SD logging, and Wi-Fi AP / STA web server.
   * **Location**: `src/`
   * **Platform**: ESP32 DevKit v1 (4MB Flash, `min_spiffs.csv` dual-OTA partition)
-  * **Network**: Multi-AP STA via WiFiMulti (`Living-Room-WiFi` + `Infinix Hot 60 Pro` hotspot fallback `aaaaaaaa`, mDNS `winebrew-main.local`) + Soft-AP `WineBrew_System` (`192.168.4.1`)
-  * **Status**: Active (OTA Enabled on port 3232)
+  * **Network**: Multi-AP STA via WiFiMulti (`Bedroom Deco` + `Living-Room-WiFi` + `Infinix Hot 60 Pro` hotspot fallback `aaaaaaaa` + `CvSU-ICT-WiFi`, mDNS `winebrew-main.local`) + Soft-AP `WineBrew_System` (`192.168.4.1`)
+  * **Status**: Active & Verified (OTA Deployed at `192.168.1.137` on port 3232, HTTP WebServer active on port 80)
   * **Documentation**: [SYSTEM_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/SYSTEM_GUIDE.md)
 
 * **Secondary Controller (Remote Sensor & Actuator Node)**

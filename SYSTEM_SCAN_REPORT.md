@@ -1,11 +1,11 @@
 # Kaong Wine Brewing System: System Scan and Upgrade Report
 
-**Updated**: September 27, 2026  
+**Updated**: October 8, 2026  
 **Repository**: `/home/dave/Projects/Kaong-Wine`  
-**Git Status**: Synchronized with `origin/main` (latest commit `c10283f` flashed and verified via OTA)  
+**Git Status**: Synchronized with `origin/main` (latest commit `33a4739` flashed and verified via OTA)  
 **Compilation & OTA Deployment Status**:  
-* Primary Firmware (`src/`): PlatformIO `esp32dev`: **SUCCESS** (RAM: 17.3%, Flash: 54.3%) — **OTA Deployed to `192.168.1.137` / `winebrew-main.local`**  
-* Secondary Firmware (`Secondary_Transmitter/`): PlatformIO `esp32dev` & `calibration`: **SUCCESS** (RAM: 6.7%, Flash: 22.5%)
+* Primary Firmware (`src/`): PlatformIO `esp32dev`: **SUCCESS** (RAM: 17.3%, Flash: 54.3%) — **OTA Deployed to `192.168.1.137` / `winebrew-main.local` in 21.73s**  
+* Secondary Firmware (`Secondary_Transmitter/`): PlatformIO `esp32dev` & `calibration`: **SUCCESS** (RAM: 18.2%, Flash: 58.4%)
 
 ---
 
