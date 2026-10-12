@@ -767,9 +767,9 @@ void drawSystemCheckMenu() {
   const char *options[] = {
       "FAN TEST",       "LIGHT INDICATORS", "RELAY TEST",     "MOTOR TEST",
       "PID CONTROL",    "SD CARD VERIFY",   "UART MONITOR",   "TRANSFER TEST",
-      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "PH AUTO-CUTOFF"};
+      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST"};
 
-  const int TOTAL_OPTS = 12;
+  const int TOTAL_OPTS = 11;
   const int VISIBLE_ITEMS = 11;
   int topIndex = 0;
   if (systemCheckSelection >= VISIBLE_ITEMS) {
@@ -3424,108 +3424,4 @@ void drawPidConfigMenu() {
 
 
 
-// ==========================================
-// THESIS CHAPTER 4: pH-TRIGGERED PASTEURIZATION AUTO-CUTOFF (TEST 16 / TABLE 22)
-// ==========================================
 
-void drawPhCutoffTestMenu(bool valuesOnly) {
-  char buf[48];
-  float curPH = (incomingData.adsStatus == 1) ? incomingData.phValue : 7.00f;
-  bool xferActive = stageTransferring && (stageTransferTarget == 2);
-  bool pumpActive = sysPump2Active || pumpFermPastOn;
-
-  if (valuesOnly) {
-    tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.setTextPadding(120);
-
-    // Live pH reading
-    sprintf(buf, "%.2f", curPH);
-    tft.drawCentreString(buf, 82, 105, 4);
-
-    // Transfer Pump state
-    tft.drawCentreString(pumpActive ? "PUMPING" : "IDLE", 237, 105, 4);
-
-    // Flow volume evacuated
-    sprintf(buf, "%.2f L", transferVolumeTransferred);
-    tft.drawCentreString(buf, 82, 200, 4);
-
-    // Scanner / Transfer State
-    if (xferActive) {
-      tft.drawCentreString("DRAINING...", 237, 200, 4);
-    } else if (phCutoffRunning) {
-      tft.drawCentreString("SCANNING", 237, 200, 4);
-    } else {
-      tft.drawCentreString("STANDBY", 237, 200, 4);
-    }
-    tft.setTextPadding(0);
-    return;
-  }
-
-  // Full Screen Redraw
-  tft.fillRect(0, 0, 320, 50, 0x03E0);
-  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-  tft.setTextColor(TFT_WHITE);
-  tft.drawString("pH AUTO-TRANSFER TEST", 10, 15, 3);
-
-  // Top Tile 1: Live In-Line pH
-  tft.fillRect(10, 60, 145, 75, 0xD6BA);
-  tft.drawRect(10, 60, 145, 75, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("LIVE pH PROBE", 82, 70, 2);
-  sprintf(buf, "%.2f", curPH);
-  tft.drawCentreString(buf, 82, 100, 4);
-
-  // Top Tile 2: Transfer Pump 2
-  tft.fillRect(165, 60, 145, 75, 0xD6BA);
-  tft.drawRect(165, 60, 145, 75, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("TRANSFER PUMP", 237, 70, 2);
-  tft.drawCentreString(pumpActive ? "PUMPING" : "IDLE", 237, 100, 4);
-
-  // Mid Tile 1: Evacuated Volume
-  tft.fillRect(10, 150, 145, 75, 0xD6BA);
-  tft.drawRect(10, 150, 145, 75, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("TRANSFERRED", 82, 160, 2);
-  sprintf(buf, "%.2f L", transferVolumeTransferred);
-  tft.drawCentreString(buf, 82, 190, 4);
-
-  // Mid Tile 2: Scanner Status
-  tft.fillRect(165, 150, 145, 75, 0xD6BA);
-  tft.drawRect(165, 150, 145, 75, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("SCANNER STATE", 237, 160, 2);
-  if (xferActive) {
-    tft.drawCentreString("DRAINING...", 237, 190, 4);
-  } else if (phCutoffRunning) {
-    tft.drawCentreString("SCANNING", 237, 190, 4);
-  } else {
-    tft.drawCentreString("STANDBY", 237, 190, 4);
-  }
-
-  // Info Banner
-  tft.fillRect(10, 240, 300, 60, 0x3566);
-  tft.drawRect(10, 240, 300, 60, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, 0x3566);
-  tft.drawCentreString("TRIGGER: SUBMERGE PROBE IN pH <= 3.00", CENTER_X, 250, 1);
-  tft.drawCentreString("PUMP AUTOMATICALLY EMPTIES CHAMBER 2", CENTER_X, 275, 1);
-
-  // Action Button
-  uint16_t btnBg = xferActive ? 0x0400 : (phCutoffRunning ? 0xFD20 : 0x0284C7);
-  tft.fillRect(10, 315, 300, 60, btnBg);
-  tft.drawRect(10, 315, 300, 60, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, btnBg);
-  if (xferActive) {
-    tft.drawCentreString("PUMPING UNTIL EMPTY...", CENTER_X, 335, 2);
-  } else if (phCutoffRunning) {
-    tft.drawCentreString("SCANNING... DIP PROBE IN pH <= 3.00", CENTER_X, 335, 1);
-  } else {
-    tft.drawCentreString("PRESS SELECT TO ARM SCANNER", CENTER_X, 335, 2);
-  }
-
-  // Footer
-  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT: ARM / STOP   RETURN: BACK", CENTER_X, 458, 1);
-  phCutoffNeedsFullRedraw = false;
-}

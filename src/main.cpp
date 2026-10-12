@@ -167,10 +167,6 @@ float dispenserCalWeighedGrams = 2.83f;
 bool dispenserCalSaved = false;
 uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
-// Thesis Chapter 4 System Check Test States
-bool phCutoffNeedsFullRedraw = true;
-bool phCutoffRunning = false;
-int  phCutoffDisplayTrial = 0;
 
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -1176,7 +1172,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 12;
+      systemCheckSelection = (systemCheckSelection + 1) % 11;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1354,7 +1350,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 11) % 12;
+      systemCheckSelection = (systemCheckSelection + 10) % 11;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1700,12 +1696,6 @@ void loop() {
         dispenserTestStartMs = 0;
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
-      } else if (systemCheckSelection == 11) {
-        phCutoffNeedsFullRedraw = true;
-        phCutoffRunning = false;
-        phCutoffDisplayTrial = 0;
-        currentAppState = PH_CUTOFF_TEST_MENU;
-        drawPhCutoffTestMenu();
       }
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 0) {
@@ -2378,30 +2368,6 @@ void loop() {
         }
       }
     } else if (currentAppState == RAPT_TEST_MENU) {
-      currentAppState = SYSTEM_CHECK_MENU;
-      systemCheckNeedsFullRedraw = true;
-      drawSystemCheckMenu();
-    } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
-      // Toggle scanning state
-      phCutoffRunning = !phCutoffRunning;
-      if (phCutoffRunning) {
-        // Arm live monitoring: ensure mixer/heater idle until cutoff event
-        currentHeatingPercent = 0;
-        digitalWrite(SSR_FERM, LOW);
-        setMixerSpeed(0);
-      } else {
-        // Stop scanning and ensure transfer pump is off
-        setPump2(false);
-        pumpFermPastOn = false;
-        stageTransferring = false;
-      }
-      drawPhCutoffTestMenu();
-    } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
-      phCutoffRunning = false;
-      setMixerSpeed(0);
-      setPump2(false);
-      digitalWrite(SSR_FERM, LOW);
-      digitalWrite(SSR_PAST, LOW);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -3807,29 +3773,6 @@ void loop() {
 
     if (currentAppState == PH_FERM_MENU)
       drawPhFermMenu(true);
-
-    if (currentAppState == PH_CUTOFF_TEST_MENU) {
-      drawPhCutoffTestMenu(true);
-
-      // Live pH Scanner: continuous monitoring
-      if (phCutoffRunning && !stageTransferring) {
-        float curPH = (incomingData.adsStatus == 1) ? incomingData.phValue : 7.0f;
-        // When pH probe reads 3.00 or below, trigger transfer flow until completely emptied
-        if (curPH > 0.0f && curPH <= fermTargetPH) {
-          // 1. Cut off fermentation heating & stop agitator
-          currentHeatingPercent = 0;
-          digitalWrite(SSR_FERM, LOW);
-          setMixerSpeed(0);
-          isFermFanOn = false;
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-
-          // 2. Trigger liquid transfer from Chamber 2 to Chamber 3
-          startLiquidTransfer(2);
-          phCutoffDisplayTrial++;
-        }
-      }
-    }
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();

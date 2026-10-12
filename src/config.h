@@ -134,16 +134,12 @@ enum AppState {
   DISPENSER_TEST_MENU,
   DISPENSER_CAL_MENU,
   
-  PH_CUTOFF_TEST_MENU,
   SETTINGS_MENU,
   GRAPH_PICK_MENU,
   PID_CHAMBER_PICK,
   PID_CONFIG_MENU
 };
 
-extern bool phCutoffNeedsFullRedraw;
-extern bool phCutoffRunning;
-extern int  phCutoffDisplayTrial;
 extern bool settingsNeedsFullRedraw;
 extern int settingsSelection;
 extern bool settingsEditing;
