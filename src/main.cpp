@@ -168,6 +168,15 @@ bool dispenserCalSaved = false;
 uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 
+// ---- Isolated pH Auto-Transfer Test State ----
+bool phTransTestNeedsFullRedraw = true;
+bool phTransTestScanning = false;
+bool phTransTestTransferActive = false;
+bool phTransTestDetected = false;
+float phTransTestVolume = 0.0f;
+uint32_t phTransTestPumpStartMs = 0;
+uint32_t phTransTestLastFlowMs = 0;
+
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 bool pidConfigNeedsFullRedraw = true;
@@ -1172,7 +1181,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 11;
+      systemCheckSelection = (systemCheckSelection + 1) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1350,7 +1359,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 10) % 11;
+      systemCheckSelection = (systemCheckSelection + 11) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1696,7 +1705,32 @@ void loop() {
         dispenserTestStartMs = 0;
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
+      } else if (systemCheckSelection == 11) {
+        phTransTestNeedsFullRedraw = true;
+        phTransTestScanning = true;
+        phTransTestTransferActive = false;
+        phTransTestDetected = false;
+        phTransTestVolume = 0.0f;
+        flowPulse2 = 0;
+        setPump2(false);
+        currentAppState = PH_TRANSFER_TEST_MENU;
+        drawPhTransferTestMenu();
       }
+    } else if (currentAppState == PH_TRANSFER_TEST_MENU) {
+      if (phTransTestTransferActive) {
+        setPump2(false);
+        phTransTestTransferActive = false;
+        phTransTestScanning = false;
+      } else {
+        phTransTestScanning = !phTransTestScanning;
+        if (phTransTestScanning) {
+          phTransTestDetected = false;
+          flowPulse2 = 0;
+          phTransTestVolume = 0.0f;
+        }
+      }
+      phTransTestNeedsFullRedraw = true;
+      drawPhTransferTestMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 0) {
         if (!dispenserTestOn) {
@@ -2296,6 +2330,20 @@ void loop() {
       drawDispenserCalMenu();
     }
   }
+
+  if (cRight && !ljRight && currentAppState == PH_TRANSFER_TEST_MENU) {
+    if (!phTransTestTransferActive) {
+      phTransTestDetected = true;
+      phTransTestTransferActive = true;
+      phTransTestScanning = false;
+      phTransTestPumpStartMs = millis();
+      phTransTestLastFlowMs = millis();
+      flowPulse2 = 0;
+      setPump2(true);
+      phTransTestNeedsFullRedraw = true;
+      drawPhTransferTestMenu();
+    }
+  }
   // Navigation: Left / Return
   if (cLeft && !ljLeft) {
     if (currentAppState == NEW_BREW_WIZARD) {
@@ -2372,6 +2420,13 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == PH_FERM_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == PH_TRANSFER_TEST_MENU) {
+      setPump2(false);
+      phTransTestTransferActive = false;
+      phTransTestScanning = false;
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -3629,9 +3684,14 @@ void loop() {
     } else {
       // Turn off pumps if not in manual transfer test menu, relay test menu, or
       // calibration wizard
-      if (currentAppState != TRANSFER_TEST_MENU &&
-          currentAppState != RELAY_TEST_MENU &&
-          currentAppState != CALIB_WIZARD) {
+      if (currentAppState == PH_TRANSFER_TEST_MENU) {
+        setPump1(false);
+        setPump2(phTransTestTransferActive);
+        pumpPreHeatFermOn = false;
+        pumpFermPastOn = phTransTestTransferActive;
+      } else if (currentAppState != TRANSFER_TEST_MENU &&
+                 currentAppState != RELAY_TEST_MENU &&
+                 currentAppState != CALIB_WIZARD) {
         setPump1(false);
         setPump2(false);
         pumpPreHeatFermOn = false;
@@ -3773,6 +3833,49 @@ void loop() {
 
     if (currentAppState == PH_FERM_MENU)
       drawPhFermMenu(true);
+
+    if (currentAppState == PH_TRANSFER_TEST_MENU) {
+      drawPhTransferTestMenu(true);
+
+      float curPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f)
+                        ? incomingData.phValue
+                        : ((incomingData.phValue > 0.0f && incomingData.phValue <= 14.0f) ? incomingData.phValue : -1.0f);
+
+      // Automatic trigger when scanning and target pH acidity detected
+      if (phTransTestScanning && !phTransTestTransferActive && !phTransTestDetected) {
+        if (curPH > 0.0f && curPH <= fermTargetPH) {
+          phTransTestDetected = true;
+          phTransTestTransferActive = true;
+          phTransTestPumpStartMs = millis();
+          phTransTestLastFlowMs = millis();
+          flowPulse2 = 0;
+          setPump2(true);
+          phTransTestNeedsFullRedraw = true;
+        }
+      }
+
+      // Empty / Cavitation detection while pump is running
+      if (phTransTestTransferActive) {
+        uint32_t nowMs = millis();
+        uint32_t runMs = nowMs - phTransTestPumpStartMs;
+        float kFactor = (flowKFactor[1] > 0.0f) ? flowKFactor[1] : 450.0f;
+        phTransTestVolume = (float)flowPulse2 / kFactor;
+
+        static uint32_t lastPulseCount = 0;
+        if (flowPulse2 != lastPulseCount) {
+          lastPulseCount = flowPulse2;
+          phTransTestLastFlowMs = nowMs;
+        }
+
+        // Empty vessel detection: after 4s priming, if no flow pulses for 4s, or safety limit of 5 mins
+        if ((runMs >= 4000 && (nowMs - phTransTestLastFlowMs >= 4000) && phTransTestVolume >= 0.1f) || runMs >= 300000) {
+          setPump2(false);
+          phTransTestTransferActive = false;
+          phTransTestScanning = false;
+          phTransTestNeedsFullRedraw = true;
+        }
+      }
+    }
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();

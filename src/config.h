@@ -133,6 +133,7 @@ enum AppState {
   PID_TRACKING_MENU,
   DISPENSER_TEST_MENU,
   DISPENSER_CAL_MENU,
+  PH_TRANSFER_TEST_MENU,
   
   SETTINGS_MENU,
   GRAPH_PICK_MENU,
@@ -140,6 +141,11 @@ enum AppState {
   PID_CONFIG_MENU
 };
 
+extern bool phTransTestNeedsFullRedraw;
+extern bool phTransTestScanning;
+extern bool phTransTestTransferActive;
+extern bool phTransTestDetected;
+extern float phTransTestVolume;
 extern bool settingsNeedsFullRedraw;
 extern int settingsSelection;
 extern bool settingsEditing;
