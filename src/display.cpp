@@ -3444,7 +3444,7 @@ void drawPhTransferTestMenu(bool valuesOnly) {
     tft.setTextPadding(280);
     if (curPH > 0.0f) {
       sprintf(buf, "%.2f", curPH);
-      uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
+      uint16_t phColor = (curPH <= 3.00f) ? 0x03E0 : TFT_BLACK;
       tft.setTextColor(phColor, 0xD6BA);
       tft.drawCentreString(buf, CENTER_X, 96, 4);
     } else {
@@ -3517,14 +3517,14 @@ void drawPhTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString("CURRENT pH LEVEL", CENTER_X, 68, 2);
   if (curPH > 0.0f) {
     sprintf(buf, "%.2f", curPH);
-    uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
+    uint16_t phColor = (curPH <= 3.00f) ? 0x03E0 : TFT_BLACK;
     tft.setTextColor(phColor, 0xD6BA);
     tft.drawCentreString(buf, CENTER_X, 96, 4);
   } else {
     tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("---", CENTER_X, 96, 4);
   }
-  sprintf(buf, "Cutoff Threshold: <= %.2f pH", fermTargetPH);
+  sprintf(buf, "Cutoff Threshold: <= 3.00 pH");
   tft.setTextColor(0x3566, 0xD6BA);
   tft.drawCentreString(buf, CENTER_X, 138, 2);
 

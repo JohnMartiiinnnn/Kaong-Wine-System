@@ -403,7 +403,7 @@ void loadSettingsFromNVS() {
   preheatTempOffset = brewPrefs.getFloat("phOffset", 0.0f);
   pastTempOffset = brewPrefs.getFloat("pastOffset", 0.0f);
   fermTempOffset = brewPrefs.getFloat("fermOffset", 0.0f);
-  fermTargetPH = brewPrefs.getFloat("fermPH", 4.0f);
+  fermTargetPH = brewPrefs.getFloat("fermPH", 3.0f);
   fermTargetGravity = brewPrefs.getFloat("fermSG", 1.0000f);
   yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
   yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
@@ -1708,6 +1708,8 @@ void loop() {
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
       } else if (systemCheckSelection == 11) {
+        fermTargetPH = 3.0f;
+        saveSettingsToNVS();
         phTransTestNeedsFullRedraw = true;
         phTransTestScanning = true;
         phTransTestTransferActive = false;
@@ -3865,9 +3867,9 @@ void loop() {
                         ? incomingData.phValue
                         : ((incomingData.phValue > 0.0f && incomingData.phValue <= 14.0f) ? incomingData.phValue : -1.0f);
 
-      // Automatic trigger when scanning and target pH acidity detected
+      // Automatic trigger when scanning and target pH acidity detected (<= 3.00 pH)
       if (phTransTestScanning && !phTransTestTransferActive && !phTransTestDetected) {
-        if (curPH > 0.0f && curPH <= fermTargetPH) {
+        if (curPH > 0.0f && curPH <= 3.00f) {
           phTransTestDetected = true;
           phTransTestTransferActive = true;
           phTransTestScanning = false;
