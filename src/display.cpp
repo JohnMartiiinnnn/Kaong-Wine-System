@@ -3453,7 +3453,12 @@ void drawPhTransferTestMenu(bool valuesOnly) {
     }
 
     // 2. Refresh Card 2: Scanning Status
-    if (phTransTestTransferActive || phTransTestDetected) {
+    if (phTransTestDone) {
+      tft.setTextColor(0x03E0, 0xD6BA);
+      tft.drawCentreString("CYCLE COMPLETE", CENTER_X, 214, 4);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
+      tft.drawCentreString("Acidity cutoff & chamber evacuation finished.", CENTER_X, 256, 2);
+    } else if (phTransTestTransferActive || phTransTestDetected) {
       tft.setTextColor(0x03E0, 0xD6BA);
       tft.drawCentreString("pH DETECTED", CENTER_X, 214, 4);
       tft.setTextColor(TFT_BLACK, 0xD6BA);
@@ -3472,7 +3477,15 @@ void drawPhTransferTestMenu(bool valuesOnly) {
     }
 
     // 3. Refresh Card 3: Transfer Flow
-    if (phTransTestTransferActive) {
+    if (phTransTestDone) {
+      tft.setTextColor(0x03E0, 0xD6BA);
+      tft.drawCentreString("TRANSFER DONE", CENTER_X, 332, 4);
+      sprintf(buf, "Transferred: %.2f L (Completed)", phTransTestVolume);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
+      tft.drawCentreString(buf, CENTER_X, 368, 2);
+      tft.setTextColor(0x3566, 0xD6BA);
+      tft.drawCentreString("Flow stopped (chamber empty)", CENTER_X, 394, 1);
+    } else if (phTransTestTransferActive) {
       tft.setTextColor(0x03E0, 0xD6BA);
       tft.drawCentreString("PUMP 2: RUNNING", CENTER_X, 332, 4);
       sprintf(buf, "Transferred: %.2f L", phTransTestVolume);
@@ -3533,7 +3546,12 @@ void drawPhTransferTestMenu(bool valuesOnly) {
   tft.drawRect(10, 178, 300, 108, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("pH SCANNING STATUS", CENTER_X, 186, 2);
-  if (phTransTestTransferActive || phTransTestDetected) {
+  if (phTransTestDone) {
+    tft.setTextColor(0x03E0, 0xD6BA);
+    tft.drawCentreString("CYCLE COMPLETE", CENTER_X, 214, 4);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
+    tft.drawCentreString("Acidity cutoff & chamber evacuation finished.", CENTER_X, 256, 2);
+  } else if (phTransTestTransferActive || phTransTestDetected) {
     tft.setTextColor(0x03E0, 0xD6BA);
     tft.drawCentreString("pH DETECTED", CENTER_X, 214, 4);
     tft.setTextColor(TFT_BLACK, 0xD6BA);
@@ -3555,7 +3573,15 @@ void drawPhTransferTestMenu(bool valuesOnly) {
   tft.drawRect(10, 296, 300, 126, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("TRANSFER FLOW (FERM -> PAST)", CENTER_X, 304, 2);
-  if (phTransTestTransferActive) {
+  if (phTransTestDone) {
+    tft.setTextColor(0x03E0, 0xD6BA);
+    tft.drawCentreString("TRANSFER DONE", CENTER_X, 332, 4);
+    sprintf(buf, "Transferred: %.2f L (Completed)", phTransTestVolume);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
+    tft.drawCentreString(buf, CENTER_X, 368, 2);
+    tft.setTextColor(0x3566, 0xD6BA);
+    tft.drawCentreString("Flow stopped (chamber empty)", CENTER_X, 394, 1);
+  } else if (phTransTestTransferActive) {
     tft.setTextColor(0x03E0, 0xD6BA);
     tft.drawCentreString("PUMP 2: RUNNING", CENTER_X, 332, 4);
     sprintf(buf, "Transferred: %.2f L", phTransTestVolume);

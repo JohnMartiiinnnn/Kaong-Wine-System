@@ -173,6 +173,7 @@ bool phTransTestNeedsFullRedraw = true;
 bool phTransTestScanning = false;
 bool phTransTestTransferActive = false;
 bool phTransTestDetected = false;
+bool phTransTestDone = false;
 float phTransTestVolume = 0.0f;
 uint32_t phTransTestPumpStartMs = 0;
 uint32_t phTransTestLastPulseMs = 0;
@@ -1714,6 +1715,7 @@ void loop() {
         phTransTestScanning = true;
         phTransTestTransferActive = false;
         phTransTestDetected = false;
+        phTransTestDone = false;
         phTransTestHasFlowed = false;
         phTransTestVolume = 0.0f;
         flowPulse2 = 0;
@@ -1735,6 +1737,7 @@ void loop() {
         phTransTestScanning = !phTransTestScanning;
         if (phTransTestScanning) {
           phTransTestDetected = false;
+          phTransTestDone = false;
           phTransTestHasFlowed = false;
           flowPulse2 = 0;
           phTransTestLastPulses = 0;
@@ -2346,6 +2349,7 @@ void loop() {
   if (cRight && !ljRight && currentAppState == PH_TRANSFER_TEST_MENU) {
     if (!phTransTestTransferActive) {
       phTransTestDetected = true;
+      phTransTestDone = false;
       phTransTestTransferActive = true;
       phTransTestScanning = false;
       phTransTestPumpStartMs = millis();
@@ -2449,6 +2453,7 @@ void loop() {
       phTransTestTransferActive = false;
       phTransTestScanning = false;
       phTransTestDetected = false;
+      phTransTestDone = false;
       phTransTestVolume = 0.0f;
       phTransTestHasFlowed = false;
       flowPulse2 = 0;
@@ -3871,6 +3876,7 @@ void loop() {
       if (phTransTestScanning && !phTransTestTransferActive && !phTransTestDetected) {
         if (curPH > 0.0f && curPH <= 3.00f) {
           phTransTestDetected = true;
+          phTransTestDone = false;
           phTransTestTransferActive = true;
           phTransTestScanning = false;
           phTransTestPumpStartMs = millis();
@@ -3918,6 +3924,7 @@ void loop() {
           mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
           phTransTestTransferActive = false;
           phTransTestScanning = false;
+          phTransTestDone = true;
           phTransTestNeedsFullRedraw = true;
         }
       }
