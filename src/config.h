@@ -146,6 +146,7 @@ extern bool phTransTestScanning;
 extern bool phTransTestTransferActive;
 extern bool phTransTestDetected;
 extern float phTransTestVolume;
+extern bool phTransTestHasFlowed;
 extern bool settingsNeedsFullRedraw;
 extern int settingsSelection;
 extern bool settingsEditing;

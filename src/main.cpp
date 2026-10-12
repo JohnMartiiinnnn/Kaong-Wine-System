@@ -175,7 +175,9 @@ bool phTransTestTransferActive = false;
 bool phTransTestDetected = false;
 float phTransTestVolume = 0.0f;
 uint32_t phTransTestPumpStartMs = 0;
-uint32_t phTransTestLastFlowMs = 0;
+uint32_t phTransTestLastPulseMs = 0;
+uint32_t phTransTestLastPulses = 0;
+bool phTransTestHasFlowed = false;
 
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -1710,22 +1712,30 @@ void loop() {
         phTransTestScanning = true;
         phTransTestTransferActive = false;
         phTransTestDetected = false;
+        phTransTestHasFlowed = false;
         phTransTestVolume = 0.0f;
         flowPulse2 = 0;
+        phTransTestLastPulses = 0;
         setPump2(false);
+        pumpFermPastOn = false;
+        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
         currentAppState = PH_TRANSFER_TEST_MENU;
         drawPhTransferTestMenu();
       }
     } else if (currentAppState == PH_TRANSFER_TEST_MENU) {
       if (phTransTestTransferActive) {
         setPump2(false);
+        pumpFermPastOn = false;
+        mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
         phTransTestTransferActive = false;
         phTransTestScanning = false;
       } else {
         phTransTestScanning = !phTransTestScanning;
         if (phTransTestScanning) {
           phTransTestDetected = false;
+          phTransTestHasFlowed = false;
           flowPulse2 = 0;
+          phTransTestLastPulses = 0;
           phTransTestVolume = 0.0f;
         }
       }
@@ -2337,9 +2347,13 @@ void loop() {
       phTransTestTransferActive = true;
       phTransTestScanning = false;
       phTransTestPumpStartMs = millis();
-      phTransTestLastFlowMs = millis();
+      phTransTestLastPulseMs = millis();
+      phTransTestLastPulses = 0;
+      phTransTestHasFlowed = false;
+      phTransTestVolume = 0.0f;
       flowPulse2 = 0;
       setPump2(true);
+      pumpFermPastOn = true;
       phTransTestNeedsFullRedraw = true;
       drawPhTransferTestMenu();
     }
@@ -2424,9 +2438,19 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == PH_TRANSFER_TEST_MENU) {
+      setPump1(false);
       setPump2(false);
+      pumpFermPastOn = false;
+      pumpPreHeatFermOn = false;
+      mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
+      mcp.digitalWrite(PUMP_PREHEAT_FERM, RELAY_OFF);
       phTransTestTransferActive = false;
       phTransTestScanning = false;
+      phTransTestDetected = false;
+      phTransTestVolume = 0.0f;
+      phTransTestHasFlowed = false;
+      flowPulse2 = 0;
+      phTransTestLastPulses = 0;
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -3846,30 +3870,50 @@ void loop() {
         if (curPH > 0.0f && curPH <= fermTargetPH) {
           phTransTestDetected = true;
           phTransTestTransferActive = true;
+          phTransTestScanning = false;
           phTransTestPumpStartMs = millis();
-          phTransTestLastFlowMs = millis();
+          phTransTestLastPulseMs = millis();
+          phTransTestLastPulses = 0;
+          phTransTestHasFlowed = false;
+          phTransTestVolume = 0.0f;
           flowPulse2 = 0;
           setPump2(true);
+          pumpFermPastOn = true;
           phTransTestNeedsFullRedraw = true;
         }
       }
 
-      // Empty / Cavitation detection while pump is running
+      // Active liquid transfer until vessel is completely empty
       if (phTransTestTransferActive) {
         uint32_t nowMs = millis();
         uint32_t runMs = nowMs - phTransTestPumpStartMs;
         float kFactor = (flowKFactor[1] > 0.0f) ? flowKFactor[1] : 450.0f;
         phTransTestVolume = (float)flowPulse2 / kFactor;
 
-        static uint32_t lastPulseCount = 0;
-        if (flowPulse2 != lastPulseCount) {
-          lastPulseCount = flowPulse2;
-          phTransTestLastFlowMs = nowMs;
+        // Pulse progress tracking:
+        if (flowPulse2 > phTransTestLastPulses) {
+          phTransTestLastPulses = flowPulse2;
+          phTransTestLastPulseMs = nowMs;
+          if (flowPulse2 >= 20 || phTransTestVolume >= 0.05f) {
+            phTransTestHasFlowed = true; // Confirms liquid is actively moving through the flow sensor!
+          }
         }
 
-        // Empty vessel detection: after 4s priming, if no flow pulses for 4s, or safety limit of 5 mins
-        if ((runMs >= 4000 && (nowMs - phTransTestLastFlowMs >= 4000) && phTransTestVolume >= 0.1f) || runMs >= 300000) {
+        // Empty vessel detection (cavitation cutoff):
+        // 1. Once bulk flow has occurred, if flow pulses have ceased for 7 full seconds,
+        //    the fermentation vessel is completely emptied!
+        bool emptyDetected = phTransTestHasFlowed && (runMs >= 6000) && (nowMs - phTransTestLastPulseMs >= 7000);
+
+        // 2. Dry-run safety: if pump ran 25s with 0 flow, shut off to protect pump
+        bool dryRunCutoff = (!phTransTestHasFlowed && runMs >= 25000);
+
+        // 3. Max safety ceiling: 15 minutes
+        bool maxSafetyCutoff = (runMs >= 900000);
+
+        if (emptyDetected || dryRunCutoff || maxSafetyCutoff) {
           setPump2(false);
+          pumpFermPastOn = false;
+          mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
           phTransTestTransferActive = false;
           phTransTestScanning = false;
           phTransTestNeedsFullRedraw = true;
