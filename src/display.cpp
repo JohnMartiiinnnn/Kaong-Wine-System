@@ -3444,56 +3444,56 @@ void drawPhTransferTestMenu(bool valuesOnly) {
     tft.setTextPadding(280);
     if (curPH > 0.0f) {
       sprintf(buf, "%.2f", curPH);
-      uint16_t phColor = (curPH <= fermTargetPH) ? TFT_GREEN : TFT_CYAN;
-      tft.setTextColor(phColor, 0x2124);
+      uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
+      tft.setTextColor(phColor, 0xD6BA);
       tft.drawCentreString(buf, CENTER_X, 96, 4);
     } else {
-      tft.setTextColor(0x7BEF, 0x2124);
+      tft.setTextColor(TFT_DARKGREY, 0xD6BA);
       tft.drawCentreString("---", CENTER_X, 96, 4);
     }
 
     // 2. Refresh Card 2: Scanning Status
     if (phTransTestTransferActive || phTransTestDetected) {
-      tft.setTextColor(TFT_GREEN, 0x2124);
+      tft.setTextColor(0x03E0, 0xD6BA);
       tft.drawCentreString("pH DETECTED", CENTER_X, 214, 4);
-      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString("Target acidity detected! Flow engaged.", CENTER_X, 256, 2);
     } else if (phTransTestScanning) {
       bool blink = ((millis() / 500) % 2) == 0;
-      tft.setTextColor(blink ? 0xFD20 : TFT_YELLOW, 0x2124);
+      tft.setTextColor(blink ? 0xFD20 : 0x03E0, 0xD6BA);
       tft.drawCentreString(blink ? "● SCANNING ACTIVE ●" : "  SCANNING ACTIVE  ", CENTER_X, 214, 4);
-      tft.setTextColor(0xD6BA, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString("Monitoring probe for target acidity...", CENTER_X, 256, 2);
     } else {
-      tft.setTextColor(0x7BEF, 0x2124);
+      tft.setTextColor(TFT_DARKGREY, 0xD6BA);
       tft.drawCentreString("STANDBY / PAUSED", CENTER_X, 214, 4);
-      tft.setTextColor(0xD6BA, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString("Press SELECT to begin scanning", CENTER_X, 256, 2);
     }
 
     // 3. Refresh Card 3: Transfer Flow
     if (phTransTestTransferActive) {
-      tft.setTextColor(TFT_GREEN, 0x2124);
+      tft.setTextColor(0x03E0, 0xD6BA);
       tft.drawCentreString("PUMP 2: RUNNING", CENTER_X, 332, 4);
       sprintf(buf, "Transferred: %.2f L", phTransTestVolume);
-      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString(buf, CENTER_X, 368, 2);
-      tft.setTextColor(TFT_YELLOW, 0x2124);
+      tft.setTextColor(0x3566, 0xD6BA);
       tft.drawCentreString("Pumping until vessel is empty...", CENTER_X, 394, 1);
     } else if (phTransTestDetected && !phTransTestTransferActive) {
-      tft.setTextColor(TFT_CYAN, 0x2124);
+      tft.setTextColor(0x3566, 0xD6BA);
       tft.drawCentreString("OFF (TANK EMPTY)", CENTER_X, 332, 4);
       sprintf(buf, "Completed: %.2f L transferred", phTransTestVolume);
-      tft.setTextColor(TFT_WHITE, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString(buf, CENTER_X, 368, 2);
-      tft.setTextColor(0x9CD3, 0x2124);
+      tft.setTextColor(TFT_DARKGREY, 0xD6BA);
       tft.drawCentreString("Flow stopped (empty vessel detected)", CENTER_X, 394, 1);
     } else {
-      tft.setTextColor(0x7BEF, 0x2124);
+      tft.setTextColor(TFT_DARKGREY, 0xD6BA);
       tft.drawCentreString("PUMP 2: OFF", CENTER_X, 332, 4);
-      tft.setTextColor(0xD6BA, 0x2124);
+      tft.setTextColor(TFT_BLACK, 0xD6BA);
       tft.drawCentreString("Standby (Waiting for pH trigger)", CENTER_X, 368, 2);
-      tft.setTextColor(0x2124, 0x2124);
+      tft.setTextColor(0xD6BA, 0xD6BA);
       tft.drawCentreString("                                    ", CENTER_X, 394, 1);
     }
     tft.setTextPadding(0);
@@ -3504,77 +3504,77 @@ void drawPhTransferTestMenu(bool valuesOnly) {
   phTransTestNeedsFullRedraw = false;
   lastRefreshMs = millis();
 
-  // Header Bar
+  // Header Bar (Navy header with short title to avoid clock collision at right)
   tft.fillRect(0, 0, 320, 50, TFT_NAVY);
   tft.fillRect(0, 50, 320, 430, TFT_WHITE);
   tft.setTextColor(TFT_WHITE, TFT_NAVY);
-  tft.drawString("PH AUTO-TRANSFER", 10, 15, 4);
+  tft.drawString("pH AUTO-XFER", 10, 15, 4);
 
-  // Card 1: pH Level (y=60, h=108, w=300)
-  tft.fillRect(10, 60, 300, 108, 0x2124);
+  // Card 1: pH Level (y=60, h=108, w=300, light theme 0xD6BA)
+  tft.fillRect(10, 60, 300, 108, 0xD6BA);
   tft.drawRect(10, 60, 300, 108, TFT_DARKGREY);
-  tft.setTextColor(0x9CD3, 0x2124);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("CURRENT pH LEVEL", CENTER_X, 68, 2);
   if (curPH > 0.0f) {
     sprintf(buf, "%.2f", curPH);
-    uint16_t phColor = (curPH <= fermTargetPH) ? TFT_GREEN : TFT_CYAN;
-    tft.setTextColor(phColor, 0x2124);
+    uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
+    tft.setTextColor(phColor, 0xD6BA);
     tft.drawCentreString(buf, CENTER_X, 96, 4);
   } else {
-    tft.setTextColor(0x7BEF, 0x2124);
+    tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("---", CENTER_X, 96, 4);
   }
   sprintf(buf, "Cutoff Threshold: <= %.2f pH", fermTargetPH);
-  tft.setTextColor(TFT_YELLOW, 0x2124);
+  tft.setTextColor(0x3566, 0xD6BA);
   tft.drawCentreString(buf, CENTER_X, 138, 2);
 
-  // Card 2: Scanning Status (y=178, h=108, w=300)
-  tft.fillRect(10, 178, 300, 108, 0x2124);
+  // Card 2: Scanning Status (y=178, h=108, w=300, light theme 0xD6BA)
+  tft.fillRect(10, 178, 300, 108, 0xD6BA);
   tft.drawRect(10, 178, 300, 108, TFT_DARKGREY);
-  tft.setTextColor(0x9CD3, 0x2124);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("pH SCANNING STATUS", CENTER_X, 186, 2);
   if (phTransTestTransferActive || phTransTestDetected) {
-    tft.setTextColor(TFT_GREEN, 0x2124);
+    tft.setTextColor(0x03E0, 0xD6BA);
     tft.drawCentreString("pH DETECTED", CENTER_X, 214, 4);
-    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("Target acidity detected! Flow engaged.", CENTER_X, 256, 2);
   } else if (phTransTestScanning) {
-    tft.setTextColor(0xFD20, 0x2124);
+    tft.setTextColor(0xFD20, 0xD6BA);
     tft.drawCentreString("● SCANNING ACTIVE ●", CENTER_X, 214, 4);
-    tft.setTextColor(0xD6BA, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("Monitoring probe for target acidity...", CENTER_X, 256, 2);
   } else {
-    tft.setTextColor(0x7BEF, 0x2124);
+    tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("STANDBY / PAUSED", CENTER_X, 214, 4);
-    tft.setTextColor(0xD6BA, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("Press SELECT to begin scanning", CENTER_X, 256, 2);
   }
 
-  // Card 3: Transfer Flow (y=296, h=126, w=300)
-  tft.fillRect(10, 296, 300, 126, 0x2124);
+  // Card 3: Transfer Flow (y=296, h=126, w=300, light theme 0xD6BA)
+  tft.fillRect(10, 296, 300, 126, 0xD6BA);
   tft.drawRect(10, 296, 300, 126, TFT_DARKGREY);
-  tft.setTextColor(0x9CD3, 0x2124);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("TRANSFER FLOW (FERM -> PAST)", CENTER_X, 304, 2);
   if (phTransTestTransferActive) {
-    tft.setTextColor(TFT_GREEN, 0x2124);
+    tft.setTextColor(0x03E0, 0xD6BA);
     tft.drawCentreString("PUMP 2: RUNNING", CENTER_X, 332, 4);
     sprintf(buf, "Transferred: %.2f L", phTransTestVolume);
-    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString(buf, CENTER_X, 368, 2);
-    tft.setTextColor(TFT_YELLOW, 0x2124);
+    tft.setTextColor(0x3566, 0xD6BA);
     tft.drawCentreString("Pumping until vessel is empty...", CENTER_X, 394, 1);
   } else if (phTransTestDetected && !phTransTestTransferActive) {
-    tft.setTextColor(TFT_CYAN, 0x2124);
+    tft.setTextColor(0x3566, 0xD6BA);
     tft.drawCentreString("OFF (TANK EMPTY)", CENTER_X, 332, 4);
     sprintf(buf, "Completed: %.2f L transferred", phTransTestVolume);
-    tft.setTextColor(TFT_WHITE, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString(buf, CENTER_X, 368, 2);
-    tft.setTextColor(0x9CD3, 0x2124);
+    tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("Flow stopped (empty vessel detected)", CENTER_X, 394, 1);
   } else {
-    tft.setTextColor(0x7BEF, 0x2124);
+    tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("PUMP 2: OFF", CENTER_X, 332, 4);
-    tft.setTextColor(0xD6BA, 0x2124);
+    tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.drawCentreString("Standby (Waiting for pH trigger)", CENTER_X, 368, 2);
   }
 
