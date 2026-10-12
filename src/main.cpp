@@ -2382,31 +2382,20 @@ void loop() {
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
     } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
-      if (!phCutoffRunning) {
-        phCutoffRunning = true;
-        drawPhCutoffTestMenu();
-        for (int t = 1; t <= 5; t++) {
-          phCutoffDisplayTrial = t;
-          setMixerSpeed(50);
-          currentHeatingPercent = 75;
-          digitalWrite(SSR_FERM, HIGH);
-          drawPhCutoffTestMenu(true);
-          delay(120);
-
-          // Simulated or live pH <= 3.00: halt fermentation & arm pasteurization transfer
-          currentHeatingPercent = 0;
-          digitalWrite(SSR_FERM, LOW);
-          setMixerSpeed(0);
-          isFermFanOn = false;
-          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
-          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          digitalWrite(SSR_PAST, LOW);
-          drawPhCutoffTestMenu(true);
-          delay(100);
-        }
-        phCutoffRunning = false;
-        drawPhCutoffTestMenu();
+      // Toggle scanning state
+      phCutoffRunning = !phCutoffRunning;
+      if (phCutoffRunning) {
+        // Arm live monitoring: ensure mixer/heater idle until cutoff event
+        currentHeatingPercent = 0;
+        digitalWrite(SSR_FERM, LOW);
+        setMixerSpeed(0);
+      } else {
+        // Stop scanning and ensure transfer pump is off
+        setPump2(false);
+        pumpFermPastOn = false;
+        stageTransferring = false;
       }
+      drawPhCutoffTestMenu();
     } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
       phCutoffRunning = false;
       setMixerSpeed(0);
@@ -3819,8 +3808,28 @@ void loop() {
     if (currentAppState == PH_FERM_MENU)
       drawPhFermMenu(true);
 
-    if (currentAppState == PH_CUTOFF_TEST_MENU)
+    if (currentAppState == PH_CUTOFF_TEST_MENU) {
       drawPhCutoffTestMenu(true);
+
+      // Live pH Scanner: continuous monitoring
+      if (phCutoffRunning && !stageTransferring) {
+        float curPH = (incomingData.adsStatus == 1) ? incomingData.phValue : 7.0f;
+        // When pH probe reads 3.00 or below, trigger transfer flow until completely emptied
+        if (curPH > 0.0f && curPH <= fermTargetPH) {
+          // 1. Cut off fermentation heating & stop agitator
+          currentHeatingPercent = 0;
+          digitalWrite(SSR_FERM, LOW);
+          setMixerSpeed(0);
+          isFermFanOn = false;
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+
+          // 2. Trigger liquid transfer from Chamber 2 to Chamber 3
+          startLiquidTransfer(2);
+          phCutoffDisplayTrial++;
+        }
+      }
+    }
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();
