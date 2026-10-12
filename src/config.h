@@ -488,6 +488,8 @@ float getFermTemp();
 
 // ---- Motor & Yeast Dispenser Command Sender ----
 void sendMotorCommand(int speed, bool cw, uint8_t yeastCmd = 0, uint32_t yeastVal = 0);
+void setPump1(bool state);
+void setPump2(bool state);
 void setMixerSpeed(int percent);
 
 // ---- Liquid Transfer Helper ----

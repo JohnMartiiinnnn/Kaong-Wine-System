@@ -886,8 +886,10 @@ void setup() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
   server.on("/log.csv", HTTP_GET, handleDownloadLog);
-  server.on("/download", HTTP_GET, handleDownloadLog);
-  server.begin();
+    server.on("/download", HTTP_GET, handleDownloadLog);
+  server.on("/test/table19", HTTP_GET, handleTestTable19);
+  server.on("/test/table22", HTTP_GET, handleTestTable22);
+  server.on("/test/status", HTTP_GET, handleTestStatus); server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
 

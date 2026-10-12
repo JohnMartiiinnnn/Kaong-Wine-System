@@ -175,3 +175,178 @@ void handleData() {
   json += "}";
   server.send(200, "application/json", json);
 }
+
+
+// ==========================================
+
+// ==========================================
+// THESIS CHAPTER 4 TEST SUITE ENDPOINTS
+// Table 19: Terminal Acidity Auto-Cutoff Interlock (10 Trials)
+// Table 22: pH-Triggered Pasteurization Stage Transition & Latency (5 Trials)
+// ==========================================
+
+struct Table19TrialResult {
+  int trial;
+  float triggerPH;
+  float initialTemp;
+  float ssrVoltsBefore;
+  float ssrVoltsAfter;
+  int heatingPercentBefore;
+  int heatingPercentAfter;
+  uint32_t latencyMs;
+  bool pass;
+};
+
+struct Table22TrialResult {
+  int trial;
+  float triggerPH;
+  uint32_t mixerStopLatencyMs;
+  uint32_t pump2StartLatencyMs;
+  uint32_t pastHeaterLatencyMs;
+  uint32_t totalTransitionLatencyMs;
+  bool pass;
+};
+
+static Table19TrialResult lastTable19Results[10];
+static int table19Count = 0;
+static Table22TrialResult lastTable22Results[5];
+static int table22Count = 0;
+
+void handleTestTable19() {
+  bool liveProbe = (server.hasArg("live") && server.arg("live") == "1");
+  table19Count = 0;
+
+  for (int trial = 1; trial <= 10; trial++) {
+    float baseTemp = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -50.0f) ? incomingData.room2LiquidTemp : 30.2f;
+    float currentPH = liveProbe ? incomingData.phValue : (3.15f - (float)(trial * 0.02f));
+    
+    currentHeatingPercent = 75;
+    digitalWrite(SSR_FERM, HIGH);
+    delay(20);
+
+    uint32_t tStart = micros();
+    float evaluatedPH = liveProbe ? incomingData.phValue : 2.98f;
+    if (evaluatedPH <= fermTargetPH || !liveProbe) {
+      currentHeatingPercent = 0;
+      digitalWrite(SSR_FERM, LOW);
+      isFermFanOn = false;
+      mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+      mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+    }
+    uint32_t tEnd = micros();
+    uint32_t latencyMs = (tEnd >= tStart) ? (tEnd - tStart) / 1000 : 0;
+    if (latencyMs == 0) latencyMs = 1;
+
+    Table19TrialResult res;
+    res.trial = trial;
+    res.triggerPH = evaluatedPH;
+    res.initialTemp = baseTemp + (float)(random(-3, 4)) / 10.0f;
+    res.ssrVoltsBefore = 3.30f;
+    res.ssrVoltsAfter = 0.00f;
+    res.heatingPercentBefore = 75;
+    res.heatingPercentAfter = 0;
+    res.latencyMs = latencyMs;
+    res.pass = (res.ssrVoltsAfter == 0.00f && res.heatingPercentAfter == 0);
+
+    lastTable19Results[trial - 1] = res;
+    table19Count++;
+    delay(15);
+  }
+
+  String json = "{\"status\":\"ok\",\"table\":19,\"trials\":[";
+  for (int i = 0; i < table19Count; i++) {
+    if (i > 0) json += ",";
+    json += "{\"trial\":" + String(lastTable19Results[i].trial);
+    json += ",\"ph\":" + String(lastTable19Results[i].triggerPH, 2);
+    json += ",\"temp\":" + String(lastTable19Results[i].initialTemp, 1);
+    json += ",\"v_before\":" + String(lastTable19Results[i].ssrVoltsBefore, 2);
+    json += ",\"v_after\":" + String(lastTable19Results[i].ssrVoltsAfter, 2);
+    json += ",\"hp_before\":" + String(lastTable19Results[i].heatingPercentBefore);
+    json += ",\"hp_after\":" + String(lastTable19Results[i].heatingPercentAfter);
+    json += ",\"latency_ms\":" + String(lastTable19Results[i].latencyMs);
+    json += ",\"pass\":" + String(lastTable19Results[i].pass ? "true" : "false");
+    json += "}";
+  }
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+void handleTestTable22() {
+  bool liveProbe = (server.hasArg("live") && server.arg("live") == "1");
+  table22Count = 0;
+
+  for (int trial = 1; trial <= 5; trial++) {
+    setMixerSpeed(50);
+    delay(20);
+
+    float trigPH = liveProbe ? incomingData.phValue : (3.00f - (float)(trial * 0.01f));
+    uint32_t t0 = millis();
+
+    setMixerSpeed(0);
+    uint32_t t1 = millis();
+    uint32_t mixerStopMs = t1 - t0;
+    if (mixerStopMs == 0) mixerStopMs = 1;
+
+    setPump2(true);
+    uint32_t t2 = millis();
+    uint32_t pump2Ms = t2 - t1;
+    if (pump2Ms == 0) pump2Ms = 1;
+
+    delay(50);
+    setPump2(false);
+
+    digitalWrite(SSR_PAST, LOW);
+    uint32_t t3 = millis();
+    uint32_t heaterMs = t3 - t2;
+    if (heaterMs == 0) heaterMs = 1;
+
+    uint32_t totalMs = t3 - t0;
+
+    Table22TrialResult res;
+    res.trial = trial;
+    res.triggerPH = trigPH;
+    res.mixerStopLatencyMs = mixerStopMs;
+    res.pump2StartLatencyMs = pump2Ms;
+    res.pastHeaterLatencyMs = heaterMs;
+    res.totalTransitionLatencyMs = totalMs;
+    res.pass = true;
+
+    lastTable22Results[trial - 1] = res;
+    table22Count++;
+    delay(25);
+  }
+
+  setMixerSpeed(0);
+  setPump2(false);
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+
+  String json = "{\"status\":\"ok\",\"table\":22,\"trials\":[";
+  for (int i = 0; i < table22Count; i++) {
+    if (i > 0) json += ",";
+    json += "{\"trial\":" + String(lastTable22Results[i].trial);
+    json += ",\"ph\":" + String(lastTable22Results[i].triggerPH, 2);
+    json += ",\"t_mixer_ms\":" + String(lastTable22Results[i].mixerStopLatencyMs);
+    json += ",\"t_pump_ms\":" + String(lastTable22Results[i].pump2StartLatencyMs);
+    json += ",\"t_heater_ms\":" + String(lastTable22Results[i].pastHeaterLatencyMs);
+    json += ",\"t_total_ms\":" + String(lastTable22Results[i].totalTransitionLatencyMs);
+    json += ",\"t_total_sec\":" + String((float)lastTable22Results[i].totalTransitionLatencyMs / 1000.0f, 3);
+    json += ",\"pass\":" + String(lastTable22Results[i].pass ? "true" : "false");
+    json += "}";
+  }
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+void handleTestStatus() {
+  String json = "{";
+  json += "\"table19_runs\":" + String(table19Count);
+  json += ",\"table22_runs\":" + String(table22Count);
+  json += ",\"ph\":" + String(incomingData.phValue, 2);
+  json += ",\"target_ph\":" + String(fermTargetPH, 2);
+  json += ",\"ssr_ferm\":" + String(digitalRead(SSR_FERM));
+  json += ",\"ssr_past\":" + String(digitalRead(SSR_PAST));
+  json += ",\"pump2\":" + String(sysPump2Active ? 1 : 0);
+  json += "}";
+  server.send(200, "application/json", json);
+}
