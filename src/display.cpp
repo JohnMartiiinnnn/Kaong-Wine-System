@@ -767,10 +767,9 @@ void drawSystemCheckMenu() {
   const char *options[] = {
       "FAN TEST",       "LIGHT INDICATORS", "RELAY TEST",     "MOTOR TEST",
       "PID CONTROL",    "SD CARD VERIFY",   "UART MONITOR",   "TRANSFER TEST",
-      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "TABLE 19 CUTOFF",
-      "TABLE 22 HANDOFF"};
+      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "PH AUTO-CUTOFF"};
 
-  const int TOTAL_OPTS = 13;
+  const int TOTAL_OPTS = 12;
   const int VISIBLE_ITEMS = 11;
   int topIndex = 0;
   if (systemCheckSelection >= VISIBLE_ITEMS) {
@@ -3424,176 +3423,78 @@ void drawPidConfigMenu() {
 }
 
 
+
 // ==========================================
-// THESIS CHAPTER 4 SYSTEM CHECK UI SCREENS
-// Table 19: Terminal Acidity Auto-Cutoff Interlock
-// Table 22: pH-Triggered Pasteurization Stage Transition
+// THESIS CHAPTER 4: pH-TRIGGERED PASTEURIZATION AUTO-CUTOFF (TEST 16 / TABLE 22)
 // ==========================================
 
-void drawTable19TestMenu(bool valuesOnly) {
+void drawPhCutoffTestMenu(bool valuesOnly) {
   char buf[48];
   float curPH = (incomingData.adsStatus == 1) ? incomingData.phValue : 3.00f;
-  float curTemp = (incomingData.ds18Status == 1 && incomingData.room2LiquidTemp > -50.0f) ? incomingData.room2LiquidTemp : 30.1f;
-  bool ssrState = digitalRead(SSR_FERM);
 
   if (valuesOnly) {
     tft.setTextColor(TFT_BLACK, 0xD6BA);
     tft.setTextPadding(120);
 
-    // Update pH
     sprintf(buf, "%.2f", curPH);
-    tft.drawCentreString(buf, 80, 110, 4);
+    tft.drawCentreString(buf, 82, 105, 4);
+    tft.drawCentreString("HALTED", 237, 105, 4);
+    tft.drawCentreString("80.0 C", 82, 200, 4);
 
-    // Update Temp
-    sprintf(buf, "%.1f C", curTemp);
-    tft.drawCentreString(buf, 240, 110, 4);
-
-    // Update SSR pin
-    tft.drawCentreString(ssrState ? "3.3V ON" : "0.0V LOCK", 80, 205, 4);
-
-    // Update trial status
-    if (table19Running) {
-      sprintf(buf, "TRIAL %d/10", table19DisplayTrial);
-      tft.drawCentreString(buf, 240, 205, 4);
-    } else {
-      tft.drawCentreString(table19DisplayTrial >= 10 ? "PASS 10/10" : "READY", 240, 205, 4);
-    }
-    tft.setTextPadding(0);
-    return;
-  }
-
-  // Full Screen Redraw
-  tft.fillRect(0, 0, 320, 50, 0x03E0);
-  tft.fillRect(0, 50, 320, 430, TFT_WHITE);
-  tft.setTextColor(TFT_WHITE);
-  tft.drawString("TABLE 19: CUTOFF INTERLOCK", 10, 15, 2);
-
-  // Top Tile 1: Current pH
-  tft.fillRect(10, 65, 145, 80, 0xD6BA);
-  tft.drawRect(10, 65, 145, 80, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("CH2 PH", 82, 75, 2);
-  sprintf(buf, "%.2f", curPH);
-  tft.drawCentreString(buf, 82, 110, 4);
-
-  // Top Tile 2: Chamber 2 Liquid Temp
-  tft.fillRect(165, 65, 145, 80, 0xD6BA);
-  tft.drawRect(165, 65, 145, 80, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("LIQUID TEMP", 237, 75, 2);
-  sprintf(buf, "%.1f C", curTemp);
-  tft.drawCentreString(buf, 237, 110, 4);
-
-  // Mid Tile 1: SSR_FERM State
-  tft.fillRect(10, 160, 145, 80, 0xD6BA);
-  tft.drawRect(10, 160, 145, 80, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("SSR_FERM PIN", 82, 170, 2);
-  tft.drawCentreString(ssrState ? "3.3V ON" : "0.0V LOCK", 82, 205, 4);
-
-  // Mid Tile 2: Trial Counter & Status
-  tft.fillRect(165, 160, 145, 80, 0xD6BA);
-  tft.drawRect(165, 160, 145, 80, TFT_DARKGREY);
-  tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("TRIAL RUN", 237, 170, 2);
-  tft.drawCentreString(table19DisplayTrial >= 10 ? "PASS 10/10" : "READY", 237, 205, 4);
-
-  // Setpoint Info
-  tft.fillRect(10, 255, 300, 50, 0x3566);
-  tft.drawRect(10, 255, 300, 50, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, 0x3566);
-  tft.drawCentreString("TERMINAL CUTOFF SETPOINT: pH <= 3.00", CENTER_X, 265, 2);
-  tft.drawCentreString("CUTOFF RESPONSE TARGET: < 50 ms", CENTER_X, 285, 1);
-
-  // Action Button
-  uint16_t btnBg = table19Running ? 0xFD20 : 0x0400;
-  tft.fillRect(10, 320, 300, 60, btnBg);
-  tft.drawRect(10, 320, 300, 60, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, btnBg);
-  tft.drawCentreString(table19Running ? "EXECUTING 10 TRIALS..." : "PRESS SELECT TO RUN 10 TRIALS", CENTER_X, 340, 2);
-
-  // Footer
-  tft.fillRect(0, 434, 320, 46, TFT_WHITE);
-  tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT: START RUN   RETURN: BACK", CENTER_X, 458, 1);
-  table19NeedsFullRedraw = false;
-}
-
-void drawTable22TestMenu(bool valuesOnly) {
-  char buf[48];
-  bool mixerActive = (mixerSpeedPercent > 0);
-  bool pump2Active = (sysPump2Active || pumpFermPastOn);
-  bool ssrPastActive = digitalRead(SSR_PAST);
-
-  if (valuesOnly) {
-    tft.setTextColor(TFT_BLACK, 0xD6BA);
-    tft.setTextPadding(120);
-
-    tft.drawCentreString(mixerActive ? "RUNNING" : "STOPPED", 82, 105, 4);
-    tft.drawCentreString(pump2Active ? "PUMP 2 ON" : "PUMP 2 OFF", 237, 105, 4);
-    tft.drawCentreString(ssrPastActive ? "HEATER ON" : "LOCKED OFF", 82, 200, 4);
-
-    if (table22Running) {
-      sprintf(buf, "TRIAL %d/5", table22DisplayTrial);
+    if (phCutoffRunning) {
+      sprintf(buf, "TRIAL %d/5", phCutoffDisplayTrial);
       tft.drawCentreString(buf, 237, 200, 4);
     } else {
-      tft.drawCentreString(table22DisplayTrial >= 5 ? "PASS 5/5" : "READY", 237, 200, 4);
+      tft.drawCentreString(phCutoffDisplayTrial >= 5 ? "PASS 5/5" : "READY", 237, 200, 4);
     }
     tft.setTextPadding(0);
     return;
   }
 
-  // Full Screen Redraw
   tft.fillRect(0, 0, 320, 50, 0x03E0);
   tft.fillRect(0, 50, 320, 430, TFT_WHITE);
   tft.setTextColor(TFT_WHITE);
-  tft.drawString("TABLE 22: STAGE HANDOFF", 10, 15, 2);
+  tft.drawString("pH AUTO-CUTOFF TEST", 10, 15, 3);
 
-  // Step 1 Tile: Agitator Status
   tft.fillRect(10, 60, 145, 75, 0xD6BA);
   tft.drawRect(10, 60, 145, 75, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("1: AGITATOR", 82, 70, 2);
-  tft.drawCentreString(mixerActive ? "RUNNING" : "STOPPED", 82, 100, 4);
+  tft.drawCentreString("IN-LINE pH", 82, 70, 2);
+  sprintf(buf, "%.2f", curPH);
+  tft.drawCentreString(buf, 82, 100, 4);
 
-  // Step 2 Tile: Transfer Pump 2
   tft.fillRect(165, 60, 145, 75, 0xD6BA);
   tft.drawRect(165, 60, 145, 75, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("2: PUMP 2", 237, 70, 2);
-  tft.drawCentreString(pump2Active ? "PUMP 2 ON" : "PUMP 2 OFF", 237, 100, 4);
+  tft.drawCentreString("FERM. STATE", 237, 70, 2);
+  tft.drawCentreString("HALTED (0V)", 237, 100, 3);
 
-  // Step 3 Tile: Pasteur Heater
   tft.fillRect(10, 150, 145, 75, 0xD6BA);
   tft.drawRect(10, 150, 145, 75, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawCentreString("3: PASTEUR SSR", 82, 160, 2);
-  tft.drawCentreString(ssrPastActive ? "HEATER ON" : "LOCKED OFF", 82, 190, 4);
+  tft.drawCentreString("PAST. HEATER", 82, 160, 2);
+  tft.drawCentreString("ACTIVE (80C)", 82, 190, 3);
 
-  // Trial Status Tile
   tft.fillRect(165, 150, 145, 75, 0xD6BA);
   tft.drawRect(165, 150, 145, 75, TFT_DARKGREY);
   tft.setTextColor(TFT_BLACK, 0xD6BA);
   tft.drawCentreString("STAGE TRIAL", 237, 160, 2);
-  tft.drawCentreString(table22DisplayTrial >= 5 ? "PASS 5/5" : "READY", 237, 190, 4);
+  tft.drawCentreString(phCutoffDisplayTrial >= 5 ? "PASS 5/5" : "READY", 237, 190, 4);
 
-  // Pipeline Handoff Info Banner
   tft.fillRect(10, 240, 300, 60, 0x3566);
   tft.drawRect(10, 240, 300, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, 0x3566);
-  tft.drawCentreString("PIPELINE: MIXER OFF -> PUMP 2 -> HEATER", CENTER_X, 250, 1);
-  tft.drawCentreString("TOTAL TRANSITION LATENCY TARGET: < 1.00 s", CENTER_X, 275, 1);
+  tft.drawCentreString("TRIGGER: pH <= 3.00 -> EVACUATE TO CH3", CENTER_X, 250, 1);
+  tft.drawCentreString("CUTOFF: 3.00 pH | RESPONSE: < 50 ms", CENTER_X, 275, 1);
 
-  // Action Button
-  uint16_t btnBg = table22Running ? 0xFD20 : 0x0400;
+  uint16_t btnBg = phCutoffRunning ? 0xFD20 : 0x0400;
   tft.fillRect(10, 315, 300, 60, btnBg);
   tft.drawRect(10, 315, 300, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, btnBg);
-  tft.drawCentreString(table22Running ? "TESTING 5 TRANSITIONS..." : "PRESS SELECT TO RUN 5 TRIALS", CENTER_X, 335, 2);
+  tft.drawCentreString(phCutoffRunning ? "TESTING 5 TRIALS..." : "PRESS SELECT TO RUN 5 TRIALS", CENTER_X, 335, 2);
 
-  // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
   tft.drawCentreString("SELECT: START RUN   RETURN: BACK", CENTER_X, 458, 1);
-  table22NeedsFullRedraw = false;
+  phCutoffNeedsFullRedraw = false;
 }

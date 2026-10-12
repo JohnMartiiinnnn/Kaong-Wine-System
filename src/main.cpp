@@ -168,12 +168,9 @@ bool dispenserCalSaved = false;
 uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 // Thesis Chapter 4 System Check Test States
-bool table19NeedsFullRedraw = true;
-bool table22NeedsFullRedraw = true;
-bool table19Running = false;
-bool table22Running = false;
-int  table19DisplayTrial = 0;
-int  table22DisplayTrial = 0;
+bool phCutoffNeedsFullRedraw = true;
+bool phCutoffRunning = false;
+int  phCutoffDisplayTrial = 0;
 
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
@@ -895,8 +892,9 @@ void setup() {
   server.on("/data", HTTP_GET, handleData);
   server.on("/log.csv", HTTP_GET, handleDownloadLog);
     server.on("/download", HTTP_GET, handleDownloadLog);
-  server.on("/test/table19", HTTP_GET, handleTestTable19);
-  server.on("/test/table22", HTTP_GET, handleTestTable22);
+  
+  server.on("/test/ph_cutoff", HTTP_GET, handleTestPhCutoff);
+  server.on("/test/table22", HTTP_GET, handleTestPhCutoff);
   server.on("/test/status", HTTP_GET, handleTestStatus); server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -1178,7 +1176,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 13;
+      systemCheckSelection = (systemCheckSelection + 1) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1356,7 +1354,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 12) % 13;
+      systemCheckSelection = (systemCheckSelection + 11) % 12;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1703,17 +1701,11 @@ void loop() {
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
       } else if (systemCheckSelection == 11) {
-        table19NeedsFullRedraw = true;
-        table19Running = false;
-        table19DisplayTrial = 0;
-        currentAppState = TABLE19_TEST_MENU;
-        drawTable19TestMenu();
-      } else if (systemCheckSelection == 12) {
-        table22NeedsFullRedraw = true;
-        table22Running = false;
-        table22DisplayTrial = 0;
-        currentAppState = TABLE22_TEST_MENU;
-        drawTable22TestMenu();
+        phCutoffNeedsFullRedraw = true;
+        phCutoffRunning = false;
+        phCutoffDisplayTrial = 0;
+        currentAppState = PH_CUTOFF_TEST_MENU;
+        drawPhCutoffTestMenu();
       }
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 0) {
@@ -2389,51 +2381,34 @@ void loop() {
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
-    } else if (currentAppState == TABLE19_TEST_MENU) {
-      if (!table19Running) {
-        table19Running = true;
-        drawTable19TestMenu();
-        for (int t = 1; t <= 10; t++) {
-          table19DisplayTrial = t;
-          drawTable19TestMenu(true);
+    } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
+      if (!phCutoffRunning) {
+        phCutoffRunning = true;
+        drawPhCutoffTestMenu();
+        for (int t = 1; t <= 5; t++) {
+          phCutoffDisplayTrial = t;
+          setMixerSpeed(50);
           currentHeatingPercent = 75;
           digitalWrite(SSR_FERM, HIGH);
-          delay(100);
+          drawPhCutoffTestMenu(true);
+          delay(120);
+
+          // Simulated or live pH <= 3.00: halt fermentation & arm pasteurization transfer
           currentHeatingPercent = 0;
           digitalWrite(SSR_FERM, LOW);
+          setMixerSpeed(0);
+          isFermFanOn = false;
           mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
           mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
-          delay(80);
-        }
-        table19Running = false;
-        drawTable19TestMenu();
-      }
-    } else if (currentAppState == TABLE22_TEST_MENU) {
-      if (!table22Running) {
-        table22Running = true;
-        drawTable22TestMenu();
-        for (int t = 1; t <= 5; t++) {
-          table22DisplayTrial = t;
-          setMixerSpeed(50);
-          drawTable22TestMenu(true);
-          delay(120);
-          setMixerSpeed(0);
-          setPump2(true);
-          drawTable22TestMenu(true);
-          delay(100);
-          setPump2(false);
           digitalWrite(SSR_PAST, LOW);
-          drawTable22TestMenu(true);
-          delay(80);
+          drawPhCutoffTestMenu(true);
+          delay(100);
         }
-        table22Running = false;
-        setMixerSpeed(0);
-        setPump2(false);
-        drawTable22TestMenu();
+        phCutoffRunning = false;
+        drawPhCutoffTestMenu();
       }
-    } else if (currentAppState == TABLE19_TEST_MENU || currentAppState == TABLE22_TEST_MENU) {
-      table19Running = false;
-      table22Running = false;
+    } else if (currentAppState == PH_CUTOFF_TEST_MENU) {
+      phCutoffRunning = false;
       setMixerSpeed(0);
       setPump2(false);
       digitalWrite(SSR_FERM, LOW);
@@ -3352,17 +3327,23 @@ void loop() {
           quartzPid.reset();
         }
 
-        // Fermentation completion: 10 minutes test timer (pH disregarded for water testing)
-        bool fermComplete = (millis() - stageStartMillis >= fermDurationMs);
-        if (fermComplete && !phAlertActive) {
+        // Fermentation completion: Terminal acidity cutoff (pH <= 3.00) or test duration timer
+        float currentPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? incomingData.phValue : 7.0f;
+        bool phCutoffTriggered = (currentPH <= fermTargetPH);
+        bool fermDurationElapsed = (millis() - stageStartMillis >= fermDurationMs);
+
+        if ((phCutoffTriggered || fermDurationElapsed) && !phAlertActive) {
           phAlertActive = true;
           if (!stageTransferring) {
             stageElapsedMs[1] = millis() - stageStartMillis;
             currentHeatingPercent = 0;
+            digitalWrite(SSR_FERM, LOW);
             isFermFanOn = false;
             mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
             mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
             setFanSpeed(0);
+            setMixerSpeed(0);
+            // Engage transfer flow to Chamber 3 (Pasteurization) until completely emptied
             startLiquidTransfer(2);
           }
         }
@@ -3838,11 +3819,8 @@ void loop() {
     if (currentAppState == PH_FERM_MENU)
       drawPhFermMenu(true);
 
-    if (currentAppState == TABLE19_TEST_MENU)
-      drawTable19TestMenu(true);
-
-    if (currentAppState == TABLE22_TEST_MENU)
-      drawTable22TestMenu(true);
+    if (currentAppState == PH_CUTOFF_TEST_MENU)
+      drawPhCutoffTestMenu(true);
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();
