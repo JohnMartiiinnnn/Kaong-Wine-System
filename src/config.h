@@ -133,12 +133,20 @@ enum AppState {
   PID_TRACKING_MENU,
   DISPENSER_TEST_MENU,
   DISPENSER_CAL_MENU,
+  TABLE19_TEST_MENU,
+  TABLE22_TEST_MENU,
   SETTINGS_MENU,
   GRAPH_PICK_MENU,
   PID_CHAMBER_PICK,
   PID_CONFIG_MENU
 };
 
+extern bool table19NeedsFullRedraw;
+extern bool table22NeedsFullRedraw;
+extern bool table19Running;
+extern bool table22Running;
+extern int  table19DisplayTrial;
+extern int  table22DisplayTrial;
 extern bool settingsNeedsFullRedraw;
 extern int settingsSelection;
 extern bool settingsEditing;

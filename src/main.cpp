@@ -167,6 +167,14 @@ float dispenserCalWeighedGrams = 2.83f;
 bool dispenserCalSaved = false;
 uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
+// Thesis Chapter 4 System Check Test States
+bool table19NeedsFullRedraw = true;
+bool table22NeedsFullRedraw = true;
+bool table19Running = false;
+bool table22Running = false;
+int  table19DisplayTrial = 0;
+int  table22DisplayTrial = 0;
+
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 bool pidConfigNeedsFullRedraw = true;
@@ -1170,7 +1178,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 11;
+      systemCheckSelection = (systemCheckSelection + 1) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1348,7 +1356,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 10) % 11;
+      systemCheckSelection = (systemCheckSelection + 12) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1694,6 +1702,18 @@ void loop() {
         dispenserTestStartMs = 0;
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
+      } else if (systemCheckSelection == 11) {
+        table19NeedsFullRedraw = true;
+        table19Running = false;
+        table19DisplayTrial = 0;
+        currentAppState = TABLE19_TEST_MENU;
+        drawTable19TestMenu();
+      } else if (systemCheckSelection == 12) {
+        table22NeedsFullRedraw = true;
+        table22Running = false;
+        table22DisplayTrial = 0;
+        currentAppState = TABLE22_TEST_MENU;
+        drawTable22TestMenu();
       }
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 0) {
@@ -2366,6 +2386,58 @@ void loop() {
         }
       }
     } else if (currentAppState == RAPT_TEST_MENU) {
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
+    } else if (currentAppState == TABLE19_TEST_MENU) {
+      if (!table19Running) {
+        table19Running = true;
+        drawTable19TestMenu();
+        for (int t = 1; t <= 10; t++) {
+          table19DisplayTrial = t;
+          drawTable19TestMenu(true);
+          currentHeatingPercent = 75;
+          digitalWrite(SSR_FERM, HIGH);
+          delay(100);
+          currentHeatingPercent = 0;
+          digitalWrite(SSR_FERM, LOW);
+          mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+          mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+          delay(80);
+        }
+        table19Running = false;
+        drawTable19TestMenu();
+      }
+    } else if (currentAppState == TABLE22_TEST_MENU) {
+      if (!table22Running) {
+        table22Running = true;
+        drawTable22TestMenu();
+        for (int t = 1; t <= 5; t++) {
+          table22DisplayTrial = t;
+          setMixerSpeed(50);
+          drawTable22TestMenu(true);
+          delay(120);
+          setMixerSpeed(0);
+          setPump2(true);
+          drawTable22TestMenu(true);
+          delay(100);
+          setPump2(false);
+          digitalWrite(SSR_PAST, LOW);
+          drawTable22TestMenu(true);
+          delay(80);
+        }
+        table22Running = false;
+        setMixerSpeed(0);
+        setPump2(false);
+        drawTable22TestMenu();
+      }
+    } else if (currentAppState == TABLE19_TEST_MENU || currentAppState == TABLE22_TEST_MENU) {
+      table19Running = false;
+      table22Running = false;
+      setMixerSpeed(0);
+      setPump2(false);
+      digitalWrite(SSR_FERM, LOW);
+      digitalWrite(SSR_PAST, LOW);
       currentAppState = SYSTEM_CHECK_MENU;
       systemCheckNeedsFullRedraw = true;
       drawSystemCheckMenu();
@@ -3765,6 +3837,12 @@ void loop() {
 
     if (currentAppState == PH_FERM_MENU)
       drawPhFermMenu(true);
+
+    if (currentAppState == TABLE19_TEST_MENU)
+      drawTable19TestMenu(true);
+
+    if (currentAppState == TABLE22_TEST_MENU)
+      drawTable22TestMenu(true);
 
     if (currentAppState == MIXER_MENU)
       drawMixerMenu();
