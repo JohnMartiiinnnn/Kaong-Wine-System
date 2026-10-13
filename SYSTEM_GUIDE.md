@@ -356,70 +356,39 @@ Tests the PID temperature controller for any one of the three tanks without runn
 
 ---
 
-### 5. HEATER OUTPUT
+---
 
-Tests the Pre-Heat and Pasteurization SSR heaters directly at a set duty cycle, with no temperature feedback.
+### 5. DATA LOGGING
 
-- UP/DOWN: navigate between Stage, Duty Cycle, and Start/Stop rows.
-- SELECT on Stage: enter editing, then UP/DOWN to switch between Pre-Heat and Pasteurization. SELECT again to confirm.
-- SELECT on Duty Cycle: enter editing, then UP/DOWN to adjust in 5% steps. SELECT again to confirm.
-- SELECT on Start/Stop: toggle the heater on or off.
-- **Monitor the tank temperature with a thermometer during this test.** The heater will run until you stop it manually.
+Validates local SD card storage and CSV telemetry integrity across stage transitions and continuous logging runs (Methodology Tests 18 & 21).
+
+- **Stage Transition Logging (Test 18)**: Verifies 120 packets per stage transition across Pre-heat, Fermentation, and Pasteurization stages with 0 corruptions.
+- **Continuous Logging Integrity (Test 21)**: Executes continuous 1-hour periodic CSV data dumps (4 intervals at 15 minutes each) confirming 100% telemetry continuity without file handle drops.
+- **Controls**:
+  - SELECT: Start / Stop data logging verification test.
+  - Live packet delivery counters and corruption checks update on-screen.
+  - LEFT: Exit back to System Check menu.
 
 ---
 
-### 6. QUARTZ HEATER TEST
-
-Tests the fermentation tank quartz heater SSR (SSR_FERM, GPIO 12) at a configurable duty cycle with no temperature feedback.
-
-- UP/DOWN: navigate between Duty Cycle and Start/Stop rows.
-- SELECT on Duty Cycle: enter editing, then UP/DOWN to adjust in 5% steps (0%–100%). SELECT again to confirm.
-- SELECT on Start/Stop: toggle the heater on or off. The status tile turns green when running, red when stopped.
-- The ferm tank temperature (from the secondary ESP32) updates every second in the bottom tile.
-- **Monitor the tank temperature closely during this test.** The heater runs until you stop it manually.
-- LEFT: stops the heater and returns to System Check.
-
----
-
-### 7. SD CARD VERIFY
-
-Checks that the SD card can be written to and read from correctly.
-
-- Press SELECT to run the test: it writes a small file, reads it back, and compares the content.
-- Shows PASS or FAIL for both write and read.
-- Press LEFT to exit.
-
----
-
-### 8. UART MONITOR
+### 6. UART MONITOR
 
 Shows the live health of the serial link to the Secondary ESP32.
 
-- **LINK:** OK (if a packet was received in the last 5 seconds) or NO SIGNAL.
-- **Last packet:** how many seconds ago the last packet arrived.
-- **Packets RX / Checksum errors:** total counts since boot.
+- **LINK**: OK (if a packet was received in the last 5 seconds) or NO SIGNAL.
+- **Last packet**: how many seconds ago the last packet arrived.
+- **Packets RX / Checksum errors**: total counts since boot.
 - All incoming sensor values are shown live (temperature, pH, gravity, BLE status, battery, signal strength).
 - This screen updates every second automatically.
 - Press LEFT to exit.
 
 ---
 
-### 9. SET RTC TIME
-
-Sets the hour and minute on the DS3231 real-time clock.
-
-- UP/DOWN: switch between HOUR and MINUTE fields.
-- RIGHT: increment the selected field (hour wraps 0–23, minute wraps 0–59).
-- SELECT: save the time to the RTC and exit.
-- Press LEFT to exit without saving.
-
----
-
-### 10. TRANSFER TEST
+### 7. TRANSFER TEST
 
 Tests the transfer pumps and flow sensors together.
 
-The screen shows two paths — Pre-Heat → Ferm and Ferm → Past — each with a pump status tile and a flow measurement tile.
+The screen shows two paths: Pre-Heat to Ferm and Ferm to Past, each with a pump status tile and a flow measurement tile.
 
 - UP/DOWN: switch between the two paths.
 - SELECT: toggle the pump ON or OFF for the selected path.
@@ -427,7 +396,48 @@ The screen shows two paths — Pre-Heat → Ferm and Ferm → Past — each with
 - RIGHT: enter the flow sensor calibration screen for the selected path.
 - LEFT: turns off both pumps and returns to System Check.
 
-> The flow reading depends on calibration. Before first use, run the calibration routine (see Section 11) so the liter display is accurate.
+> The flow reading depends on calibration. Before first use, run the calibration routine (see Section 10) so the liter display is accurate.
+
+---
+
+### 8. RAPT PILL
+
+Monitors direct Bluetooth Low Energy (BLE) advertisements and telemetry from the RAPT Pill digital hydrometer.
+
+- Displays live Specific Gravity (SG), internal temperature, battery level, and BLE RSSI signal strength (dBm).
+- Validates real-time hydrometer floating telemetry handshakes.
+- Press LEFT to exit.
+
+---
+
+### 9. PH & FERM TEMP
+
+Displays real-time pH and liquid temperature readings transmitted from the Secondary Controller.
+
+- Shows live calibrated pH from the PH4502C probe via ADS1115 ADC.
+- Shows fermentation liquid temperature from the secondary DS18B20 probe.
+- Press LEFT to exit.
+
+---
+
+### 10. DISPENSER TEST
+
+Tests the motorized yeast dispenser mechanism (N20 DC geared motor driven by DRV8871 H-Bridge).
+
+- SELECT: triggers calibrated dosing pulse (5s, 8s, or 12s test bursts).
+- Measures dispenser mass output and auger repeatability.
+- Press LEFT to exit.
+
+---
+
+### 11. PH AUTO-TRANSFER
+
+Validates the pH-triggered terminal acidity auto-cutoff interlock (Methodology Tests 16 & 22).
+
+- Monitors live in-line pH until threshold drops to 3.00 pH.
+- Automatically cuts fermentation heating (0V SSR) and activates Transfer Pump 2 to evacuate liquid to the pasteurization vessel.
+- Displays explicit evacuation status upon vessel draining.
+- Press LEFT to exit.
 
 ---
 
