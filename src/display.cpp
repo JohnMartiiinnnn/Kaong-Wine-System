@@ -384,24 +384,50 @@ void updateDashboardValues() {
     String pt = (simTempOverride[2] > 0.0f) ? String(simTempOverride[2], 1) + " C" : (liquid1Status ? String(getPastTemp(), 1) + " C" : "-- C");
     tft.drawCentreString(pt, 239, 144, 4);
 
-    // Est. Vol. Tile (x=5, y=176, w=152, h=45)
+    // Est. Vol. Tile / Current Trial Tile (x=5, y=176, w=152, h=45)
     tft.fillRect(7, 191, 148, 28, bgCard);
-    float pastVol = (stageTransferring && stageTransferTarget == 2)
-                        ? transferVolumeTransferred
-                        : (chamberVolume[2] > 0.0f ? chamberVolume[2] : (activeBrewStage == 2 ? transferVolumeTransferred : 0.0f));
-    String volStr2 = (pastVol > 0.05f || (stageTransferring && stageTransferTarget == 2))
-                         ? String(pastVol, 1) + " L"
-                         : ((activeBrewStage == 2 && chamberVolume[2] > 0.0f) ? String(chamberVolume[2], 1) + " L" : "-- L");
     tft.setTextColor(TFT_BLACK, bgCard);
-    tft.drawCentreString(volStr2, 81, 193, 4);
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      char trBuf[32];
+      sprintf(trBuf, "%d / %d", pastTestCurrentTrial, pastTestTotalTrials);
+      tft.drawCentreString(trBuf, 81, 193, 4);
+    } else {
+      float pastVol = (stageTransferring && stageTransferTarget == 2)
+                          ? transferVolumeTransferred
+                          : (chamberVolume[2] > 0.0f ? chamberVolume[2] : (activeBrewStage == 2 ? transferVolumeTransferred : 0.0f));
+      String volStr2 = (pastVol > 0.05f || (stageTransferring && stageTransferTarget == 2))
+                           ? String(pastVol, 1) + " L"
+                           : ((activeBrewStage == 2 && chamberVolume[2] > 0.0f) ? String(chamberVolume[2], 1) + " L" : "-- L");
+      tft.drawCentreString(volStr2, 81, 193, 4);
+    }
 
     // Status Tile (x=163, y=176, w=152, h=45) - Centered layout
     tft.fillRect(165, 189, 148, 30, bgCard);
     tft.setTextColor(TFT_BLACK, bgCard);
-    float curT = liquid1Status ? getPastTemp() : 0.0f;
+    float curT = (simTempOverride[2] > 0.0f) ? simTempOverride[2] : (liquid1Status ? getPastTemp() : 0.0f);
     float ambT = bme1Status ? bme1.readTemperature() : 0.0f;
 
-    if (stageTransferring && stageTransferTarget == 2) {
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      if (pastTestComplete) {
+        tft.setTextColor(0x03E0, bgCard);
+        tft.drawCentreString("10/10 DONE", 239, 190, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        tft.drawCentreString("TEST PASSED", 239, 206, 1);
+      } else if (pastTestFermDone) {
+        tft.setTextColor(0x0400, bgCard);
+        tft.drawCentreString("FERM DONE", 239, 190, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        sprintf(subBuf, "%.1fC -> 59.5C", curT);
+        tft.drawCentreString(subBuf, 239, 206, 1);
+      } else {
+        tft.setTextColor(TFT_RED, bgCard);
+        tft.drawCentreString("HEATING", 239, 190, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        sprintf(subBuf, "%.1fC / 60.0C", curT);
+        tft.drawCentreString(subBuf, 239, 206, 1);
+      }
+
+    } else if (stageTransferring && stageTransferTarget == 2) {
       if (transferDryRunAlarm || transferErrorActive) {
         tft.drawCentreString("DRY ALARM", 239, 190, 2);
       } else {
@@ -439,11 +465,27 @@ void updateDashboardValues() {
 }
 
 void drawDashboardHeaderInfo() {
-  if (currentAppState != DASHBOARD_ACTIVE || moduleViewActive) return;
+  if ((currentAppState != DASHBOARD_ACTIVE && currentAppState != PAST_HEATER_TEST_ACTIVE) || moduleViewActive) return;
 
   // Clear sub-bar area (Y: 50 - 88) to prevent ghosting/overlap on SD card changes
   tft.fillRect(0, 50, 320, 38, TFT_WHITE);
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
+
+  if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+    char trialHeader[48];
+    sprintf(trialHeader, "TEST 13: 60C CYCLE [%d/10]", pastTestCurrentTrial);
+    tft.drawString(trialHeader, 10, 54, 2);
+    drawWifiBadge(238, 54);
+
+    tft.drawString("TRIAL STATUS:", 10, 70, 2);
+    uint16_t statBg = pastTestComplete ? 0x03E0 : (pastTestFermDone ? 0x0400 : TFT_RED);
+    tft.setTextColor(TFT_WHITE, statBg);
+    const char *stMsg = pastTestComplete ? " 10/10 DONE " : (pastTestFermDone ? " FERM DONE " : " HEATING ");
+    tft.drawString(stMsg, 125, 70, 2);
+
+    tft.drawFastHLine(0, 88, 320, TFT_DARKGREY);
+    return;
+  }
 
   char startBuf[64];
   sprintf(startBuf, "STARTED: %s", brewStartTime);
@@ -472,25 +514,39 @@ void drawDashboardLayout() {
     tft.fillRect(0, 0, 320, 50, TFT_NAVY);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("DASHBOARD", 10, 15, 4);
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      tft.drawString("PAST HEATER TEST", 10, 15, 4);
+    } else {
+      tft.drawString("DASHBOARD", 10, 15, 4);
+    }
     tft.setTextPadding(0);
     drawDashboardHeaderInfo();
     dashNeedsFullRedraw = false;
   }
 
   // ---- 1. PHASE SELECTOR HEADER TILE (Y: 90-124) — always redraw ----
-  const char *stageNames[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
-  uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-  uint16_t viewColor = stageColors[dashSelection];
-  tft.fillRect(5, 90, 310, 34, viewColor);
-  tft.drawRect(5, 90, 310, 34, TFT_DARKGREY);
-  if (dashSelection == activeBrewStage) {
+  if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+    char pastTitle[48];
+    sprintf(pastTitle, "PASTEURIZATION [%d/10 TRIALS]", pastTestCurrentTrial);
+    tft.fillRect(5, 90, 310, 34, 0x03E0);
+    tft.drawRect(5, 90, 310, 34, TFT_DARKGREY);
     tft.fillCircle(20, 107, 5, TFT_WHITE);
+    tft.setTextColor(TFT_WHITE, 0x03E0);
+    tft.drawCentreString(pastTitle, CENTER_X, 98, 4);
   } else {
-    tft.drawCircle(20, 107, 5, TFT_WHITE);
+    const char *stageNames[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
+    uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+    uint16_t viewColor = stageColors[dashSelection];
+    tft.fillRect(5, 90, 310, 34, viewColor);
+    tft.drawRect(5, 90, 310, 34, TFT_DARKGREY);
+    if (dashSelection == activeBrewStage) {
+      tft.fillCircle(20, 107, 5, TFT_WHITE);
+    } else {
+      tft.drawCircle(20, 107, 5, TFT_WHITE);
+    }
+    tft.setTextColor(TFT_WHITE, viewColor);
+    tft.drawCentreString(stageNames[dashSelection], CENTER_X, 98, 4);
   }
-  tft.setTextColor(TFT_WHITE, viewColor);
-  tft.drawCentreString(stageNames[dashSelection], CENTER_X, 98, 4);
 
   // barY drives both parameter tile layout and graph bar position
   int barY = (dashSelection == 1) ? 259 : 225;
@@ -519,7 +575,11 @@ void drawDashboardLayout() {
     } else if (dashSelection == 2) {
       drawUnifiedTile(5, 127, 152, 45, "AMBIENT TEMP");
       drawUnifiedTile(163, 127, 152, 45, "LIQUID TEMP");
-      drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
+      if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+        drawUnifiedTile(5, 176, 152, 45, "CURRENT TRIAL");
+      } else {
+        drawUnifiedTile(5, 176, 152, 45, "EST. VOL.");
+      }
       drawUnifiedTile(163, 176, 152, 45, "STATUS", true);
     }
     prevDashSel = dashSelection;
@@ -543,7 +603,9 @@ void drawDashboardLayout() {
     tft.fillRect(0, 444, 320, 36, TFT_WHITE);
     tft.drawFastHLine(0, 444, 320, TFT_DARKGREY);
     tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-    if (transferDryRunAlarm || transferErrorActive) {
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      tft.drawCentreString("ENTER / RETURN: EXIT TEST (HEATER OFF)", CENTER_X, 458, 1);
+    } else if (transferDryRunAlarm || transferErrorActive) {
       tft.drawCentreString("XFER ALARM   ENTER: ADVANCE   UP: RETRY", CENTER_X, 458, 1);
     } else if (stageTransferring) {
       tft.drawCentreString("XFER ACTIVE   ENTER: FORCE ADVANCE", CENTER_X, 458, 1);
@@ -767,9 +829,10 @@ void drawSystemCheckMenu() {
   const char *options[] = {
       "FAN TEST",       "LIGHT INDICATORS", "RELAY TEST",     "MOTOR TEST",
       "PID CONTROL",    "DATA LOGGING",     "UART MONITOR",   "TRANSFER TEST",
-      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "PH AUTO-TRANSFER"};
+      "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "PH AUTO-TRANSFER",
+      "PAST HEATER TEST"};
 
-  const int TOTAL_OPTS = 12;
+  const int TOTAL_OPTS = 13;
   const int VISIBLE_ITEMS = 11;
   int topIndex = 0;
   if (systemCheckSelection >= VISIBLE_ITEMS) {

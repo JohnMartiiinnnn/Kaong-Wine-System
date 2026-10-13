@@ -295,8 +295,8 @@ void handleTestPasteurization() {
     // Lockout fermentation heater
     digitalWrite(SSR_FERM, LOW);
 
-    // Set pasteurization target setpoint to 80.0 °C
-    stageTargetTemp[2] = 80.0f;
+    // Set pasteurization target setpoint to 60.0 °C
+    stageTargetTemp[2] = 60.0f;
     saveBrewStateToNVS();
 
     // Engage bottom pasteurization immersion heater relay (SSR_PAST)
@@ -310,7 +310,7 @@ void handleTestPasteurization() {
     // 3. Verify interlock state:
     bool ssrPastOn = (digitalRead(SSR_PAST) == HIGH);
     bool ssrFermOff = (digitalRead(SSR_FERM) == LOW);
-    bool tempOk = (fabs(stageTargetTemp[2] - 80.0f) < 0.1f);
+    bool tempOk = (fabs(stageTargetTemp[2] - 60.0f) < 0.1f);
     bool trialPass = ssrPastOn && ssrFermOff && tempOk;
 
     results[trial - 1].trial = trial;
@@ -334,7 +334,7 @@ void handleTestPasteurization() {
   json += q + String("status") + q + ":" + q + String("ok") + q + ",";
   json += q + String("test") + q + ":13,";
   json += q + String("table") + q + ":20,";
-  json += q + String("benchmark_target_temp") + q + ":80.0,";
+  json += q + String("benchmark_target_temp") + q + ":60.0,";
   json += q + String("trials") + q + ":[";
   for (int i = 0; i < NUM_TRIALS; i++) {
     if (i > 0) json += ",";

@@ -168,6 +168,14 @@ bool dispenserCalSaved = false;
 uint32_t dispenserCalSavedTimer = 0;
 AppState prevLoadCellState = SYSTEM_CHECK_MENU;
 
+// ---- Pasteurization Heater 60C Cycling Test (Test 13) ----
+bool pastTestActive = false;
+int  pastTestCurrentTrial = 1;
+int  pastTestTotalTrials = 10;
+bool pastTestHeating = true;
+bool pastTestFermDone = false;
+bool pastTestComplete = false;
+
 // ---- Isolated pH Auto-Transfer Test State ----
 bool phTransTestNeedsFullRedraw = true;
 bool phTransTestScanning = false;
@@ -935,6 +943,45 @@ void setup() {
   drawStartMenu();
 }
 
+// ---- Pasteurization Heater 60C Cycling Test Routine (Test 13) ----
+void handlePastHeaterTestLoop() {
+  if (currentAppState != PAST_HEATER_TEST_ACTIVE || !pastTestActive) return;
+
+  float curT = (simTempOverride[2] > 0.0f) ? simTempOverride[2] : (liquid1Status ? getPastTemp() : 0.0f);
+
+  if (pastTestComplete) {
+    return;
+  }
+
+  if (pastTestHeating) {
+    if (curT >= 60.0f) {
+      pastTestHeating = false;
+      pastTestFermDone = true;
+      drawDashboardHeaderInfo();
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+    }
+  } else if (pastTestFermDone) {
+    if (curT <= 59.5f) {
+      if (pastTestCurrentTrial >= pastTestTotalTrials) {
+        pastTestComplete = true;
+        pastTestFermDone = false;
+        pastTestHeating = false;
+        drawDashboardHeaderInfo();
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+      } else {
+        pastTestCurrentTrial++;
+        pastTestHeating = true;
+        pastTestFermDone = false;
+        drawDashboardHeaderInfo();
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
+      }
+    }
+  }
+}
+
 // ---- Main Loop ----
 void loop() {
   server.handleClient();
@@ -1196,7 +1243,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 1) % 12;
+      systemCheckSelection = (systemCheckSelection + 1) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1374,7 +1421,7 @@ void loop() {
         drawCalibWizard();
       }
     } else if (currentAppState == SYSTEM_CHECK_MENU) {
-      systemCheckSelection = (systemCheckSelection + 11) % 12;
+      systemCheckSelection = (systemCheckSelection + 12) % 13;
       drawSystemCheckMenu();
     } else if (currentAppState == DISPENSER_TEST_MENU) {
       if (dispenserTestSelection == 1 && dispenserTestEditing) {
@@ -1737,7 +1784,25 @@ void loop() {
         mcp.digitalWrite(PUMP_FERM_PAST, RELAY_OFF);
         currentAppState = PH_TRANSFER_TEST_MENU;
         drawPhTransferTestMenu();
+      } else if (systemCheckSelection == 12) {
+        pastTestActive = true;
+        pastTestCurrentTrial = 1;
+        pastTestTotalTrials = 10;
+        pastTestHeating = true;
+        pastTestFermDone = false;
+        pastTestComplete = false;
+        dashSelection = 2; // Pasteurization dashboard view
+        stageTargetTemp[2] = 60.0f;
+        dashNeedsFullRedraw = true;
+        currentAppState = PAST_HEATER_TEST_ACTIVE;
+        drawDashboardLayout();
       }
+    } else if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      pastTestActive = false;
+      digitalWrite(SSR_PAST, LOW);
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == PH_TRANSFER_TEST_MENU) {
       if (phTransTestTransferActive) {
         setPump2(false);
@@ -2424,6 +2489,12 @@ void loop() {
       currentAppState = DASHBOARD_ACTIVE;
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
+    } else if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      pastTestActive = false;
+      digitalWrite(SSR_PAST, LOW);
+      currentAppState = SYSTEM_CHECK_MENU;
+      systemCheckNeedsFullRedraw = true;
+      drawSystemCheckMenu();
     } else if (currentAppState == DASHBOARD_ACTIVE) {
       if (moduleViewActive) {
         moduleViewActive = false;
@@ -3653,7 +3724,15 @@ void loop() {
     bool fState = LOW;
     bool pastState = LOW;
 
-    if (activeHeaterPin != -1 && (millis() - pidWindowStart < onTime)) {
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE && pastTestActive) {
+      if (pastTestHeating && !pastTestComplete) {
+        pastState = HIGH;
+        currentHeatingPercent = 100;
+      } else {
+        pastState = LOW;
+        currentHeatingPercent = 0;
+      }
+    } else if (activeHeaterPin != -1 && (millis() - pidWindowStart < onTime)) {
       if (activeHeaterPin == SSR_PREHEAT)
         pState = HIGH;
       else if (activeHeaterPin == SSR_FERM)
@@ -3852,6 +3931,7 @@ void loop() {
       case START_MENU:
       case NEW_BREW_WIZARD:
       case DASHBOARD_ACTIVE:
+      case PAST_HEATER_TEST_ACTIVE:
       case MIXER_MENU:
         hdrBg = TFT_NAVY;
         break;
@@ -3890,7 +3970,7 @@ void loop() {
       }
     }
 
-    if (currentAppState == DASHBOARD_ACTIVE && !moduleViewActive) {
+    if ((currentAppState == DASHBOARD_ACTIVE || currentAppState == PAST_HEATER_TEST_ACTIVE) && !moduleViewActive) {
       static wl_status_t lastDashWifiSt = WL_IDLE_STATUS;
       if (WiFi.status() != lastDashWifiSt) {
         lastDashWifiSt = WiFi.status();
@@ -3976,6 +4056,10 @@ void loop() {
           phTransTestNeedsFullRedraw = true;
         }
       }
+    }
+
+    if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
+      handlePastHeaterTestLoop();
     }
 
     if (currentAppState == MIXER_MENU)
@@ -4092,7 +4176,7 @@ void loop() {
     if (currentAppState == CALIB_WIZARD)
       drawCalibWizard();
 
-    if (currentAppState == DASHBOARD_ACTIVE) {
+    if (currentAppState == DASHBOARD_ACTIVE || currentAppState == PAST_HEATER_TEST_ACTIVE) {
       updateDashboardValues();
 
       if (activeBrewStage >= 0 && dashSelection != activeBrewStage) {

@@ -134,6 +134,7 @@ enum AppState {
   DISPENSER_TEST_MENU,
   DISPENSER_CAL_MENU,
   PH_TRANSFER_TEST_MENU,
+  PAST_HEATER_TEST_ACTIVE,
   
   SETTINGS_MENU,
   GRAPH_PICK_MENU,
@@ -498,6 +499,15 @@ extern uint32_t tareCountdownStartMs;
 extern int      tareCountdownRemainingSec;
 extern AppState tareCountdownOriginState;
 extern uint32_t tareSuccessMillis;
+
+// ---- Pasteurization Heater 60C Cycling Test (Test 13) ----
+extern bool pastTestActive;
+extern int  pastTestCurrentTrial;
+extern int  pastTestTotalTrials;
+extern bool pastTestHeating;
+extern bool pastTestFermDone;
+extern bool pastTestComplete;
+void handlePastHeaterTestLoop();
 
 // ---- Temperature Calibration Helpers ----
 float getPreheatTemp();
