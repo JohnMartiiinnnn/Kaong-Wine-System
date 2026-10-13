@@ -24,7 +24,7 @@ void drawRelayTestMenu();
 void drawMotorTestMenu();
 void drawHeaterTestPick();
 void drawHeaterTestMenu();
-void drawSdVerifyMenu();
+void drawSdVerifyMenu(bool valuesOnly = false);
 void drawUartMonitorMenu();
 void drawRtcSetMenu();
 void drawValueTile(int x, int y, const char *label, String value, bool isError);

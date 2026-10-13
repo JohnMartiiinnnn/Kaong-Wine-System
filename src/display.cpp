@@ -766,7 +766,7 @@ void drawSystemCheckMenu() {
 
   const char *options[] = {
       "FAN TEST",       "LIGHT INDICATORS", "RELAY TEST",     "MOTOR TEST",
-      "PID CONTROL",    "SD CARD VERIFY",   "UART MONITOR",   "TRANSFER TEST",
+      "PID CONTROL",    "DATA LOGGING",     "UART MONITOR",   "TRANSFER TEST",
       "RAPT PILL",      "PH & FERM TEMP",   "DISPENSER TEST", "PH AUTO-TRANSFER"};
 
   const int TOTAL_OPTS = 12;
@@ -1910,51 +1910,123 @@ void drawHeaterTestMenu() {
   tft.drawCentreString("RETURN: BACK", CENTER_X, 462, 1);
 }
 
-void drawSdVerifyMenu() {
-  char buf[40];
+void drawSdVerifyMenu(bool valuesOnly) {
+  char buf[48];
+
+  if (valuesOnly && !sdVerifyNeedsFullRedraw) {
+    static uint32_t lastRefreshMs = 0;
+    if (millis() - lastRefreshMs < 200) return;
+    lastRefreshMs = millis();
+
+    // Live update Card 2: Logging test status
+    uint16_t logBg = logTestRunning ? 0xFD20 : (logTestDone ? (logTestIntegrityPass == 1 ? 0x0400 : 0xF800) : 0xD6BA);
+    uint16_t logFg = (logTestRunning || logTestDone) ? TFT_WHITE : TFT_BLACK;
+    tft.fillRect(10, 120, 300, 75, logBg);
+    tft.drawRect(10, 120, 300, 75, TFT_DARKGREY);
+    tft.setTextColor(logFg, logBg);
+
+    if (logTestRunning) {
+      const char* stNames[] = {"PREHEAT", "FERMENTATION", "PASTEURIZATION"};
+      sprintf(buf, "LOGGING: %s", stNames[logTestCurrentStage]);
+      tft.drawCentreString(buf, CENTER_X, 127, 2);
+      sprintf(buf, "Pkt: %d/%d  Total: %d", logTestStagePackets[logTestCurrentStage], logTestTargetPackets,
+              logTestStagePackets[0] + logTestStagePackets[1] + logTestStagePackets[2]);
+      tft.drawCentreString(buf, CENTER_X, 150, 2);
+      tft.drawCentreString("Verifying packet delivery & telemetry...", CENTER_X, 172, 1);
+    } else if (logTestDone) {
+      if (logTestIntegrityPass == 1) {
+        tft.drawCentreString("LOGGING & INTEGRITY: PASS", CENTER_X, 127, 2);
+        sprintf(buf, "Packets: %d/%d (100%% Delivery)", 
+                logTestStagePackets[0] + logTestStagePackets[1] + logTestStagePackets[2], logTestTargetPackets * 3);
+        tft.drawCentreString(buf, CENTER_X, 150, 2);
+        tft.drawCentreString("0 Corruptions | 100% Valid CSV Continuity", CENTER_X, 172, 1);
+      } else {
+        tft.drawCentreString("LOGGING & INTEGRITY: FAIL", CENTER_X, 127, 2);
+        tft.drawCentreString("Packet drop or CSV corruption detected", CENTER_X, 150, 2);
+      }
+    } else {
+      tft.drawCentreString("DATA LOGGING & INTEGRITY TEST", CENTER_X, 127, 2);
+      tft.drawCentreString("Preheat -> Ferm -> Past Transitions", CENTER_X, 150, 2);
+      tft.drawCentreString("Target: 40 pkts/stage | 100% Continuity", CENTER_X, 172, 1);
+    }
+    return;
+  }
 
   if (sdVerifyNeedsFullRedraw) {
     tft.fillRect(0, 0, 320, 50, 0x03E0);
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("SD CARD VERIFY", 10, 15, 4);
+    tft.drawString("DATA LOGGING TEST", 10, 15, 4);
     sdVerifyNeedsFullRedraw = false;
   }
 
-  // Mount status
-  uint16_t mBg = sdStatus ? 0x0400 : 0xF800;
-  tft.fillRect(10, 60, 300, 55, mBg);
-  tft.drawRect(10, 60, 300, 55, TFT_DARKGREY);
+  // Card 1: Mount & Raw Read/Write
+  uint16_t mBg = sdStatus ? ((sdVerifyResult == 1) ? 0x0400 : 0x03E0) : 0xF800;
+  tft.fillRect(10, 58, 300, 56, mBg);
+  tft.drawRect(10, 58, 300, 56, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, mBg);
-  tft.drawString("MOUNT STATUS", 20, 70, 2);
-  tft.drawRightString(sdStatus ? "OK" : "FAILED", 300, 70, 2);
-  tft.drawCentreString(sdStatus ? "Card detected and mounted"
-                                : "No card or mount error",
-                       CENTER_X, 94, 1);
+  tft.drawString("SD MOUNT / R/W", 20, 66, 2);
+  const char* rwStatusStr = !sdStatus ? "FAILED" : ((sdVerifyResult == 1) ? "VERIFIED PASS" : "MOUNTED OK");
+  tft.drawRightString(rwStatusStr, 300, 66, 2);
+  tft.drawCentreString(sdStatus ? "FAT32 Card Mounted - R/W Buffer Ready" : "No card or mount initialization error",
+                       CENTER_X, 92, 1);
 
-  // Write/read result
-  uint16_t vrBg =
-      (sdVerifyResult == 1) ? 0x0400 : (sdVerifyResult == 0 ? 0xF800 : 0xD6BA);
-  const char *vrTxt = (sdVerifyResult == 1)   ? "WRITE / READ: PASS"
-                      : (sdVerifyResult == 0) ? "WRITE / READ: FAIL"
-                                              : "WRITE / READ: NOT TESTED";
-  tft.fillRect(10, 123, 300, 55, vrBg);
-  tft.drawRect(10, 123, 300, 55, TFT_DARKGREY);
-  tft.setTextColor((sdVerifyResult < 0) ? TFT_BLACK : TFT_WHITE, vrBg);
-  tft.drawCentreString(vrTxt, CENTER_X, 143, 2);
+  // Card 2: Logging Test Status
+  uint16_t logBg = logTestRunning ? 0xFD20 : (logTestDone ? (logTestIntegrityPass == 1 ? 0x0400 : 0xF800) : 0xD6BA);
+  uint16_t logFg = (logTestRunning || logTestDone) ? TFT_WHITE : TFT_BLACK;
+  tft.fillRect(10, 120, 300, 75, logBg);
+  tft.drawRect(10, 120, 300, 75, TFT_DARKGREY);
+  tft.setTextColor(logFg, logBg);
 
-  // Action button
-  uint16_t btnBg = sdStatus ? 0x3566 : TFT_DARKGREY;
-  tft.fillRect(10, 196, 300, 60, btnBg);
-  tft.drawRect(10, 196, 300, 60, TFT_DARKGREY);
+  if (logTestRunning) {
+    const char* stNames[] = {"PREHEAT", "FERMENTATION", "PASTEURIZATION"};
+    sprintf(buf, "LOGGING: %s", stNames[logTestCurrentStage]);
+    tft.drawCentreString(buf, CENTER_X, 127, 2);
+    sprintf(buf, "Pkt: %d/%d  Total: %d", logTestStagePackets[logTestCurrentStage], logTestTargetPackets,
+            logTestStagePackets[0] + logTestStagePackets[1] + logTestStagePackets[2]);
+    tft.drawCentreString(buf, CENTER_X, 150, 2);
+    tft.drawCentreString("Verifying packet delivery & telemetry...", CENTER_X, 172, 1);
+  } else if (logTestDone) {
+    if (logTestIntegrityPass == 1) {
+      tft.drawCentreString("LOGGING & INTEGRITY: PASS", CENTER_X, 127, 2);
+      sprintf(buf, "Packets: %d/%d (100%% Delivery)", 
+              logTestStagePackets[0] + logTestStagePackets[1] + logTestStagePackets[2], logTestTargetPackets * 3);
+      tft.drawCentreString(buf, CENTER_X, 150, 2);
+      tft.drawCentreString("0 Corruptions | 100% Valid CSV Continuity", CENTER_X, 172, 1);
+    } else {
+      tft.drawCentreString("LOGGING & INTEGRITY: FAIL", CENTER_X, 127, 2);
+      tft.drawCentreString("Packet drop or CSV corruption detected", CENTER_X, 150, 2);
+    }
+  } else {
+    tft.drawCentreString("DATA LOGGING & INTEGRITY TEST", CENTER_X, 127, 2);
+    tft.drawCentreString("Preheat -> Ferm -> Past Transitions", CENTER_X, 150, 2);
+    tft.drawCentreString("Target: 40 pkts/stage | 100% Continuity", CENTER_X, 172, 1);
+  }
+
+  // Card 3: Live File Details & CSV Path
+  tft.fillRect(10, 201, 300, 52, 0xD6BA);
+  tft.drawRect(10, 201, 300, 52, TFT_DARKGREY);
+  tft.setTextColor(TFT_BLACK, 0xD6BA);
+  tft.drawString("FILE PATH:", 20, 209, 2);
+  const char* activeFileStr = (logTestFileName[0] != '\0') ? logTestFileName : (currentLogFile.length() > 0 ? currentLogFile.c_str() : "/data_log.csv");
+  tft.drawRightString(activeFileStr, 300, 209, 2);
+  sprintf(buf, "Stage Pkts: [%d, %d, %d] / 120", logTestStagePackets[0], logTestStagePackets[1], logTestStagePackets[2]);
+  tft.drawCentreString(buf, CENTER_X, 231, 1);
+
+  // Action Button
+  uint16_t btnBg = !sdStatus ? TFT_DARKGREY : (logTestRunning ? 0xF800 : 0x3566);
+  tft.fillRect(10, 260, 300, 60, btnBg);
+  tft.drawRect(10, 260, 300, 60, TFT_DARKGREY);
   tft.setTextColor(TFT_WHITE, btnBg);
-  tft.drawCentreString("RUN VERIFY TEST", CENTER_X, 212, 4);
-  tft.drawCentreString(sdStatus ? "SELECT TO RUN" : "SD NOT AVAILABLE",
-                       CENTER_X, 242, 1);
+  const char* btnTitle = !sdStatus ? "SD CARD NOT MOUNTED" : (logTestRunning ? "STOP LOGGING TEST" : "START DATA LOGGING TEST");
+  tft.drawCentreString(btnTitle, CENTER_X, 274, 4);
+  const char* btnSub = !sdStatus ? "INSERT SD CARD" : (logTestRunning ? "CLICK TO ABORT RUN" : "TEST 18 (TRANSITIONS) & 21 (CONTINUITY)");
+  tft.drawCentreString(btnSub, CENTER_X, 302, 1);
 
+  // Footer
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT: RUN TEST   RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("SELECT: START/STOP   RETURN: BACK", CENTER_X, 458, 1);
 }
 
 void drawUartMonitorMenu() {

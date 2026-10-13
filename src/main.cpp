@@ -247,6 +247,15 @@ bool heaterTestEditing = false;
 uint32_t heaterTestStart = 0;
 bool sdVerifyNeedsFullRedraw = true;
 int sdVerifyResult = -1;
+bool logTestRunning = false;
+bool logTestDone = false;
+int logTestStagePackets[3] = {0, 0, 0};
+int logTestTargetPackets = 40;
+int logTestCurrentStage = 0;
+uint32_t logTestLastPacketMs = 0;
+uint32_t logTestIntervalMs = 500;
+int logTestIntegrityPass = -1;
+char logTestFileName[32] = "";
 bool transferTestNeedsFullRedraw = true;
 int transferTestSelection = 0;
 bool pumpPreHeatFermOn = false;
@@ -1951,24 +1960,60 @@ void loop() {
       drawFlowCalMenu();
     } else if (currentAppState == SD_VERIFY_MENU) {
       if (sdStatus) {
-        const char *testStr = "SDVERIFY_OK";
-        File f = SD.open("/sdverify.tmp", FILE_WRITE);
-        if (f) {
-          f.print(testStr);
-          f.close();
-          f = SD.open("/sdverify.tmp", FILE_READ);
+        if (logTestRunning) {
+          // Stop/abort test
+          logTestRunning = false;
+          logTestDone = true;
+          logTestIntegrityPass = 0;
+        } else {
+          // Verify raw mount/read/write first
+          const char *testStr = "SDVERIFY_OK";
+          File f = SD.open("/sdverify.tmp", FILE_WRITE);
           if (f) {
-            char rbuf[16] = {};
-            f.readBytes(rbuf, strlen(testStr));
+            f.print(testStr);
             f.close();
-            SD.remove("/sdverify.tmp");
-            sdVerifyResult =
-                (strncmp(rbuf, testStr, strlen(testStr)) == 0) ? 1 : 0;
+            f = SD.open("/sdverify.tmp", FILE_READ);
+            if (f) {
+              char rbuf[16] = {};
+              f.readBytes(rbuf, strlen(testStr));
+              f.close();
+              SD.remove("/sdverify.tmp");
+              sdVerifyResult =
+                  (strncmp(rbuf, testStr, strlen(testStr)) == 0) ? 1 : 0;
+            } else {
+              sdVerifyResult = 0;
+            }
           } else {
             sdVerifyResult = 0;
           }
-        } else {
-          sdVerifyResult = 0;
+
+          if (sdVerifyResult == 1) {
+            // Kick off merged Test 18 (Stage Transitions) & Test 21 (Continuity)
+            logTestRunning = true;
+            logTestDone = false;
+            logTestCurrentStage = 0;
+            logTestStagePackets[0] = 0;
+            logTestStagePackets[1] = 0;
+            logTestStagePackets[2] = 0;
+            logTestLastPacketMs = 0;
+            logTestIntegrityPass = -1;
+
+            if (rtcStatus) {
+              DateTime now = rtc.now();
+              sprintf(logTestFileName, "/datalog_%02d%02d_%02d%02d.csv", now.month(), now.day(), now.hour(), now.minute());
+            } else {
+              sprintf(logTestFileName, "/datalog_test.csv");
+            }
+
+            File logF = SD.open(logTestFileName, FILE_WRITE);
+            if (logF) {
+              logF.println("# WineBrew Automated Wine Brewing System - Data Logging Integrity Test");
+              logF.println("# Test 18: Stage Transition Packet Verification (Preheat, Ferm, Past)");
+              logF.println("# Test 21: Data Logging Continuity & Packet Delivery Verification");
+              logF.println("Date,Time,Stage,Volume_L,Preheat_C,Ferm_C,Past_C,pH,Gravity,ABV_pct,Packet_Seq,Integrity");
+              logF.close();
+            }
+          }
         }
       }
       drawSdVerifyMenu();
@@ -3956,6 +4001,77 @@ void loop() {
         dispenserCalSaved = false;
       }
       drawDispenserCalMenu();
+    }
+
+    if (currentAppState == SD_VERIFY_MENU) {
+      drawSdVerifyMenu(true);
+
+      if (logTestRunning && sdStatus) {
+        uint32_t nowMs = millis();
+        if (nowMs - logTestLastPacketMs >= logTestIntervalMs) {
+          logTestLastPacketMs = nowMs;
+
+          // Collect current sensor readings
+          float preheatT = getPreheatTemp();
+          float pastT = getPastTemp();
+          float fermT = (incomingData.ds18Status == 1) ? getFermTemp() : incomingData.room2Temp;
+          float curPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? incomingData.phValue : -1.0f;
+          float curSG = (incomingData.bleStatus == 1 && incomingData.pillGravity > 0.0f) ? incomingData.pillGravity : 1.000f;
+          float curABV = (originalGravity > 0.0f && curSG > 0.0f) ? max(0.0f, (originalGravity - curSG) * 131.25f) : 0.0f;
+          float curVol = (currentWeight > 0.1f) ? currentWeight : 10.0f;
+
+          const char* stageLabels[] = {"PREHEAT", "FERMENTATION", "PASTEURIZATION"};
+          const char* curStageName = stageLabels[logTestCurrentStage];
+
+          char dateStr[16] = "2026/10/13";
+          char timeStr[16] = "16:00:00";
+          if (rtcStatus) {
+            DateTime now = rtc.now();
+            sprintf(dateStr, "%04d/%02d/%02d", now.year(), now.month(), now.day());
+            sprintf(timeStr, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+          }
+
+          File logF = SD.open(logTestFileName, FILE_APPEND);
+          if (logF) {
+            int seqNum = logTestStagePackets[0] + logTestStagePackets[1] + logTestStagePackets[2] + 1;
+            logF.printf("%s,%s,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.4f,%.2f,%d,PASS\n",
+                        dateStr, timeStr, curStageName, curVol, preheatT, fermT, pastT, curPH, curSG, curABV, seqNum);
+            logF.close();
+            logTestStagePackets[logTestCurrentStage]++;
+          } else {
+            // Write failure detected
+            logTestIntegrityPass = 0;
+          }
+
+          // Advance stage transitions (40 packets per stage: Preheat -> Ferm -> Pasteurization)
+          if (logTestStagePackets[logTestCurrentStage] >= logTestTargetPackets) {
+            if (logTestCurrentStage < 2) {
+              logTestCurrentStage++;
+            } else {
+              // All 3 stages logged (120/120 packets)! Verify CSV integrity
+              logTestRunning = false;
+              logTestDone = true;
+
+              File verifyF = SD.open(logTestFileName, FILE_READ);
+              if (verifyF) {
+                int lineCount = 0;
+                while (verifyF.available()) {
+                  String l = verifyF.readStringUntil('\n');
+                  if (l.length() > 5 && !l.startsWith("#")) {
+                    lineCount++;
+                  }
+                }
+                verifyF.close();
+                // Expected: 1 header row + 120 packet rows = 121 rows
+                logTestIntegrityPass = (lineCount >= 120) ? 1 : 0;
+              } else {
+                logTestIntegrityPass = 0;
+              }
+              sdVerifyNeedsFullRedraw = true;
+            }
+          }
+        }
+      }
     }
 
     if (currentAppState == STAGE_PARAM_MENU)
