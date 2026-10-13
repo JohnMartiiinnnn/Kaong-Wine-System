@@ -172,22 +172,24 @@ static void formatStageTimer(uint32_t ms, char *out) {
 }
 
 void updateDashboardValues() {
-  if (currentAppState != DASHBOARD_ACTIVE) return;
+  if (currentAppState != DASHBOARD_ACTIVE && currentAppState != PAST_HEATER_TEST_ACTIVE) return;
 
   char buf[64];
   char subBuf[32];
   uint16_t bgCard = 0xD6BA; // Light Gray tile fill
 
   // Live countdown timer text on Header Tile (Y=90 to 124)
-  const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-  uint16_t viewColor = stageColors[dashSelection];
-  tft.fillRect(265, 98, 28, 18, viewColor);
-  if (dashSelection != activeBrewStage && activeBrewStage >= 0) {
-    int remSec = 5 - (int)((millis() - lastPhaseViewNavMs) / 1000);
-    if (remSec < 1) remSec = 1;
-    sprintf(buf, "%ds", remSec);
-    tft.setTextColor(TFT_YELLOW, viewColor);
-    tft.drawString(buf, 266, 100, 2);
+  if (currentAppState != PAST_HEATER_TEST_ACTIVE) {
+    const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
+    uint16_t viewColor = stageColors[dashSelection];
+    tft.fillRect(265, 98, 28, 18, viewColor);
+    if (dashSelection != activeBrewStage && activeBrewStage >= 0) {
+      int remSec = 5 - (int)((millis() - lastPhaseViewNavMs) / 1000);
+      if (remSec < 1) remSec = 1;
+      sprintf(buf, "%ds", remSec);
+      tft.setTextColor(TFT_YELLOW, viewColor);
+      tft.drawString(buf, 266, 100, 2);
+    }
   }
 
 
@@ -515,7 +517,7 @@ void drawDashboardLayout() {
     tft.fillRect(0, 50, 320, 430, TFT_WHITE);
     tft.setTextColor(TFT_WHITE);
     if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
-      tft.drawString("PAST HEATER TEST", 10, 15, 4);
+      tft.drawString("TEST 13", 10, 15, 4);
     } else {
       tft.drawString("DASHBOARD", 10, 15, 4);
     }
@@ -526,13 +528,11 @@ void drawDashboardLayout() {
 
   // ---- 1. PHASE SELECTOR HEADER TILE (Y: 90-124) — always redraw ----
   if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
-    char pastTitle[48];
-    sprintf(pastTitle, "PASTEURIZATION [%d/10 TRIALS]", pastTestCurrentTrial);
     tft.fillRect(5, 90, 310, 34, 0x03E0);
     tft.drawRect(5, 90, 310, 34, TFT_DARKGREY);
     tft.fillCircle(20, 107, 5, TFT_WHITE);
     tft.setTextColor(TFT_WHITE, 0x03E0);
-    tft.drawCentreString(pastTitle, CENTER_X, 98, 4);
+    tft.drawCentreString("PASTEURIZATION", CENTER_X, 98, 4);
   } else {
     const char *stageNames[] = {"PRE-HEATING", "FERMENTATION", "PASTEURIZATION"};
     uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
@@ -597,6 +597,7 @@ void drawDashboardLayout() {
   tft.drawCentreString(barBuf, CENTER_X, barY + 4, 2);
 
   updateDashboardValues();
+  updateDashboardGraph();
 
   // ---- 4. FOOTER — only on full redraw ----
   if (doFullRedraw) {
@@ -2382,8 +2383,9 @@ void drawSettingsMenu() {
 }
 
 void updateDashboardGraph() {
-  if (currentAppState != DASHBOARD_ACTIVE || moduleViewActive ||
-      activeBrewStage < 0 || stageTransferring)
+  bool isPastTest = (currentAppState == PAST_HEATER_TEST_ACTIVE);
+  if ((currentAppState != DASHBOARD_ACTIVE && !isPastTest) || moduleViewActive ||
+      (!isPastTest && (activeBrewStage < 0 || stageTransferring)))
     return;
 
   const int GX = 28;
@@ -2392,11 +2394,19 @@ void updateDashboardGraph() {
   const int GH = (dashSelection == 1) ? 146 : 178;
 
   const uint16_t stageColors[] = {TFT_RED, TFT_ORANGE, 0x03E0};
-  uint16_t lineColor = stageColors[activeBrewStage];
+  uint16_t lineColor = isPastTest ? 0x03E0 : stageColors[activeBrewStage];
 
   float yMin, yMax;
   float tickTemps[5];
-  if (dashSelection == 1 && dashGraphPlotType == 1) { // pH Level
+  if (isPastTest) {
+    yMin = 20.0f;
+    yMax = 70.0f;
+    tickTemps[0] = 20;
+    tickTemps[1] = 30;
+    tickTemps[2] = 40;
+    tickTemps[3] = 50;
+    tickTemps[4] = 60;
+  } else if (dashSelection == 1 && dashGraphPlotType == 1) { // pH Level
     yMin = 3.0f;
     yMax = 7.0f;
     tickTemps[0] = 3.0f;
@@ -2460,7 +2470,11 @@ void updateDashboardGraph() {
   }
 
   // Target dashed lines
-  if (dashSelection == 1 && dashGraphPlotType == 1) { // pH target line
+  if (isPastTest) {
+    int ty = tempToY(60.0f);
+    for (int x = GX; x < GX + GW - 1; x += 4)
+      tft.drawFastHLine(x, ty, 2, TFT_GREEN);
+  } else if (dashSelection == 1 && dashGraphPlotType == 1) { // pH target line
     int py = tempToY(4.5f);
     for (int x = GX; x < GX + GW - 1; x += 4) tft.drawFastHLine(x, py, 2, TFT_GREEN);
   } else if (dashSelection == 1 && dashGraphPlotType == 2) { // SG target line
@@ -2483,7 +2497,7 @@ void updateDashboardGraph() {
   tft.drawRect(GX, GPY, GW, GH, TFT_DARKGREY);
 
   // Data line
-  uint16_t plotColor = (dashSelection == 1 && dashGraphPlotType == 1) ? TFT_YELLOW : ((dashSelection == 1 && dashGraphPlotType == 2) ? TFT_CYAN : lineColor);
+  uint16_t plotColor = isPastTest ? 0x03E0 : ((dashSelection == 1 && dashGraphPlotType == 1) ? TFT_YELLOW : ((dashSelection == 1 && dashGraphPlotType == 2) ? TFT_CYAN : lineColor));
   int n = tempHistoryCount;
   if (n >= 2) {
     int displayCount = (n < GW) ? n : GW;

@@ -1793,6 +1793,11 @@ void loop() {
         pastTestComplete = false;
         dashSelection = 2; // Pasteurization dashboard view
         stageTargetTemp[2] = 60.0f;
+        tempHistoryCount = 0;
+        float initT = (simTempOverride[2] > 0.0f) ? simTempOverride[2] : (liquid1Status ? getPastTemp() : 0.0f);
+        if (initT > 0.0f) {
+          tempHistory[tempHistoryCount++] = initT;
+        }
         dashNeedsFullRedraw = true;
         currentAppState = PAST_HEATER_TEST_ACTIVE;
         drawDashboardLayout();
@@ -4187,16 +4192,22 @@ void loop() {
         }
       }
 
-      if (activeBrewStage >= 0 && !stageTransferring) {
+      static uint32_t lastGraphSampleMs = 0;
+      bool isPastTest = (currentAppState == PAST_HEATER_TEST_ACTIVE);
+      if (((activeBrewStage >= 0 && !stageTransferring) || isPastTest) && (millis() - lastGraphSampleMs >= 1000UL)) {
+        lastGraphSampleMs = millis();
         float gTemp = -999.0f;
-        if (simTempOverride[activeBrewStage] > 0.0f)
+        if (isPastTest) {
+          gTemp = (simTempOverride[2] > 0.0f) ? simTempOverride[2] : (liquid1Status ? getPastTemp() : 0.0f);
+        } else if (simTempOverride[activeBrewStage] > 0.0f) {
           gTemp = simTempOverride[activeBrewStage];
-        else if (activeBrewStage == 0 && liquid2Status)
+        } else if (activeBrewStage == 0 && liquid2Status) {
           gTemp = getPreheatTemp();
-        else if (activeBrewStage == 1 && incomingData.ds18Status == 1)
+        } else if (activeBrewStage == 1 && incomingData.ds18Status == 1) {
           gTemp = getFermTemp();
-        else if (activeBrewStage == 2 && liquid1Status)
+        } else if (activeBrewStage == 2 && liquid1Status) {
           gTemp = getPastTemp();
+        }
         if (gTemp > -100.0f) {
           if (tempHistoryCount < TEMP_GRAPH_W) {
             tempHistory[tempHistoryCount++] = gTemp;
