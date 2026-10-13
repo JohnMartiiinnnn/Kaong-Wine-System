@@ -23,6 +23,11 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
 </head>
 <body>
 <h1>SYSTEM MONITOR</h1>
+<div class="card" id="pastCard" style="display:none;background:#1e1b4b;border-color:#6366f1;text-align:center">
+  <div class="label" style="color:#a5b4fc">Test 13: Pasteurization Heater Interlock</div>
+  <div class="val" id="pastTrial" style="color:#818cf8">-- / 10 Trials</div>
+  <div style="margin-top:.4rem"><span class="status" id="pastStatus" style="background:#4338ca;color:#e0e7ff">IDLE</span></div>
+</div>
 <div class="card" style="text-align:center">
   <div class="label">Sap Volume</div>
   <div class="val" id="vol">--</div><span class="unit">Liters</span>
@@ -45,6 +50,14 @@ async function update(){
   try{
     const r=await fetch('/data');
     const d=await r.json();
+    if(d.past_active){
+      document.getElementById('pastCard').style.display='block';
+      document.getElementById('pastTrial').innerText=d.past_trial+' / '+d.past_tot+' Trials';
+      document.getElementById('pastStatus').innerText=d.past_done ? '10/10 COMPLETED (PASSED)' : (d.past_ferm ? 'FERM DONE (COOLING)' : 'HEATING (60.0°C TARGET)');
+      document.getElementById('pastStatus').className='status ' + (d.past_done ? 'good' : (d.past_ferm ? 'warn' : ''));
+    } else {
+      document.getElementById('pastCard').style.display='none';
+    }
     document.getElementById('vol').innerText=d.vol.toFixed(2);
     document.getElementById('la').innerText=d.la.toFixed(1);
     document.getElementById('ll').innerText=d.ll.toFixed(1);
@@ -171,7 +184,13 @@ void handleData() {
   json += "\"tgt_sg_val\":" + String(fermTargetGravity, 4) + ",";
   json += "\"ferm_dur_hr\":" + String((float)fermDurationMs / (3600.0f * 1000.0f), 1) + ",";
   json += "\"xfer1\":" + String(transfer1Volume, 2) + ",";
-  json += "\"xfer2\":" + String(transfer2Volume, 2);
+  json += "\"xfer2\":" + String(transfer2Volume, 2) + ",";
+  json += "\"past_active\":" + String(pastTestActive ? 1 : 0) + ",";
+  json += "\"past_trial\":" + String(pastTestCurrentTrial) + ",";
+  json += "\"past_tot\":" + String(pastTestTotalTrials) + ",";
+  json += "\"past_heat\":" + String(pastTestHeating ? 1 : 0) + ",";
+  json += "\"past_ferm\":" + String(pastTestFermDone ? 1 : 0) + ",";
+  json += "\"past_done\":" + String(pastTestComplete ? 1 : 0);
   json += "}";
   server.send(200, "application/json", json);
 }
