@@ -188,6 +188,33 @@ uint32_t phTransTestLastPulseMs = 0;
 uint32_t phTransTestLastPulses = 0;
 bool phTransTestHasFlowed = false;
 
+// ---- Rolling Median pH Filter (Outlier Rejection) ----
+#define PH_ROLLING_WINDOW_SIZE 11
+static float phRollingWindow[PH_ROLLING_WINDOW_SIZE] = {0};
+static int phRollingCount = 0;
+static int phRollingHead = 0;
+
+void addPHSample(float val) {
+  if (val <= 0.1f || val > 14.0f) return;
+  phRollingWindow[phRollingHead] = val;
+  phRollingHead = (phRollingHead + 1) % PH_ROLLING_WINDOW_SIZE;
+  if (phRollingCount < PH_ROLLING_WINDOW_SIZE) phRollingCount++;
+}
+
+float getFilteredPH() {
+  if (phRollingCount == 0) return 7.0f;
+  float sorted[PH_ROLLING_WINDOW_SIZE];
+  for (int i = 0; i < phRollingCount; i++) sorted[i] = phRollingWindow[i];
+  for (int i = 0; i < phRollingCount - 1; i++) {
+    for (int j = 0; j < phRollingCount - 1 - i; j++) {
+      if (sorted[j] > sorted[j + 1]) {
+        float tmp = sorted[j]; sorted[j] = sorted[j + 1]; sorted[j + 1] = tmp;
+      }
+    }
+  }
+  return sorted[phRollingCount / 2];
+}
+
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 bool pidConfigNeedsFullRedraw = true;
@@ -2892,6 +2919,10 @@ void loop() {
       incomingData.pillGravity += GRAVITY_OFFSET;
       lastDataReceivedMillis = millis();
 
+      if (incomingData.adsStatus == 1 && incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f) {
+        addPHSample(incomingData.phValue);
+      }
+
       // Maintain continuous motor heartbeat to Secondary ESP32 based on active state
       int activeMixerSpeed = 0;
       if (currentAppState == MOTOR_TEST_MENU) {
@@ -3492,9 +3523,17 @@ void loop() {
           quartzPid.reset();
         }
 
-        // Fermentation completion: Terminal acidity cutoff (pH <= 3.00) or test duration timer
-        float currentPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? incomingData.phValue : 7.0f;
-        bool phCutoffTriggered = (currentPH <= fermTargetPH);
+        // Fermentation completion: Terminal acidity cutoff (pH <= 3.00) with rolling median & 10s persistence
+        float currentPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? getFilteredPH() : 7.0f;
+        static uint32_t phTriggerStartMs = 0;
+        if (currentPH <= fermTargetPH && currentPH > 0.5f) {
+          if (phTriggerStartMs == 0) {
+            phTriggerStartMs = millis();
+          }
+        } else {
+          phTriggerStartMs = 0;
+        }
+        bool phCutoffTriggered = (phTriggerStartMs > 0 && (millis() - phTriggerStartMs >= 10000UL));
         bool fermDurationElapsed = (millis() - stageStartMillis >= fermDurationMs);
 
         if ((phCutoffTriggered || fermDurationElapsed) && !phAlertActive) {
@@ -4002,7 +4041,7 @@ void loop() {
       drawPhTransferTestMenu(true);
 
       float curPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f)
-                        ? incomingData.phValue
+                        ? getFilteredPH()
                         : ((incomingData.phValue > 0.0f && incomingData.phValue <= 14.0f) ? incomingData.phValue : -1.0f);
 
       // Automatic trigger when scanning and target pH acidity detected (<= 3.00 pH)

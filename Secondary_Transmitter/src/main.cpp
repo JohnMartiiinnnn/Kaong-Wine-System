@@ -323,10 +323,32 @@ void loop() {
       txData.room2LiquidTemp = -127.0;
     }
 
-    // 4. Update pH data and Motor Current Sense
+    // 4. Update pH data with 10-sample trimmed median filter and EMA
     if (txData.adsStatus == 1) {
-      int16_t results = ads.readADC_SingleEnded(0);
-      float voltage = ads.computeVolts(results);
+      float samples[10];
+      for (int s = 0; s < 10; s++) {
+        int16_t raw = ads.readADC_SingleEnded(0);
+        samples[s] = ads.computeVolts(raw);
+        delay(5);
+      }
+
+      // Sort samples ascending
+      for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9 - i; j++) {
+          if (samples[j] > samples[j + 1]) {
+            float tmp = samples[j];
+            samples[j] = samples[j + 1];
+            samples[j + 1] = tmp;
+          }
+        }
+      }
+
+      // Discard lowest 2 and highest 2, average middle 6
+      float sumVolts = 0.0f;
+      for (int i = 2; i < 8; i++) {
+        sumVolts += samples[i];
+      }
+      float voltage = sumVolts / 6.0f;
 
       // Temperature Compensation & Dual-Slope Calibration (Nernst-based)
       // Calibrated against 4.01, 6.86, and 9.18 buffers @ ~30C
@@ -337,11 +359,18 @@ void loop() {
                              ? 0.16553f
                              : 0.17086f; // Acid vs Alkaline slope @ 25C
       float slope_V_pH = base_slope * (tempC + 273.15f) / 298.15f;
-      txData.phValue = 7.0f - (voltage - 2.555f) / slope_V_pH;
-      if (txData.phValue < 0.0f)
-        txData.phValue = 0.0f;
-      if (txData.phValue > 14.0f)
-        txData.phValue = 14.0f;
+      float rawPH = 7.0f - (voltage - 2.555f) / slope_V_pH;
+      if (rawPH < 0.0f)
+        rawPH = 0.0f;
+      if (rawPH > 14.0f)
+        rawPH = 14.0f;
+
+      // Exponential Moving Average (EMA) for continuous drift smoothing
+      if (txData.phValue <= 0.1f || txData.phValue > 14.0f) {
+        txData.phValue = rawPH;
+      } else {
+        txData.phValue = (0.30f * rawPH) + (0.70f * txData.phValue);
+      }
 
       // Read channel A1 for BTS7960 current sense
       int16_t results_motor = ads.readADC_SingleEnded(1);
