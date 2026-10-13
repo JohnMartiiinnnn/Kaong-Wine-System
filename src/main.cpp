@@ -215,7 +215,7 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {40.0f, 38.0f, 72.0f};
+float stageTargetTemp[3] = {40.0f, 38.0f, 80.0f};
 float preheatCoolTarget = 38.0f;
 float fermTargetPH = 3.0f;
 float fermTargetGravity = 1.010f;
@@ -399,7 +399,7 @@ void loadSettingsFromNVS() {
   stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
   preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
-  stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
+  stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 80.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
   msPerGramYeast = brewPrefs.getFloat("dispMsG", DEFAULT_MS_PER_GRAM_YEAST);
   if (fabs(msPerGramYeast - 1764.0f) < 1.0f) {
@@ -476,7 +476,7 @@ void loadBrewStateFromNVS() {
     stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
     preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
-    stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 72.0f);
+    stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 80.0f);
     yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
@@ -912,7 +912,10 @@ void setup() {
   
   server.on("/test/ph_cutoff", HTTP_GET, handleTestPhCutoff);
   server.on("/test/table22", HTTP_GET, handleTestPhCutoff);
-  server.on("/test/status", HTTP_GET, handleTestStatus); server.begin();
+  server.on("/test/pasteurization", HTTP_GET, handleTestPasteurization);
+  server.on("/test/table20", HTTP_GET, handleTestPasteurization);
+  server.on("/test/status", HTTP_GET, handleTestStatus);
+  server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
 

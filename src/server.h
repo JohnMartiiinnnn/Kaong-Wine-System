@@ -6,3 +6,4 @@ void handleData();
 void handleDownloadLog();
 void handleTestPhCutoff();
 void handleTestStatus();
+void handleTestPasteurization();

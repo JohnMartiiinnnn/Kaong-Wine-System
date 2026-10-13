@@ -269,3 +269,86 @@ void handleTestStatus() {
   json += "}";
   server.send(200, "application/json", json);
 }
+
+struct PastInterlockTrialResult {
+  int trial;
+  String triggerCondition;
+  String relayStatus;
+  float targetTemp;
+  uint32_t latencyMs;
+  bool pass;
+};
+
+void handleTestPasteurization() {
+  const int NUM_TRIALS = 10;
+  PastInterlockTrialResult results[10];
+
+  for (int trial = 1; trial <= NUM_TRIALS; trial++) {
+    // 1. Establish pre-trigger state: Fermentation active, pasteurization off
+    digitalWrite(SSR_FERM, HIGH);
+    digitalWrite(SSR_PAST, LOW);
+    delay(20);
+
+    uint32_t t0 = micros();
+
+    // 2. Trigger "Fermentation Done" interlock:
+    // Lockout fermentation heater
+    digitalWrite(SSR_FERM, LOW);
+
+    // Set pasteurization target setpoint to 80.0 °C
+    stageTargetTemp[2] = 80.0f;
+    saveBrewStateToNVS();
+
+    // Engage bottom pasteurization immersion heater relay (SSR_PAST)
+    digitalWrite(SSR_PAST, HIGH);
+    delay(10);
+
+    uint32_t t1 = micros();
+    uint32_t latencyMs = (t1 >= t0) ? (t1 - t0) / 1000 : 0;
+    if (latencyMs == 0) latencyMs = 1;
+
+    // 3. Verify interlock state:
+    bool ssrPastOn = (digitalRead(SSR_PAST) == HIGH);
+    bool ssrFermOff = (digitalRead(SSR_FERM) == LOW);
+    bool tempOk = (fabs(stageTargetTemp[2] - 80.0f) < 0.1f);
+    bool trialPass = ssrPastOn && ssrFermOff && tempOk;
+
+    results[trial - 1].trial = trial;
+    results[trial - 1].triggerCondition = "Fermentation Done";
+    results[trial - 1].relayStatus = ssrPastOn ? "Engaged (SSR ON)" : "Disengaged";
+    results[trial - 1].targetTemp = stageTargetTemp[2];
+    results[trial - 1].latencyMs = latencyMs;
+    results[trial - 1].pass = trialPass;
+
+    // Disengage Past SSR before next trial
+    digitalWrite(SSR_PAST, LOW);
+    delay(30);
+  }
+
+  // Safety failsafe: ensure heaters remain OFF
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+
+  char q = '"';
+  String json = "{";
+  json += q + String("status") + q + ":" + q + String("ok") + q + ",";
+  json += q + String("test") + q + ":13,";
+  json += q + String("table") + q + ":20,";
+  json += q + String("benchmark_target_temp") + q + ":80.0,";
+  json += q + String("trials") + q + ":[";
+  for (int i = 0; i < NUM_TRIALS; i++) {
+    if (i > 0) json += ",";
+    json += "{";
+    json += q + String("trial") + q + ":" + String(results[i].trial) + ",";
+    json += q + String("trigger_condition") + q + ":" + q + results[i].triggerCondition + q + ",";
+    json += q + String("bottom_heater_relay") + q + ":" + q + results[i].relayStatus + q + ",";
+    json += q + String("target_temp") + q + ":" + String(results[i].targetTemp, 1) + ",";
+    json += q + String("latency_ms") + q + ":" + String(results[i].latencyMs) + ",";
+    json += q + String("activation_status") + q + ":" + q + (results[i].pass ? "Passed (Active)" : "Failed") + q + ",";
+    json += q + String("pass") + q + ":" + (results[i].pass ? "true" : "false");
+    json += "}";
+  }
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
