@@ -254,10 +254,10 @@ Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system energiz
 
 ### Stage 2 — Pasteurization
 
-**Goal:** Heat the wine to 80°C to kill any remaining microorganisms before bottling.
+**Goal:** Heat the wine to 60.0°C to stabilize and pasteurize the wine without boiling off volatile alcohol or compromising delicate fruit esters before bottling.
 
 **What happens automatically:**
-1. PID controller targets 80°C using the pasteurization tank DS18B20.
+1. PID controller targets 60.0°C using the pasteurization tank DS18B20.
 2. 15-second hold once temperature is reached.
 3. After the hold, the heater turns off. Pasteurization is complete.
 
