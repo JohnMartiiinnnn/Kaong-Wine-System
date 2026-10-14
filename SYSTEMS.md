@@ -157,6 +157,9 @@ The system supports automated batch brewing with NVS memory persistence:
   * Fermentation quartz heater continuous ON duration is capped at **1.5 seconds max** per pulse cycle to protect insulation.
 * **1-Wire DS18B20 Dynamic Hot-Plug Auto-Recovery**
   * Re-scans OneWire bus every 5 seconds if sensors report disconnected or invalid readings (`-127.0 °C` or `85.0 °C`), restoring live telemetry automatically upon probe replacement.
+* **RAPT Pill Telemetry Physical Bounds & Freshness Timeout**
+  * Hydrometer specific gravity readings are strictly validated within physical limits (`0.980 <= SG <= 1.150`) and temperature within `-5.0 °C <= Temp <= 60.0 °C`.
+  * Out-of-bounds samples and packets exceeding the freshness timeout are dropped across Secondary transmitter broadcasts, Main controller state, LCD display screens, REST endpoints (`/data`), and SD card CSV logging, preventing frozen or corrupt telemetry from corrupting fermentation monitoring.
 
 ---
 

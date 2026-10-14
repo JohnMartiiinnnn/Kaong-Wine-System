@@ -80,6 +80,8 @@ The brewing machine operates on a distributed dual-ESP32 architecture interconne
   * Fluid transfers rely on continuous flow sensor pulses. A 15-second rolling settle window with volume delta < 0.05L confirms vessel evacuation before pump disengagement.
 * **Pasteurization Trigger Interlock (Test 13 / Table 20)**
   * Automated 10-cycle system check verifying heater activation and cutoff at 60.0 °C setpoint with rate-of-rise validation.
+* **RAPT Pill Telemetry Validation Bounds & Freshness Timeout**
+  * Specific gravity strictly validated within physical hydrometer bounds (0.980 to 1.150 SG) and temperature within -5.0 °C to 60.0 °C. Stale BLE packets exceeding the freshness timeout are invalidated across TFT displays, REST endpoints (/data), and SD CSV telemetry logs to prevent freeze-state errors.
 
 ---
 
