@@ -130,7 +130,7 @@ The system supports automated batch brewing with NVS memory persistence:
 * **Dual-Layer pH Filter and 10-Second Terminal Acidity Persistence Debounce**
   * Protects against premature fermentation cutoff and false pump transfers triggered by transient noise spikes, electrode agitation, or EMI.
   * **Layer 1 (Secondary Transmitter Node)**: Samples ADS1115 channel 0 with a 10-sample ADC burst at 5ms intervals. Applies a trimmed mean by sorting the burst, discarding the 2 highest and 2 lowest outlier samples, and averaging the central 6. The output is smoothed using Exponential Moving Average (EMA: alpha = 0.30 raw, 0.70 previous).
-  * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter. Completely rejects isolated noise dips (e.g. 4.2 dipping to 2.9) and upward transients (e.g. true 2.8 spiking to 4.0).
+  * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter and assigns the smoothed output directly to `incomingData.phValue`. Completely rejects isolated noise dips (e.g. 4.2 dipping to 2.9) and upward transients (e.g. true 2.8 spiking to 4.0), ensuring real-time stability across LCD display screens and REST endpoints.
   * **Persistence Debounce Timer**: Requires the filtered pH to remain strictly <= 3.00 for 10.0 continuous seconds (`phTriggerStartMs`). If pH bounces back above threshold, the timer immediately resets to 0.
 * **Pasteurization Subsystem Trigger Interlock (Test 13 / Table 20 Validation)**
   * Dedicated interlock routine verifying automated heater cutoff at exactly 60.0 C.

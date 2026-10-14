@@ -70,7 +70,7 @@ The brewing machine operates on a distributed dual-ESP32 architecture interconne
 
 * **Dual-Layer pH Filtering & Terminal Acidity Debounce**
   * Layer 1 (Secondary Transmitter): Executes 10-sample ADC burst reads at 5ms spacing on ADS1115 channel 0. Applies a trimmed mean by discarding the two lowest and two highest samples, then averages the central six. An Exponential Moving Average (EMA, alpha 0.30) smooths drift.
-  * Layer 2 (Primary Controller): Feeds incoming telemetry into an 11-sample rolling circular window median filter, rejecting noise spikes and false drops.
+  * Layer 2 (Primary Controller): Feeds incoming UART telemetry into an 11-sample rolling circular window median filter and assigns the filtered output directly to incomingData.phValue, delivering stable, noise-immune readings across all UI screens (PH & FERM TEMP, Live Dashboard) and web REST endpoints.
   * Persistence Debounce: Terminal acidity cutoff (pH <= 3.00) requires a sustained 10.0-second persistence timer before tripping Stage 1 advancement to pasteurization.
 * **5.0L Chamber Volume Interlock**
   * Enforced at the hardware driver level before any SSR can fire. Chamber 1 requires scale reading >= 5.0 kg; Chamber 2 and Chamber 3 require accumulated flow transfer volume >= 5.0 L.
