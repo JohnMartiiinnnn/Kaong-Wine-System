@@ -309,12 +309,19 @@ void updateDashboardValues() {
     // S. Gravity Tile (x=5, y=215, w=152, h=40)
     tft.fillRect(7, 229, 148, 24, bgCard);
     char sgBuf[16];
-    if (incomingData.pillGravity != 0 && incomingData.pillGravity < 10.0) dtostrf(incomingData.pillGravity, 5, 3, sgBuf);
-    else strcpy(sgBuf, "--");
+    bool pillValid = (incomingData.bleStatus == 1 &&
+                      incomingData.pillGravity >= 0.9500f &&
+                      incomingData.pillGravity <= 1.2000f);
+    if (pillValid) {
+      dtostrf(incomingData.pillGravity, 5, 3, sgBuf);
+      sprintf(buf, "%ddBm %d%%", incomingData.pillRSSI, incomingData.pillBattery);
+    } else {
+      strcpy(sgBuf, "--");
+      strcpy(buf, "--");
+    }
 
     tft.setTextColor(TFT_BLACK, bgCard);
     tft.drawString(sgBuf, 10, 229, 4);
-    sprintf(buf, "%ddBm %d%%", incomingData.pillRSSI, incomingData.pillBattery);
     tft.drawRightString(buf, 150, 233, 1);
 
     // Status Tile (x=163, y=215, w=152, h=40) - Centered layout
@@ -2148,16 +2155,29 @@ void drawUartMonitorMenu() {
   sprintf(buf, "Ambient: %.1fC  %.0fhPa", incomingData.room2Temp,
           incomingData.room2Pres);
   tft.drawCentreString(buf, CENTER_X, 274, 1);
-  sprintf(buf, "Gravity: %.3f  Pill: %.1fC", incomingData.pillGravity,
-          incomingData.pillTemp);
+  bool pillValidDiag = (incomingData.bleStatus == 1 &&
+                        incomingData.pillGravity >= 0.9500f &&
+                        incomingData.pillGravity <= 1.2000f &&
+                        incomingData.pillTemp >= 0.0f &&
+                        incomingData.pillTemp <= 60.0f);
+  if (pillValidDiag) {
+    sprintf(buf, "Gravity: %.3f  Pill: %.1fC", incomingData.pillGravity,
+            incomingData.pillTemp);
+  } else {
+    sprintf(buf, "Gravity: --    Pill: --");
+  }
   tft.drawCentreString(buf, CENTER_X, 290, 1);
   sprintf(buf, "BLE: %s   ADS: %s   DS18: %s",
-          incomingData.bleStatus ? "OK" : "--",
+          pillValidDiag ? "OK" : "--",
           incomingData.adsStatus ? "OK" : "--",
           incomingData.ds18Status ? "OK" : "--");
   tft.drawCentreString(buf, CENTER_X, 306, 1);
-  sprintf(buf, "Battery: %d%%  RSSI: %d", incomingData.pillBattery,
-          incomingData.pillRSSI);
+  if (pillValidDiag) {
+    sprintf(buf, "Battery: %d%%  RSSI: %d", incomingData.pillBattery,
+            incomingData.pillRSSI);
+  } else {
+    sprintf(buf, "Battery: --    RSSI: --");
+  }
   tft.drawCentreString(buf, CENTER_X, 322, 1);
 
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);

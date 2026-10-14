@@ -373,10 +373,11 @@ async function updateData() {
     document.getElementById('lp').innerHTML = (d.lp ? d.lp.toFixed(1) : '--') + '<span class="metric-unit">°C</span>';
 
     // Kinetics
-    document.getElementById('ph').innerText = d.ph ? d.ph.toFixed(2) : '--';
-    document.getElementById('sg').innerText = (d.sg && d.sg < 10.0) ? d.sg.toFixed(4) : '--';
-    document.getElementById('abv').innerHTML = (d.abv !== undefined ? d.abv.toFixed(2) : '0.00') + '<span class="metric-unit">%</span>';
-    document.getElementById('pill-info').innerText = (d.bat || 0) + '% (' + (d.rssi || 0) + ' dBm)';
+    document.getElementById('ph').innerText = (d.ph && d.ph > 0.1) ? d.ph.toFixed(2) : '--';
+    const sgValid = (d.sg && d.sg >= 0.95 && d.sg <= 1.25);
+    document.getElementById('sg').innerText = sgValid ? d.sg.toFixed(4) : '--';
+    document.getElementById('abv').innerHTML = (sgValid && d.abv !== undefined && d.abv > 0 && d.abv <= 25.0 ? d.abv.toFixed(2) : '--') + '<span class="metric-unit">%</span>';
+    document.getElementById('pill-info').innerText = sgValid ? ((d.bat || 0) + '% (' + (d.rssi || 0) + ' dBm)') : '--';
 
     // Actuators
     const hp = d.hp || 0;

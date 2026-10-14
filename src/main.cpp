@@ -1185,6 +1185,7 @@ void loop() {
       incomingData.adsStatus = 0;
       incomingData.ds18Status = 0;
       incomingData.pillGravity = 0.0f;
+      incomingData.pillTemp = -999.0f;
       incomingData.phValue = 0.0f;
       incomingData.room2LiquidTemp = 0.0f;
       incomingData.room2Temp = 0.0f;
@@ -2916,7 +2917,22 @@ void loop() {
     if (t.signature == 0xDEADBEEF && calc_cs == t.checksum) {
       incomingData = t;
       uartPacketCount++;
-      incomingData.pillGravity += GRAVITY_OFFSET;
+
+      // Sanitize RAPT Pill telemetry: enforce physical valid bounds
+      bool pillValid = (incomingData.bleStatus == 1 &&
+                        incomingData.pillGravity >= 0.9500f &&
+                        incomingData.pillGravity <= 1.2000f &&
+                        incomingData.pillTemp >= 0.0f &&
+                        incomingData.pillTemp <= 60.0f);
+      if (pillValid) {
+        incomingData.pillGravity += GRAVITY_OFFSET;
+      } else {
+        incomingData.bleStatus = 0;
+        incomingData.pillGravity = 0.0f;
+        incomingData.pillTemp = -999.0f;
+        incomingData.pillBattery = 0;
+        incomingData.pillRSSI = 0;
+      }
       lastDataReceivedMillis = millis();
 
       if (incomingData.adsStatus == 1 && incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f) {
@@ -2938,7 +2954,7 @@ void loop() {
       sendMotorCommand(activeMixerSpeed, true);
 
       // Check for new RAPT Pill telemetry update
-      if (incomingData.pillGravity > 0.1f) {
+      if (pillValid) {
         static float lastPillTemp = -999.0f;
         static float lastPillGravity = -999.0f;
         static int16_t lastPillRSSI = -999;
@@ -2976,7 +2992,7 @@ void loop() {
         }
       }
 
-      if (ogCapturing && incomingData.pillGravity > 0.5f) {
+      if (ogCapturing && pillValid) {
         ogSampleSum += incomingData.pillGravity;
         ogSampleCount++;
         if (ogSampleCount >= OG_SAMPLES) {

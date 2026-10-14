@@ -62,6 +62,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 NimBLEScan *pBLEScan;
+static uint32_t lastPillPktMs = 0;
 
 class MyAdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
   void onResult(NimBLEAdvertisedDevice *advertisedDevice) {
@@ -89,34 +90,42 @@ class MyAdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
 
         // --- 2. TEMPERATURE ---
         uint16_t tempRaw = (payload[11] << 8) | payload[12];
-        float pillTemp = (tempRaw / 128.0) - 273.15;
+        float pillTemp = (tempRaw / 128.0f) - 273.15f;
 
         // --- 3. SPECIFIC GRAVITY ---
-        // Based on your raw data, 1.296 (0x44A2003A) starts at byte index 13
-        uint32_t gravInt = (payload[13] << 24) | (payload[14] << 16) |
-                           (payload[15] << 8) | payload[16];
-        float sgFloat;
+        // Based on raw data, 1.296 (0x44A2003A) starts at byte index 13
+        uint32_t gravInt = ((uint32_t)payload[13] << 24) | ((uint32_t)payload[14] << 16) |
+                           ((uint32_t)payload[15] << 8)  |  (uint32_t)payload[16];
+        float sgFloat = 0.0f;
         memcpy(&sgFloat, &gravInt, sizeof(float));
         // For this firmware version, SG is sent as density (1296.0)
-        float pillGravity = (sgFloat > 200.0) ? sgFloat / 1000.0 : sgFloat;
+        float pillGravity = (sgFloat > 200.0f) ? sgFloat / 1000.0f : sgFloat;
 
         // --- 4. RSSI ---
         int16_t rssi = advertisedDevice->getRSSI();
 
-        // Write decoded fields atomically — callback runs in NimBLE RTOS task
-        portENTER_CRITICAL(&txDataMux);
-        txData.pillBattery = bat;
-        txData.pillTemp = pillTemp;
-        txData.pillGravity = pillGravity;
-        txData.pillRSSI = rssi;
-        portEXIT_CRITICAL(&txDataMux);
+        // VALIDATION GATE:
+        // Physical specific gravity for kaong wine: 0.9500 to 1.2000
+        // Physical liquid temperature: 0.0°C to 60.0°C
+        bool validSG = (pillGravity >= 0.9500f && pillGravity <= 1.2000f);
+        bool validTemp = (pillTemp >= 0.0f && pillTemp <= 60.0f);
 
-        Serial.print("Decoded -> Bat: ");
-        Serial.print(txData.pillBattery);
-        Serial.print("%, Temp: ");
-        Serial.print(txData.pillTemp);
-        Serial.print("C, Grav: ");
-        Serial.println(txData.pillGravity, 4);
+        if (validSG && validTemp) {
+          portENTER_CRITICAL(&txDataMux);
+          txData.pillBattery = (bat <= 100) ? bat : 100;
+          txData.pillTemp = pillTemp;
+          txData.pillGravity = pillGravity;
+          txData.pillRSSI = rssi;
+          txData.bleStatus = 1;
+          lastPillPktMs = millis();
+          portEXIT_CRITICAL(&txDataMux);
+
+          Serial.printf("Decoded -> Bat: %d%%, Temp: %.2fC, Grav: %.4f, RSSI: %d dBm\n",
+                        bat, pillTemp, pillGravity, rssi);
+        } else {
+          Serial.printf("Filtered invalid RAPT packet -> Grav: %.4f, Temp: %.2fC, Bat: %d%% (outside valid bounds)\n",
+                        pillGravity, pillTemp, bat);
+        }
       }
     }
   }
@@ -225,11 +234,16 @@ void setup() {
   pBLEScan->setWindow(99);
   pBLEScan->setDuplicateFilter(false);
 
+  // Initialize RAPT Pill telemetry with safe defaults
+  txData.bleStatus = 0;
+  txData.pillGravity = 0.0f;
+  txData.pillTemp = -999.0f;
+  txData.pillBattery = 0;
+  txData.pillRSSI = 0;
+
   if (pBLEScan->start(0, nullptr, false)) {
-    txData.bleStatus = 1;
     Serial.println("initialized");
   } else {
-    txData.bleStatus = 0;
     Serial.println("failed to initialize");
   }
 
@@ -377,6 +391,17 @@ void loop() {
       txData.motorSenseVolts = ads.computeVolts(results_motor);
     } else {
       txData.motorSenseVolts = 0.0f;
+    }
+
+    // 4.5. Check RAPT Pill freshness (timeout after 90 seconds without a valid packet)
+    if (lastPillPktMs == 0 || (millis() - lastPillPktMs > 90000UL)) {
+      portENTER_CRITICAL(&txDataMux);
+      txData.bleStatus = 0;
+      txData.pillGravity = 0.0f;
+      txData.pillTemp = -999.0f;
+      txData.pillBattery = 0;
+      txData.pillRSSI = 0;
+      portEXIT_CRITICAL(&txDataMux);
     }
 
     // 5. UART Transmission — copy under lock so BLE callback can't tear a field

@@ -45,8 +45,12 @@ void logDataToSD() {
   float curPast = liquid1Status ? getPastTemp() : 0.0f;
   float curFermLiq = (incomingData.ds18Status == 1) ? incomingData.room2LiquidTemp : 0.0f;
   float ambLocal = bme1Status ? bme1.readTemperature() : 0.0f;
-  float abv = (originalGravity > 0.0f && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f)
-              ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
+  bool pillValid = (incomingData.bleStatus == 1 &&
+                    incomingData.pillGravity >= 0.9500f &&
+                    incomingData.pillGravity <= 1.2000f);
+  float curSG = pillValid ? incomingData.pillGravity : 0.0f;
+  float abv = (pillValid && originalGravity > 1.0f && curSG <= originalGravity)
+              ? max(0.0f, (originalGravity - curSG) * 131.25f) : 0.0f;
   float ch0Vol = (activeBrewStage == 0 || activeBrewStage == -1) ? (hx711Status ? currentWeight : chamberVolume[0]) : chamberVolume[0];
   float curTgt = (activeBrewStage >= 0 && activeBrewStage < 3) ? stageTargetTemp[activeBrewStage] : stageTargetTemp[0];
 
@@ -66,7 +70,7 @@ void logDataToSD() {
           incomingData.room2Temp,
           curFermLiq,
           incomingData.phValue,
-          incomingData.pillGravity,
+          curSG,
           abv,
           curTgt,
           fermTargetPH,

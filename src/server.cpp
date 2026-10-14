@@ -118,11 +118,16 @@ void handleData() {
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue, 2) + ",";
   json += "\"ads\":" + String((int)incomingData.adsStatus) + ",";
-  json += "\"sg\":" + String(incomingData.pillGravity, 4) + ",";
-  json += "\"bat\":" + String(incomingData.pillBattery) + ",";
-  json += "\"rssi\":" + String(incomingData.pillRSSI) + ",";
-  json += "\"pt\":" + String(incomingData.pillTemp, 1) + ",";
-  float abv = (originalGravity > 0 && incomingData.pillGravity > 0 && incomingData.pillGravity < 10.0)
+  bool pillValid = (incomingData.bleStatus == 1 &&
+                    incomingData.pillGravity >= 0.9500f &&
+                    incomingData.pillGravity <= 1.2000f &&
+                    incomingData.pillTemp >= 0.0f &&
+                    incomingData.pillTemp <= 60.0f);
+  json += "\"sg\":" + String(pillValid ? incomingData.pillGravity : 0.0f, 4) + ",";
+  json += "\"bat\":" + String(pillValid ? incomingData.pillBattery : 0) + ",";
+  json += "\"rssi\":" + String(pillValid ? incomingData.pillRSSI : 0) + ",";
+  json += "\"pt\":" + String(pillValid ? incomingData.pillTemp : 0.0f, 1) + ",";
+  float abv = (pillValid && originalGravity > 1.0f && incomingData.pillGravity <= originalGravity)
               ? max(0.0f, (originalGravity - incomingData.pillGravity) * 131.25f) : 0.0f;
   json += "\"abv\":" + String(abv, 2) + ",";
   json += "\"mv\":" + String(incomingData.motorSenseVolts, 3) + ",";
