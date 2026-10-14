@@ -2921,6 +2921,7 @@ void loop() {
 
       if (incomingData.adsStatus == 1 && incomingData.phValue > 0.1f && incomingData.phValue <= 14.0f) {
         addPHSample(incomingData.phValue);
+        incomingData.phValue = getFilteredPH();
       }
 
       // Maintain continuous motor heartbeat to Secondary ESP32 based on active state
