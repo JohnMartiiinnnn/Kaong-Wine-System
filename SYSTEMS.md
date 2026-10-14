@@ -114,10 +114,10 @@ The system supports automated batch brewing with NVS memory persistence:
   * Inoculation: Automated yeast dispenser dispenses exact weighed grams or pulse duration.
   * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (e.g. 38.0 C testing / 28.0 C production).
   * Agitation: Mixing impeller executes scheduled cycles (5 minutes ON, 355 minutes OFF) or manual continuous speed override.
-  * Completion: Monitors specific gravity progression, pH drop, and elapsed fermentation duration.
-  * Auto-Transfer: Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
+  * Completion: Monitors specific gravity progression, pH drop (via dual-layer trimmed median filter), and elapsed fermentation duration.
+  * Auto-Transfer: Triggered upon terminal acidity cutoff (pH <= 3.00 sustained continuously for 10.0 seconds). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
 * **Stage 2: Pasteurization**
-  * Target: Liquid heated to 65.0 C to 72.0 C via immersion heater and held for 15 minutes to stabilize wine.
+  * Target: Liquid heated to 60.0 C via 1.5 kW immersion heater and held for thermal stabilization (conforming to Table 20 interlock specifications).
   * Cooling: Natural or assisted cooling back to ambient before bottling.
 * **Dual-Transfer Test Mode (`TRANSFER TEST`)**
   * Enabled in New Brew Wizard.
@@ -127,6 +127,14 @@ The system supports automated batch brewing with NVS memory persistence:
 
 ## 5. Hardware Safety Interlocks & Thermal Protection
 
+* **Dual-Layer pH Filter and 10-Second Terminal Acidity Persistence Debounce**
+  * Protects against premature fermentation cutoff and false pump transfers triggered by transient noise spikes, electrode agitation, or EMI.
+  * **Layer 1 (Secondary Transmitter Node)**: Samples ADS1115 channel 0 with a 10-sample ADC burst at 5ms intervals. Applies a trimmed mean by sorting the burst, discarding the 2 highest and 2 lowest outlier samples, and averaging the central 6. The output is smoothed using Exponential Moving Average (EMA: alpha = 0.30 raw, 0.70 previous).
+  * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter. Completely rejects isolated noise dips (e.g. 4.2 dipping to 2.9) and upward transients (e.g. true 2.8 spiking to 4.0).
+  * **Persistence Debounce Timer**: Requires the filtered pH to remain strictly <= 3.00 for 10.0 continuous seconds (`phTriggerStartMs`). If pH bounces back above threshold, the timer immediately resets to 0.
+* **Pasteurization Subsystem Trigger Interlock (Test 13 / Table 20 Validation)**
+  * Dedicated interlock routine verifying automated heater cutoff at exactly 60.0 C.
+  * Enforces low-level SSR lock, verifies Chamber 3 heater probe telemetry, and samples rate-of-rise to guarantee heater coil immersion before energizing.
 * **Flow-Sensor Drain-to-Empty and Dual-Stage Settle Verification (< 0.15L Delta)**
   * All inter-chamber liquid transfers rely 100% on flow sensor pulse activity to verify liquid movement and complete emptying.
   * A 15-second pump priming grace period prevents false stall detection while lines fill.
@@ -193,7 +201,7 @@ PlatformIO CLI commands for building and uploading firmware:
 
 ## 7. Sensor Calibration References
 
-* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation. See [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
+* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation with dual-layer signal filtering (10-sample trimmed mean burst + EMA alpha 0.30 on Secondary node; 11-sample rolling median + 10s persistence debounce on Main controller). See [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
 * **Load Cell (HX711)**: Tare and calibration coefficient stored in NVS. Available in `SYSTEM CHECK` item 10 or `SETTINGS`.
 * **Flow Sensors (YF-S201 / YF-B series)**: Pulses per liter calibration stored in EEPROM/NVS.
 * **Yeast Dispenser (DRV8871)**: Milliseconds per gram delivery curve configured via `msPerGramYeast`. See [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md).

@@ -299,7 +299,7 @@ Press LEFT to return to the dashboard module view.
 
 ## 9. System Check Tests
 
-Access from the Main Menu → SYSTEM CHECK. Eleven items, navigated with UP/DOWN, entered with SELECT, exited with LEFT.
+Access from the Main Menu → SYSTEM CHECK. Thirteen items (0 through 12), navigated with UP/DOWN, entered with SELECT, exited with LEFT.
 
 ### 0. FAN TEST
 
@@ -434,10 +434,25 @@ Tests the motorized yeast dispenser mechanism (N20 DC geared motor driven by DRV
 
 Validates the pH-triggered terminal acidity auto-cutoff interlock (Methodology Tests 16 & 22).
 
-- Monitors live in-line pH until threshold drops to 3.00 pH.
-- Automatically cuts fermentation heating (0V SSR) and activates Transfer Pump 2 to evacuate liquid to the pasteurization vessel.
+- Dual-Layer Signal Conditioning:
+  - Secondary Node: 10-sample ADC burst with trimmed mean (discarding top 2 and bottom 2 outliers) and Exponential Moving Average (alpha 0.30).
+  - Main Controller: 11-sample rolling circular window median filter, rejecting transient noise spikes.
+  - Persistence Debounce: Acidity cutoff (pH <= 3.00) requires a sustained 10.0-second persistence timer before tripping.
+- Automatically cuts fermentation heating (0V SSR) and activates Transfer Pump 2 to evacuate liquid to the pasteurization vessel once sustained cutoff is reached.
 - Displays explicit evacuation status upon vessel draining.
 - Press LEFT to exit.
+
+---
+
+### 12. PAST HEATER TEST
+
+Validates the Stage 2 pasteurization heater interlock and temperature cutoff (Methodology Test 13 / Table 20).
+
+- Executes a 10-cycle automated test verifying the 1.5 kW immersion heater relay/SSR engagement up to the 60.0°C pasteurization setpoint.
+- Real-time display renders active trial counter (1 to 10), live Chamber 3 heater probe temperature, thermal rate-of-rise (RoR), and scrolling thermal history chart.
+- Automatically shuts off heater SSR when temperature reaches 60.0°C and tracks natural cooling before re-engaging.
+- Press SELECT to toggle or pause the automated cycle sequence.
+- Press LEFT to abort heater output and return to System Check menu.
 
 ---
 
