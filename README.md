@@ -71,7 +71,7 @@ The brewing machine operates on a distributed dual-ESP32 architecture interconne
 * **Dual-Layer pH Filtering & Terminal Acidity Debounce**
   * Layer 1 (Secondary Transmitter): Executes 10-sample ADC burst reads at 5ms spacing on ADS1115 channel 0. Applies a trimmed mean by discarding the two lowest and two highest samples, then averages the central six. An Exponential Moving Average (EMA, alpha 0.30) smooths drift.
   * Layer 2 (Primary Controller): Feeds incoming UART telemetry into an 11-sample rolling circular window median filter and assigns the filtered output directly to incomingData.phValue, delivering stable, noise-immune readings across all UI screens (PH & FERM TEMP, Live Dashboard) and web REST endpoints.
-  * Persistence Debounce: Terminal acidity cutoff (pH <= 3.00) requires a sustained 10.0-second persistence timer before tripping Stage 1 advancement to pasteurization.
+  * Persistence Debounce: Terminal acidity cutoff (pH <= fermTargetPH, nominal target 3.50 for finished wine vs 3.00 vinegar boundary) requires a sustained 10.0-second persistence timer before tripping Stage 1 advancement to pasteurization.
 * **5.0L Chamber Volume Interlock**
   * Enforced at the hardware driver level before any SSR can fire. Chamber 1 requires scale reading >= 5.0 kg; Chamber 2 and Chamber 3 require accumulated flow transfer volume >= 5.0 L.
 * **Dynamic 2.0 °C / Second Rate-of-Rise (RoR) Cutoff**
@@ -82,6 +82,31 @@ The brewing machine operates on a distributed dual-ESP32 architecture interconne
   * Automated 10-cycle system check verifying heater activation and cutoff at 60.0 °C setpoint with rate-of-rise validation.
 * **RAPT Pill Telemetry Validation Bounds & Freshness Timeout**
   * Specific gravity strictly validated within physical hydrometer bounds (0.980 to 1.150 SG) and temperature within -5.0 °C to 60.0 °C. Stale BLE packets exceeding the freshness timeout are invalidated across TFT displays, REST endpoints (/data), and SD CSV telemetry logs to prevent freeze-state errors.
+
+---
+
+## Dual-Batch Testing Protocol & 2014 CvSU Study Baseline
+
+To satisfy thesis Objective 4 and provide rigorous empirical data for the Independent Samples t-Test, the experimental design compares two distinct batches:
+
+* **Batch 1: Traditional Wild Control (CvSU 2014 Baseline)**
+  * Method: 100% natural wild fermentation using indigenous sap microflora, matching the 2014 CvSU thesis study (FERMENTATION-VESSELS-FOR-SUGAR-PALM-WINE-PRODUCTION.pdf).
+  * Inoculation: Zero added yeast, zero pre-heating.
+  * Thermal Profile: Unregulated ambient room temperature (27 °C to 31 °C).
+  * Stabilization: Cold-stabilized below 4 °C upon reaching target acidity (pH 3.6 to 3.8) to halt acetobacter proliferation.
+  * Baseline Insight: Confirms natural fermentation dynamics without thermal shock, validating traditional Cavite table wine production.
+
+* **Batch 2: Automated Prototype (Engineered Inoculation)**
+  * Method: Closed-loop automated brewing process inside the dual-ESP32 prototype.
+  * Sterilization: 80 °C pre-heat sterilization in Chamber 1, followed by automated fan cooling to 28 °C to 30 °C.
+  * Inoculation: Automated DRV8871 dispenser pitches pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast.
+  * Thermal Profile: Closed-loop PID control maintaining 25 °C to 30 °C via radiant quartz heater and cross-flow fans.
+  * Thermal Arrest: Automated inter-chamber transfer to Chamber 3 for pasteurization at 60 °C (10 to 15 minute hold) upon reaching target pH 3.5.
+
+* **Acidity Threshold Clarification (Wine vs Vinegar)**
+  * Kaong Wine Target: pH 3.40 to 3.90 (optimal cutoff at pH 3.50).
+  * Kaong Vinegar Boundary: pH 2.00 to 3.00 (sukang kaong). Fermentation allowed to progress below pH 3.20 rapidly sour as acetic acid bacteria consume ethanol.
+  * Rejection of Preheat-Without-Yeast Setup: Preheating without yeast inoculation kills natural flora and halts fermentation entirely, spoiling raw sap. Automated pitching post-cooling is mandatory.
 
 ---
 

@@ -1,4 +1,4 @@
-# Automated Kaong Wine Brewing System — Master Registry & Operations
+# Automated Kaong Wine Brewing System: Master Registry & Operations
 
 ## 1. System Ecosystem Overview
 
@@ -115,13 +115,33 @@ The system supports automated batch brewing with NVS memory persistence:
   * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (e.g. 38.0 C testing / 28.0 C production).
   * Agitation: Mixing impeller executes scheduled cycles (5 minutes ON, 355 minutes OFF) or manual continuous speed override.
   * Completion: Monitors specific gravity progression, pH drop (via dual-layer trimmed median filter), and elapsed fermentation duration.
-  * Auto-Transfer: Triggered upon terminal acidity cutoff (pH <= 3.00 sustained continuously for 10.0 seconds). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
+  * Auto-Transfer: Triggered upon terminal acidity cutoff (filtered pH <= fermTargetPH, nominal target 3.50 for finished wine vs 3.00 vinegar boundary, sustained continuously for 10.0 seconds). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
 * **Stage 2: Pasteurization**
   * Target: Liquid heated to 60.0 C via 1.5 kW immersion heater and held for thermal stabilization (conforming to Table 20 interlock specifications).
   * Cooling: Natural or assisted cooling back to ambient before bottling.
 * **Dual-Transfer Test Mode (`TRANSFER TEST`)**
   * Enabled in New Brew Wizard.
   * Executes back-to-back fluid transfer tests (Chamber 1 -> Chamber 2 -> Chamber 3) with zero heating, zero fans, and zero yeast dispensing to safely validate pump flow and plumbing.
+
+### Dual-Batch Testing Protocol & 2014 CvSU Study Baseline
+
+To satisfy thesis Objective 4 and provide empirical data for the Independent Samples t-Test, the experimental evaluation compares two distinct operational batches:
+
+* **Batch 1: Traditional Wild Control (CvSU 2014 Baseline)**
+  * Natural wild fermentation using indigenous sap microflora, conforming to the 2014 CvSU thesis study (FERMENTATION-VESSELS-FOR-SUGAR-PALM-WINE-PRODUCTION.pdf).
+  * Zero added yeast and zero pre-heating.
+  * Unregulated ambient room temperature (27 °C to 31 °C).
+  * Stabilized below 4 °C in refrigeration upon reaching target acidity (pH 3.6 to 3.8) to halt acetobacter growth.
+* **Batch 2: Automated Prototype (Engineered Inoculation)**
+  * Full automated brewing cycle in the dual-ESP32 prototype.
+  * 80 °C pre-heat sterilization in Chamber 1, active fan cooling down to 28 °C to 30 °C.
+  * Inoculation via DRV8871 dispenser pitching pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast.
+  * Closed-loop PID temperature regulation at 25 °C to 30 °C.
+  * Automated thermal arrest in Chamber 3 at 60 °C (10 to 15 minute hold) upon reaching pH 3.5.
+* **Acidity Threshold Clarification**
+  * Kaong Wine Target: pH 3.40 to 3.90 (optimal cutoff at pH 3.50).
+  * Kaong Vinegar Boundary: pH 2.00 to 3.00 (sukang kaong). If unpasteurized past pH 3.20, acetobacter rapidly oxidizes ethanol into acetic acid.
+  * Inoculation Requirement: Preheating without yeast inoculation completely halts fermentation due to thermal sterilization of native microbes. Automated yeast pitching is required when preheating.
 
 ---
 
@@ -131,7 +151,7 @@ The system supports automated batch brewing with NVS memory persistence:
   * Protects against premature fermentation cutoff and false pump transfers triggered by transient noise spikes, electrode agitation, or EMI.
   * **Layer 1 (Secondary Transmitter Node)**: Samples ADS1115 channel 0 with a 10-sample ADC burst at 5ms intervals. Applies a trimmed mean by sorting the burst, discarding the 2 highest and 2 lowest outlier samples, and averaging the central 6. The output is smoothed using Exponential Moving Average (EMA: alpha = 0.30 raw, 0.70 previous).
   * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter and assigns the smoothed output directly to `incomingData.phValue`. Completely rejects isolated noise dips (e.g. 4.2 dipping to 2.9) and upward transients (e.g. true 2.8 spiking to 4.0), ensuring real-time stability across LCD display screens and REST endpoints.
-  * **Persistence Debounce Timer**: Requires the filtered pH to remain strictly <= 3.00 for 10.0 continuous seconds (`phTriggerStartMs`). If pH bounces back above threshold, the timer immediately resets to 0.
+  * **Persistence Debounce Timer**: Requires the filtered pH to remain strictly <= fermTargetPH (nominal 3.50 for wine) for 10.0 continuous seconds (`phTriggerStartMs`). If pH bounces back above threshold, the timer immediately resets to 0.
 * **Pasteurization Subsystem Trigger Interlock (Test 13 / Table 20 Validation)**
   * Dedicated interlock routine verifying automated heater cutoff at exactly 60.0 C.
   * Enforces low-level SSR lock, verifies Chamber 3 heater probe telemetry, and samples rate-of-rise to guarantee heater coil immersion before energizing.
