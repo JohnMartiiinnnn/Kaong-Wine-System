@@ -11,6 +11,7 @@ Production and thesis repository for the automated, sensor-monitored Kaong (Suga
 ## Quick Navigation
 
 * [SYSTEMS.md](file:///home/dave/Projects/Kaong-Wine/SYSTEMS.md) : Master architecture, hardware topology, and deployment commands.
+* [FERMENTATION_RUN_ALIGNMENT_RECORD.md](file:///home/dave/Projects/Kaong-Wine/FERMENTATION_RUN_ALIGNMENT_RECORD.md) : Comprehensive alignment record, CvSU 2014 study analysis, and dual-batch fermentation protocol.
 * [SYSTEM_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/SYSTEM_GUIDE.md) : Complete user manual covering all screens, keypad controls, and brewing workflows.
 * [PINOUT.md](file:///home/dave/Projects/Kaong-Wine/PINOUT.md) : Comprehensive electrical pin mappings for both ESP32 controllers.
 * [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md) : Sensor calibration procedures for pH, load cell, and flow meters.

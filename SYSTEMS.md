@@ -33,6 +33,7 @@ Kaong-Wine/
 ├── min_spiffs.csv              # Flash partition table (dual 1.9MB app OTA partitions)
 ├── SYSTEMS.md                  # Master System Architecture and Operations Manual
 ├── README.md                   # Repository Entrypoint (links to SYSTEMS.md)
+├── FERMENTATION_RUN_ALIGNMENT_RECORD.md # Group alignment record & CvSU 2014 study analysis
 ├── AGENTS.md                   # AI pair programming guidelines, hardware constraints, and pinouts
 ├── SYSTEM_GUIDE.md             # Complete user and operator manual (screens, keypad, workflows)
 ├── PINOUT.md                   # Comprehensive electrical wiring and pin connection reference
