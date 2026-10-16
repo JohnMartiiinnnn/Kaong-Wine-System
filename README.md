@@ -109,6 +109,17 @@ To satisfy thesis Objective 4 and provide rigorous empirical data for the Indepe
   * Kaong Vinegar Boundary: pH 2.00 to 3.00 (sukang kaong). Fermentation allowed to progress below pH 3.20 rapidly sour as acetic acid bacteria consume ethanol.
   * Rejection of Preheat-Without-Yeast Setup: Preheating without yeast inoculation kills natural flora and halts fermentation entirely, spoiling raw sap. Automated pitching post-cooling is mandatory.
 
+* **Aseptic Sampling & Telemetry Measurement Protocol**
+  * Day 0 Baseline: Single 200 mL draw into a 250 mL graduated cylinder establishes starting sugar density (Original Gravity, 1.055 to 1.065 SG / ~14 to 16 Brix) and baseline pH (6.0 to 6.8) for both experimental batches.
+  * Active Fermentation Checks (Traditional Control): Hydrometer extraction during active fermentation is strictly prohibited to prevent volume depletion and acetic oxidation. Daytime tracking uses micro-pours of 5 mL to 10 mL into a sanitized vessel to submerge the digital pH pen bulb. The sample is discarded immediately after logging.
+  * Active Fermentation Checks (Automated Prototype): 100% non-invasive continuous telemetry. The submerged RAPT Pill broadcasts floating specific gravity and temperature over BLE to the telemetry logger without fluid loss.
+  * Terminal Endpoint (Finished Wine): Upon reaching terminal attenuation (stabilized SG <= 1.010 and pH target), a final 200 mL sample is racked for terminal hydrometer reading (Final Gravity), final pH verification, and Alcohol by Volume (ABV) computation via (OG - FG) * 131.25.
+
+* **Manuscript Alignment & Verification Status**
+  * Live Google Doc Table Sequence: Continuous sequence verified from Table 1 through Table 28 with zero duplicate numbers and zero missing entries.
+  * Single Comparative Run Specification: Section 3.8 explicitly establishes a single comparative trial run per method (Automated vs Traditional Control).
+  * Process Consistency Definition: Clarified as continuous temporal standard deviation of pH, temperature, and specific gravity across the active fermentation curve.
+
 ---
 
 ## Field Network Configuration
