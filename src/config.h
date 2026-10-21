@@ -158,7 +158,7 @@ extern long rawHX711;
 
 const uint32_t MIXER_ON_MS     = 60UL * 1000;       // 1 min max auto-mixing cycle
 const uint32_t MIXER_MIN_MS    = 30UL * 1000;       // 30 secs min auto-mixing cycle
-const uint32_t MIXER_OFF_MS    = 355UL * 60 * 1000;
+const uint32_t MIXER_OFF_MS    = 359UL * 60 * 1000; // 5h 59m OFF (exactly 6h total cycle with 1 min ON)
 const uint32_t PREHEAT_HOLD_MS = 15UL * 60 * 1000;  // 15 min sterilization hold at 80°C
 const uint32_t PAST_HOLD_MS    = 15UL * 60 * 1000;  // 15 min pasteurization hold
 
