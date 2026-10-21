@@ -141,7 +141,8 @@ Add the following fields:
 3. [x] Apply `main.cpp` Line 2707 submerged liquid probe fix.
 4. [x] Update `server.cpp` with 28-field `/data` schema.
 5. [x] Swap 1-Wire DS18B20 index mapping for new pasteurizer probe (`Index 0: Preheat`, `Index 1: Pasteurization`).
-6. [ ] Implement Phase 5A: `returnConfirmState` guard in `updateDashboardValues()`.
-7. [ ] Implement Phase 5B: NVS boot recovery (skip auto-tare on active brew recovery).
-8. [ ] Implement Phase 5C: Low-volume (< 5.0L) on-screen warning banner.
-9. [ ] User confirmation prior to flashing firmware.
+6. [x] Implement Phase 5A: `returnConfirmState` guard in `updateDashboardValues()`.
+7. [x] Implement Phase 5B: NVS boot recovery (skip auto-tare on active brew recovery, resume direct to dashboard).
+8. [x] Implement Phase 5C: Low-volume (< 5.0L) on-screen warning banner (`VOL < 5.0L / HEATER LOCKED`).
+9. [x] Standardize brewing setpoints: Pre-heat 60 °C heat / 30 °C cool, Fermentation pH 3.50 cutoff, Pasteurization 60 °C heat.
+10. [ ] User confirmation prior to flashing firmware.

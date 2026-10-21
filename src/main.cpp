@@ -250,9 +250,9 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {40.0f, 38.0f, 80.0f};
-float preheatCoolTarget = 38.0f;
-float fermTargetPH = 3.0f;
+float stageTargetTemp[3] = {60.0f, 38.0f, 60.0f};
+float preheatCoolTarget = 30.0f;
+float fermTargetPH = 3.5f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
 float    yeastPitchRate = 0.50f;
@@ -431,10 +431,10 @@ void saveSettingsToNVS() {
 void loadSettingsFromNVS() {
   brewPrefs.begin("wb_config", true);
   minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
-  stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
-  preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
+  stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 60.0f);
+  preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 30.0f);
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
-  stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 80.0f);
+  stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 60.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
   msPerGramYeast = brewPrefs.getFloat("dispMsG", DEFAULT_MS_PER_GRAM_YEAST);
   if (fabs(msPerGramYeast - 1764.0f) < 1.0f) {
@@ -448,7 +448,7 @@ void loadSettingsFromNVS() {
   preheatTempOffset = brewPrefs.getFloat("phOffset", 0.0f);
   pastTempOffset = brewPrefs.getFloat("pastOffset", 0.0f);
   fermTempOffset = brewPrefs.getFloat("fermOffset", 0.0f);
-  fermTargetPH = brewPrefs.getFloat("fermPH", 3.0f);
+  fermTargetPH = brewPrefs.getFloat("fermPH", 3.5f);
   fermTargetGravity = brewPrefs.getFloat("fermSG", 1.0000f);
   yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
   yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
@@ -508,10 +508,10 @@ void loadBrewStateFromNVS() {
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
     minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
-    stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 40.0f);
-    preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 38.0f);
+    stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 60.0f);
+    preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 30.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
-    stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 80.0f);
+    stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 60.0f);
     yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
     yeastPitchGrams = brewPrefs.getFloat("yeastG", 5.0f);
     actualYeastDispensedGrams = brewPrefs.getFloat("dispYeastG", 0.0f);
@@ -871,6 +871,11 @@ void setup() {
     liquid1Status = true;
   pastSensors.requestTemperatures();
 
+  // Phase 5B: Check if active brew was in progress before scale initialization
+  brewPrefs.begin("winebrew", true);
+  int savedBrewStage = brewPrefs.getInt("stage", -1);
+  brewPrefs.end();
+
   scale.begin(HX711_DT_PIN, HX711_SCK_PIN);
   {
     uint32_t t0 = millis();
@@ -880,7 +885,10 @@ void setup() {
   if (scale.is_ready()) {
     hx711Status = true;
     scale.set_scale(calibrationFactor);
-    scale.tare(10);
+    // Only tare scale if no active brew is in progress (preserves liquid weight across reboots)
+    if (savedBrewStage < 0) {
+      scale.tare(10);
+    }
   }
 
   if (mcp.begin_I2C()) {
@@ -955,19 +963,25 @@ void setup() {
   ArduinoOTA.begin();
 
   loadBrewStateFromNVS();
-  if (activeBrewStage == 0) {
-    mcp.digitalWrite(LIGHT_R, RELAY_ON);
-  } else if (activeBrewStage == 1) {
-    mcp.digitalWrite(LIGHT_Y, RELAY_ON);
-  } else if (activeBrewStage == 2) {
-    mcp.digitalWrite(LIGHT_G, RELAY_ON);
+  if (activeBrewStage >= 0) {
+    if (activeBrewStage == 0) {
+      mcp.digitalWrite(LIGHT_R, RELAY_ON);
+    } else if (activeBrewStage == 1) {
+      mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+    } else if (activeBrewStage == 2) {
+      mcp.digitalWrite(LIGHT_G, RELAY_ON);
+    }
+    dashSelection = activeBrewStage;
+    dashNeedsFullRedraw = true;
+    delay(300);
+    currentAppState = DASHBOARD_ACTIVE;
+    drawDashboardLayout();
   } else {
     loadBrewSummaryFromNVS();
+    delay(600);
+    currentAppState = START_MENU;
+    drawStartMenu();
   }
-
-  delay(600);
-  currentAppState = START_MENU;
-  drawStartMenu();
 }
 
 // ---- Pasteurization Heater 60C Cycling Test Routine (Test 13) ----
@@ -1796,7 +1810,7 @@ void loop() {
         currentAppState = DISPENSER_TEST_MENU;
         drawDispenserTestMenu();
       } else if (systemCheckSelection == 11) {
-        fermTargetPH = 3.0f;
+        fermTargetPH = 3.5f;
         saveSettingsToNVS();
         phTransTestNeedsFullRedraw = true;
         phTransTestScanning = true;
@@ -4061,9 +4075,9 @@ void loop() {
                         ? getFilteredPH()
                         : ((incomingData.phValue > 0.0f && incomingData.phValue <= 14.0f) ? incomingData.phValue : -1.0f);
 
-      // Automatic trigger when scanning and target pH acidity detected (<= 3.00 pH)
+      // Automatic trigger when scanning and target pH acidity detected (<= fermTargetPH)
       if (phTransTestScanning && !phTransTestTransferActive && !phTransTestDetected) {
-        if (curPH > 0.0f && curPH <= 3.00f) {
+        if (curPH > 0.0f && curPH <= fermTargetPH) {
           phTransTestDetected = true;
           phTransTestDone = false;
           phTransTestTransferActive = true;
@@ -4237,7 +4251,7 @@ void loop() {
     if (currentAppState == CALIB_WIZARD)
       drawCalibWizard();
 
-    if (currentAppState == DASHBOARD_ACTIVE || currentAppState == PAST_HEATER_TEST_ACTIVE) {
+    if ((currentAppState == DASHBOARD_ACTIVE && returnConfirmState == 0) || currentAppState == PAST_HEATER_TEST_ACTIVE) {
       updateDashboardValues();
 
       if (activeBrewStage >= 0 && dashSelection != activeBrewStage) {

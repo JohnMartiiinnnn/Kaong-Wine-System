@@ -261,8 +261,16 @@ void updateDashboardValues() {
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else {
-      tft.drawCentreString("IDLE", 239, 190, 2);
-      tft.drawCentreString("-- / --", 239, 206, 1);
+      float preheatVol = (hx711Status && currentWeight > 0.0f) ? currentWeight : chamberVolume[0];
+      if (activeBrewStage == 0 && !preHeatCompleted && !preHeatHolding && preheatVol < MIN_HEATER_SAFE_VOLUME) {
+        tft.setTextColor(TFT_RED, bgCard);
+        tft.drawCentreString("VOL < 5.0L", 239, 190, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        tft.drawCentreString("HEATER LOCKED", 239, 206, 1);
+      } else {
+        tft.drawCentreString("IDLE", 239, 190, 2);
+        tft.drawCentreString("-- / --", 239, 206, 1);
+      }
     }
 
   } else if (dashSelection == 1) { // FERMENTATION VIEW
@@ -372,13 +380,21 @@ void updateDashboardValues() {
       tft.drawCentreString(subBuf, 239, 243, 1);
 
     } else {
-      tft.drawCentreString("FERMENTING", 239, 228, 2);
-      if (actualYeastDispensedGrams > 0.0f) {
-        sprintf(subBuf, "%.1fC/%.1fC (%.1fg)", fermT, stageTargetTemp[1], actualYeastDispensedGrams);
+      float fermVol = (chamberVolume[1] > 0.0f) ? chamberVolume[1] : transferVolumeTransferred;
+      if (activeBrewStage == 1 && !fermCompleted && fermVol < MIN_HEATER_SAFE_VOLUME) {
+        tft.setTextColor(TFT_RED, bgCard);
+        tft.drawCentreString("VOL < 5.0L", 239, 228, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        tft.drawCentreString("HEATER LOCKED", 239, 243, 1);
       } else {
-        sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);
+        tft.drawCentreString("FERMENTING", 239, 228, 2);
+        if (actualYeastDispensedGrams > 0.0f) {
+          sprintf(subBuf, "%.1fC/%.1fC (%.1fg)", fermT, stageTargetTemp[1], actualYeastDispensedGrams);
+        } else {
+          sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);
+        }
+        tft.drawCentreString(subBuf, 239, 243, 1);
       }
-      tft.drawCentreString(subBuf, 239, 243, 1);
     }
 
   } else if (dashSelection == 2) { // PASTEURIZATION VIEW
@@ -464,8 +480,16 @@ void updateDashboardValues() {
       tft.drawCentreString(subBuf, 239, 206, 1);
 
     } else {
-      tft.drawCentreString("IDLE", 239, 190, 2);
-      tft.drawCentreString("-- / --", 239, 206, 1);
+      float pastVol = (chamberVolume[2] > 0.0f) ? chamberVolume[2] : (activeBrewStage == 2 ? transferVolumeTransferred : 0.0f);
+      if (activeBrewStage == 2 && !pastSterilized && !pastHolding && pastVol < MIN_HEATER_SAFE_VOLUME) {
+        tft.setTextColor(TFT_RED, bgCard);
+        tft.drawCentreString("VOL < 5.0L", 239, 190, 2);
+        tft.setTextColor(TFT_BLACK, bgCard);
+        tft.drawCentreString("HEATER LOCKED", 239, 206, 1);
+      } else {
+        tft.drawCentreString("IDLE", 239, 190, 2);
+        tft.drawCentreString("-- / --", 239, 206, 1);
+      }
     }
   }
 
@@ -2567,7 +2591,8 @@ void drawBrewSummaryMenu() {
   tft.drawRightString(s0, 306, 45, 2);
 
   tft.setTextColor(TFT_BLACK, 0xD6BA);
-  tft.drawString("Sterilize: 80.0C (15m)  |  Cooled: 38.0C", 14, 66, 1);
+  sprintf(buf, "Pre-Heat: %.1fC  |  Cooled: %.1fC", stageTargetTemp[0], preheatCoolTarget);
+  tft.drawString(buf, 14, 66, 1);
 
   float initWt = (transferStartWeight > 0.0f) ? transferStartWeight : (hx711Status ? currentWeight : minVolumeReq);
   sprintf(buf, "Initial: %.2f L  |  Xfer 1: %.2f L", initWt, transfer1Volume);
@@ -3613,7 +3638,7 @@ void drawPhTransferTestMenu(bool valuesOnly) {
     tft.setTextPadding(280);
     if (curPH > 0.0f) {
       sprintf(buf, "%.2f", curPH);
-      uint16_t phColor = (curPH <= 3.00f) ? 0x03E0 : TFT_BLACK;
+      uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
       tft.setTextColor(phColor, 0xD6BA);
       tft.drawCentreString(buf, CENTER_X, 96, 4);
     } else {
@@ -3699,14 +3724,14 @@ void drawPhTransferTestMenu(bool valuesOnly) {
   tft.drawCentreString("CURRENT pH LEVEL", CENTER_X, 68, 2);
   if (curPH > 0.0f) {
     sprintf(buf, "%.2f", curPH);
-    uint16_t phColor = (curPH <= 3.00f) ? 0x03E0 : TFT_BLACK;
+    uint16_t phColor = (curPH <= fermTargetPH) ? 0x03E0 : TFT_BLACK;
     tft.setTextColor(phColor, 0xD6BA);
     tft.drawCentreString(buf, CENTER_X, 96, 4);
   } else {
     tft.setTextColor(TFT_DARKGREY, 0xD6BA);
     tft.drawCentreString("---", CENTER_X, 96, 4);
   }
-  sprintf(buf, "Cutoff Threshold: <= 3.00 pH");
+  sprintf(buf, "Cutoff Threshold: <= %.2f pH", fermTargetPH);
   tft.setTextColor(0x3566, 0xD6BA);
   tft.drawCentreString(buf, CENTER_X, 138, 2);
 
