@@ -215,6 +215,37 @@ float getFilteredPH() {
   return sorted[phRollingCount / 2];
 }
 
+// ---- 60-Second Rolling pH Average (Fluctuation Rejection) ----
+#define PH_ROLLING_AVG_WINDOW 60
+static float ph60sBuffer[PH_ROLLING_AVG_WINDOW] = {0};
+int ph60sCount = 0;
+static int ph60sHead = 0;
+static uint32_t lastPhSampleMs = 0;
+float ph1MinAvg = 7.0f;
+
+void resetPhRollingAvg() {
+  ph60sCount = 0;
+  ph60sHead = 0;
+  lastPhSampleMs = 0;
+  ph1MinAvg = 7.0f;
+  for (int i = 0; i < PH_ROLLING_AVG_WINDOW; i++) {
+    ph60sBuffer[i] = 7.0f;
+  }
+}
+
+void updatePhRollingAvg(float val) {
+  if (val <= 0.1f || val > 14.0f) return;
+  ph60sBuffer[ph60sHead] = val;
+  ph60sHead = (ph60sHead + 1) % PH_ROLLING_AVG_WINDOW;
+  if (ph60sCount < PH_ROLLING_AVG_WINDOW) ph60sCount++;
+
+  float sum = 0.0f;
+  for (int i = 0; i < ph60sCount; i++) {
+    sum += ph60sBuffer[i];
+  }
+  ph1MinAvg = sum / (float)ph60sCount;
+}
+
 // ---- PID Test State ----
 bool pidTestNeedsFullRedraw = true;
 bool pidConfigNeedsFullRedraw = true;
@@ -710,6 +741,7 @@ void completeLiquidTransfer(float finalVol) {
   tempHistoryCount = 0;
 
   if (activeBrewStage == 1) {
+    resetPhRollingAvg();
     mcp.digitalWrite(LIGHT_R, RELAY_OFF);
     mcp.digitalWrite(LIGHT_Y, RELAY_ON);
     mcp.digitalWrite(LIGHT_G, RELAY_OFF);
@@ -3554,20 +3586,19 @@ void loop() {
           quartzPid.reset();
         }
 
-        // Fermentation completion: Terminal acidity cutoff (pH <= 3.00) with rolling median & 10s persistence
+        // Fermentation completion: Terminal acidity cutoff (pH <= fermTargetPH)
+        // Evaluates a 60-second rolling average to reject probe fluctuation noise
         float currentPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? getFilteredPH() : 7.0f;
-        static uint32_t phTriggerStartMs = 0;
-        if (currentPH <= fermTargetPH && currentPH > 0.5f) {
-          if (phTriggerStartMs == 0) {
-            phTriggerStartMs = millis();
-          }
-        } else {
-          phTriggerStartMs = 0;
+        if (millis() - lastPhSampleMs >= 1000UL) {
+          lastPhSampleMs = millis();
+          updatePhRollingAvg(currentPH);
         }
-        bool phCutoffTriggered = (phTriggerStartMs > 0 && (millis() - phTriggerStartMs >= 10000UL));
-        bool fermDurationElapsed = (millis() - stageStartMillis >= fermDurationMs);
 
-        if ((phCutoffTriggered || fermDurationElapsed) && !phAlertActive) {
+        // Terminal cutoff requires full 1-minute (60 samples) of continuous rolling telemetry AND 1m average <= fermTargetPH (3.50)
+        // Minute duration placeholder is removed so Chamber 2 strictly waits for target acidity
+        bool phCutoffTriggered = (ph60sCount >= 60 && ph1MinAvg <= fermTargetPH && ph1MinAvg > 0.5f);
+
+        if (phCutoffTriggered && !phAlertActive) {
           phAlertActive = true;
           if (!stageTransferring) {
             stageElapsedMs[1] = millis() - stageStartMillis;

@@ -388,7 +388,9 @@ void updateDashboardValues() {
         tft.drawCentreString("HEATER LOCKED", 239, 243, 1);
       } else {
         tft.drawCentreString("FERMENTING", 239, 228, 2);
-        if (actualYeastDispensedGrams > 0.0f) {
+        if (ph60sCount >= 10) {
+          sprintf(subBuf, "%.1fC | 1m:%.2f", fermT, ph1MinAvg);
+        } else if (actualYeastDispensedGrams > 0.0f) {
           sprintf(subBuf, "%.1fC/%.1fC (%.1fg)", fermT, stageTargetTemp[1], actualYeastDispensedGrams);
         } else {
           sprintf(subBuf, "%.1fC / %.1fC", fermT, stageTargetTemp[1]);

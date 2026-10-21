@@ -117,6 +117,7 @@ void handleData() {
   json += "\"fa\":" + String(incomingData.room2Temp) + ",";
   json += "\"fl\":" + String(incomingData.room2LiquidTemp) + ",";
   json += "\"ph\":" + String(incomingData.phValue, 2) + ",";
+  json += "\"ph_1m_avg\":" + String(ph1MinAvg, 2) + ",";
   json += "\"ads\":" + String((int)incomingData.adsStatus) + ",";
   bool pillValid = (incomingData.bleStatus == 1 &&
                     incomingData.pillGravity >= 0.9500f &&

@@ -388,6 +388,8 @@ extern float stageTargetTemp[3];
 extern float preheatCoolTarget;
 extern float fermTargetPH;
 extern float fermTargetGravity;
+extern float ph1MinAvg;
+extern int ph60sCount;
 extern int stageParamSelection;
 extern bool stageParamNeedsFullRedraw;
 extern bool stageParamEditing;
