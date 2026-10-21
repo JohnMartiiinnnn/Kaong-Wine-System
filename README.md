@@ -69,10 +69,19 @@ The brewing machine operates on a distributed dual-ESP32 architecture interconne
 
 ## Signal Processing & Safety Interlocks
 
-* **Dual-Layer pH Filtering & Terminal Acidity Debounce**
+* **Dual-Layer pH Filtering & 60-Second Rolling Average Cutoff**
   * Layer 1 (Secondary Transmitter): Executes 10-sample ADC burst reads at 5ms spacing on ADS1115 channel 0. Applies a trimmed mean by discarding the two lowest and two highest samples, then averages the central six. An Exponential Moving Average (EMA, alpha 0.30) smooths drift.
-  * Layer 2 (Primary Controller): Feeds incoming UART telemetry into an 11-sample rolling circular window median filter and assigns the filtered output directly to incomingData.phValue, delivering stable, noise-immune readings across all UI screens (PH & FERM TEMP, Live Dashboard) and web REST endpoints.
-  * Persistence Debounce: Terminal acidity cutoff (pH <= fermTargetPH, nominal target 3.50 for finished wine vs 3.00 vinegar boundary) requires a sustained 10.0-second persistence timer before tripping Stage 1 advancement to pasteurization.
+  * Layer 2 (Primary Controller): Feeds incoming UART telemetry into an 11-sample rolling circular window median filter (`getFilteredPH()`) to reject transient spikes, and samples into a 60-sample second-by-second ring buffer to compute a true 1-minute moving average (`ph1MinAvg`).
+  * Terminal Acidity Cutoff: Advancement from Chamber 2 to Chamber 3 strictly requires the 60-second rolling average to hold at `<= 3.50 pH` (`ph60sCount >= 60 && ph1MinAvg <= 3.50`). The legacy 10-minute placeholder cutoff has been eliminated, ensuring transfer occurs only upon true biological attenuation.
+* **Mixer Dynamic Profile & Transfer Interlocks**
+  * Initial Pitch Mixing: Automatically engages at 100% speed immediately upon entering Chamber 2 to create a vortex and rehydrate pitched yeast, dynamically clamped to **30 seconds minimum** and **60 seconds (1 minute) maximum** (`mixMs = yeastPitchGrams * 10s`).
+  * Periodic Resuspension: Runs for strictly **1 minute ON** every **6 hours** (359 minutes OFF) to gently resuspend settling yeast lees without disturbing the anaerobic CO2 blanket or introducing oxygen.
+  * Transfer Interlock: Impeller is strictly locked to **0% (OFF)** during all liquid transfers (`stageTransferring == true`) and non-fermentation stages to prevent shaft dry-spinning, fluid splashing, and pump intake vortex cavitation.
+* **Phase 5 Stability & NVS Auto-Migration**
+  * Tare Preservation Across Reboots: Boot initialization inspects NVS for an active brew; if `savedBrewStage >= 0`, `scale.tare(10)` is bypassed to preserve calibrated tare weight, and the system resumes directly to `DASHBOARD_ACTIVE`.
+  * Modal Redraw Guard: Background `updateDashboardValues()` calls are guarded against `returnConfirmState != 0`, preventing background redraws over confirmation modals.
+  * On-Screen Safety Interlock Banners: Displays explicit red `VOL < 5.0L` / `HEATER LOCKED` badges on dashboard cards when volume is below `MIN_HEATER_SAFE_VOLUME`.
+  * Flash Schema Auto-Migration: Bumps configuration schema (`cfgVer = 3`) to automatically overwrite legacy stored setpoints with the standardized profile (63.0 °C preheat, 33.0 °C cool, 3.50 pH cutoff, 60.0 °C pasteurization).
 * **5.0L Chamber Volume Interlock**
   * Enforced at the hardware driver level before any SSR can fire. Chamber 1 requires scale reading >= 5.0 kg; Chamber 2 and Chamber 3 require accumulated flow transfer volume >= 5.0 L.
 * **Dynamic 2.0 °C / Second Rate-of-Rise (RoR) Cutoff**
@@ -99,10 +108,10 @@ To satisfy thesis Objective 4 and provide rigorous empirical data for the Indepe
 
 * **Batch 2: Automated Prototype (Engineered Inoculation)**
   * Method: Closed-loop automated brewing process inside the dual-ESP32 prototype.
-  * Sterilization: 80 °C pre-heat sterilization in Chamber 1, followed by automated fan cooling to 28 °C to 30 °C.
-  * Inoculation: Automated DRV8871 dispenser pitches pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast.
+  * Pre-Heating & Thermal Conditioning: 63.0 °C pre-heat thermal conditioning in Chamber 1, followed by automated cross-flow fan cooling to 33.0 °C safe yeast inoculation cutoff.
+  * Inoculation & Agitation: Automated DRV8871 dispenser pitches pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast with 30s to 60s dynamic initial pitch mixing, followed by 1 min ON every 6 hours periodic resuspension (impeller hard-interlocked to 0% OFF during all liquid transfers).
   * Thermal Profile: Closed-loop PID control maintaining 25 °C to 30 °C via radiant quartz heater and cross-flow fans.
-  * Thermal Arrest: Automated inter-chamber transfer to Chamber 3 for pasteurization at 60 °C (10 to 15 minute hold) upon reaching target pH 3.5.
+  * Thermal Arrest: Automated inter-chamber transfer to Chamber 3 for pasteurization at 60.0 °C (10 to 15 minute hold) upon reaching 60-second rolling average pH <= 3.50.
 
 * **Acidity Threshold Clarification (Wine vs Vinegar)**
   * Kaong Wine Target: pH 3.40 to 3.90 (optimal cutoff at pH 3.50).

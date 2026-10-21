@@ -107,18 +107,18 @@ Kaong-Wine/
 
 The system supports automated batch brewing with NVS memory persistence:
 
-* **Stage 0: Pre-Heating & Sterilization**
-  * Target: Liquid heated to setpoint (e.g. 40.0 C for testing, 72.0 C for standard production).
-  * Cool-down: Active fan cooling reduces temperature to transfer threshold (e.g. 38.0 C for testing, 30.0 C for pitch).
+* **Stage 0: Pre-Heating & Thermal Conditioning**
+  * Target: Liquid heated to setpoint (standardized 63.0 °C pre-heat, configurable in settings).
+  * Cool-down: Active fan cooling reduces temperature to yeast pitch threshold (standardized 33.0 °C).
   * Auto-Transfer: Pump 1 energizes, transferring liquid to the fermentation tank governed strictly by Flow Sensor 1 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the pre-heat chamber is confirmed completely evacuated and the system initializes Fermentation.
 * **Stage 1: Fermentation**
-  * Inoculation: Automated yeast dispenser dispenses exact weighed grams or pulse duration.
-  * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (e.g. 38.0 C testing / 28.0 C production).
-  * Agitation: Mixing impeller executes scheduled cycles (5 minutes ON, 355 minutes OFF) or manual continuous speed override.
-  * Completion: Monitors specific gravity progression, pH drop (via dual-layer trimmed median filter), and elapsed fermentation duration.
-  * Auto-Transfer: Triggered upon terminal acidity cutoff (filtered pH <= fermTargetPH, nominal target 3.50 for finished wine vs 3.00 vinegar boundary, sustained continuously for 10.0 seconds). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
+  * Inoculation: Automated yeast dispenser dispenses exact weighed grams or pulse duration, followed immediately by dynamic initial vortex mixing (clamped between 30 seconds minimum and 60 seconds maximum).
+  * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (25 °C to 30 °C, nominal 28.0 °C).
+  * Agitation: Mixing impeller executes scheduled cycles (1 minute ON, 359 minutes OFF for an exact 6-hour cycle) with impeller strictly locked to 0% (OFF) during all liquid transfers (`stageTransferring == true`) to protect against dry-spinning, fluid splashing, and pump cavitation.
+  * Completion: Monitors specific gravity progression, continuous pH kinetics, and true biological attenuation without arbitrary placeholder timers.
+  * Auto-Transfer: Triggered upon terminal acidity cutoff requiring the 60-second rolling circular buffer average (`ph1MinAvg`) to remain strictly `<= 3.50 pH` with at least 60 valid samples (`ph60sCount >= 60`). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
 * **Stage 2: Pasteurization**
-  * Target: Liquid heated to 60.0 C via 1.5 kW immersion heater and held for thermal stabilization (conforming to Table 20 interlock specifications).
+  * Target: Liquid heated to 60.0 °C via 1.5 kW immersion heater and held for thermal stabilization (conforming to Table 20 interlock specifications).
   * Cooling: Natural or assisted cooling back to ambient before bottling.
 * **Dual-Transfer Test Mode (`TRANSFER TEST`)**
   * Enabled in New Brew Wizard.
@@ -135,10 +135,10 @@ To satisfy thesis Objective 4 and provide empirical data for the Independent Sam
   * Stabilized below 4 °C in refrigeration upon reaching target acidity (pH 3.6 to 3.8) to halt acetobacter growth.
 * **Batch 2: Automated Prototype (Engineered Inoculation)**
   * Full automated brewing cycle in the dual-ESP32 prototype.
-  * 80 °C pre-heat sterilization in Chamber 1, active fan cooling down to 28 °C to 30 °C.
-  * Inoculation via DRV8871 dispenser pitching pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast.
+  * 63.0 °C pre-heat thermal conditioning in Chamber 1, followed by active cross-flow fan cooling down to 33.0 °C.
+  * Inoculation via DRV8871 dispenser pitching pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast with 30s to 60s dynamic initial vortex mixing and 1 min ON every 6 hours periodic agitation (interlocked to 0% during transfers).
   * Closed-loop PID temperature regulation at 25 °C to 30 °C.
-  * Automated thermal arrest in Chamber 3 at 60 °C (10 to 15 minute hold) upon reaching pH 3.5.
+  * Automated thermal arrest in Chamber 3 at 60.0 °C (10 to 15 minute hold) upon reaching 60-second rolling average pH <= 3.50.
 * **Acidity Threshold Clarification**
   * Kaong Wine Target: pH 3.40 to 3.90 (optimal cutoff at pH 3.50).
   * Kaong Vinegar Boundary: pH 2.00 to 3.00 (sukang kaong). If unpasteurized past pH 3.20, acetobacter rapidly oxidizes ethanol into acetic acid.
@@ -158,11 +158,11 @@ To satisfy thesis Objective 4 and provide empirical data for the Independent Sam
 
 ## 5. Hardware Safety Interlocks & Thermal Protection
 
-* **Dual-Layer pH Filter and 10-Second Terminal Acidity Persistence Debounce**
+* **Dual-Layer pH Filtering & 60-Second Rolling Average Cutoff**
   * Protects against premature fermentation cutoff and false pump transfers triggered by transient noise spikes, electrode agitation, or EMI.
   * **Layer 1 (Secondary Transmitter Node)**: Samples ADS1115 channel 0 with a 10-sample ADC burst at 5ms intervals. Applies a trimmed mean by sorting the burst, discarding the 2 highest and 2 lowest outlier samples, and averaging the central 6. The output is smoothed using Exponential Moving Average (EMA: alpha = 0.30 raw, 0.70 previous).
-  * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter and assigns the smoothed output directly to `incomingData.phValue`. Completely rejects isolated noise dips (e.g. 4.2 dipping to 2.9) and upward transients (e.g. true 2.8 spiking to 4.0), ensuring real-time stability across LCD display screens and REST endpoints.
-  * **Persistence Debounce Timer**: Requires the filtered pH to remain strictly <= fermTargetPH (nominal 3.50 for wine) for 10.0 continuous seconds (`phTriggerStartMs`). If pH bounces back above threshold, the timer immediately resets to 0.
+  * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter (`getFilteredPH()`) to reject transient spikes and assigns the smoothed output directly to `incomingData.phValue`.
+  * **60-Second Rolling Average Cutoff**: Acidity evaluation is buffered into a second-by-second 60-sample ring buffer (`ph1MinAvg`). Stage advancement strictly requires `ph60sCount >= 60 && ph1MinAvg <= 3.50`, eliminating fixed placeholder timers and ensuring transfer to pasteurization occurs only upon true biological acidification.
 * **Pasteurization Subsystem Trigger Interlock (Test 13 / Table 20 Validation)**
   * Dedicated interlock routine verifying automated heater cutoff at exactly 60.0 C.
   * Enforces low-level SSR lock, verifies Chamber 3 heater probe telemetry, and samples rate-of-rise to guarantee heater coil immersion before energizing.
@@ -235,7 +235,7 @@ PlatformIO CLI commands for building and uploading firmware:
 
 ## 7. Sensor Calibration References
 
-* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation with dual-layer signal filtering (10-sample trimmed mean burst + EMA alpha 0.30 on Secondary node; 11-sample rolling median + 10s persistence debounce on Main controller). See [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
+* **pH Sensor (PH4502C + ADS1115)**: Dual-slope Nernst temperature compensation with dual-layer signal filtering (10-sample trimmed mean burst + EMA alpha 0.30 on Secondary node; 11-sample rolling median + 60-second rolling average buffer on Main controller). See [CALIBRATION_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/CALIBRATION_GUIDE.md).
 * **Load Cell (HX711)**: Tare and calibration coefficient stored in NVS. Available in `SYSTEM CHECK` item 10 or `SETTINGS`.
 * **Flow Sensors (YF-S201 / YF-B series)**: Pulses per liter calibration stored in EEPROM/NVS.
 * **Yeast Dispenser (DRV8871)**: Milliseconds per gram delivery curve configured via `msPerGramYeast`. See [YEAST_DISPENSER_GUIDE.md](file:///home/dave/Projects/Kaong-Wine/YEAST_DISPENSER_GUIDE.md).
