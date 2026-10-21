@@ -655,6 +655,9 @@ void startLiquidTransfer(int targetStage) {
   transferDryRunAlarm = false;
   transferErrorActive = false;
   transferVolumeTransferred = 0.0f;
+  mixerRunning = false;
+  isInitialPitchMixing = false;
+  setMixerSpeed(0);
 
   if (targetStage == 1) {
     preHeatCompleted = true;
@@ -3010,7 +3013,7 @@ void loop() {
       if (currentAppState == MOTOR_TEST_MENU) {
         activeMixerSpeed = motorTestOn ? motorTestSpeed : 0;
       } else if (currentMixerMode == MIXER_AUTO) {
-        activeMixerSpeed = mixerRunning ? mixerSpeedPercent : 0;
+        activeMixerSpeed = (mixerRunning && !stageTransferring && activeBrewStage == 1) ? mixerSpeedPercent : 0;
       } else if (currentMixerMode == MIXER_MANUAL) {
         activeMixerSpeed = mixerSpeedPercent;
       } else {
@@ -3136,26 +3139,35 @@ void loop() {
     }
   }
 
-  // Auto-mixing scheduler
+  // Auto-mixing scheduler (strictly locked to OFF during transfers and outside Stage 1)
   if (currentMixerMode == MIXER_AUTO) {
-    uint32_t now = millis();
-    if (mixerRunning) {
-      if (now - mixerOnTimer >= mixerActiveDurationMs) {
+    if (stageTransferring || activeBrewStage != 1) {
+      if (mixerRunning) {
         mixerRunning = false;
         isInitialPitchMixing = false;
-        mixerCycleTimer = now;
         mixerSpeedPercent = 0;
         setMixerSpeed(0);
-        mixerActiveDurationMs = MIXER_ON_MS; // reset to 1-min max cycle for subsequent periodic mixing
       }
     } else {
-      isInitialPitchMixing = false;
-      if (now - mixerCycleTimer >= MIXER_OFF_MS) {
-        mixerRunning = true;
-        mixerOnTimer = now;
-        mixerActiveDurationMs = MIXER_ON_MS;
-        mixerSpeedPercent = 100;
-        setMixerSpeed(100);
+      uint32_t now = millis();
+      if (mixerRunning) {
+        if (now - mixerOnTimer >= mixerActiveDurationMs) {
+          mixerRunning = false;
+          isInitialPitchMixing = false;
+          mixerCycleTimer = now;
+          mixerSpeedPercent = 0;
+          setMixerSpeed(0);
+          mixerActiveDurationMs = MIXER_ON_MS; // reset to 1-min max cycle for subsequent periodic mixing
+        }
+      } else {
+        isInitialPitchMixing = false;
+        if (now - mixerCycleTimer >= MIXER_OFF_MS) {
+          mixerRunning = true;
+          mixerOnTimer = now;
+          mixerActiveDurationMs = MIXER_ON_MS;
+          mixerSpeedPercent = 100;
+          setMixerSpeed(100);
+        }
       }
     }
   }
