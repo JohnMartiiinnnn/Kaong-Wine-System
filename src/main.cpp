@@ -438,6 +438,7 @@ Preferences brewPrefs;
 
 void saveSettingsToNVS() {
   brewPrefs.begin("wb_config", false);
+  brewPrefs.putInt("cfgVer", 2);
   brewPrefs.putFloat("minVol", minVolumeReq);
   brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
@@ -460,6 +461,21 @@ void saveSettingsToNVS() {
 }
 
 void loadSettingsFromNVS() {
+  brewPrefs.begin("wb_config", true);
+  int cfgVer = brewPrefs.getInt("cfgVer", 0);
+  brewPrefs.end();
+
+  if (cfgVer < 2) {
+    // Migration: Update stored NVS keys to latest recipe standards
+    brewPrefs.begin("wb_config", false);
+    brewPrefs.putFloat("phTgt", 60.0f);
+    brewPrefs.putFloat("phCoolTgt", 30.0f);
+    brewPrefs.putFloat("pastTgt", 60.0f);
+    brewPrefs.putFloat("fermPH", 3.5f);
+    brewPrefs.putInt("cfgVer", 2);
+    brewPrefs.end();
+  }
+
   brewPrefs.begin("wb_config", true);
   minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
   stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 60.0f);
