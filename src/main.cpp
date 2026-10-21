@@ -281,8 +281,8 @@ char pidLogFileName[32] = "/pid_track.csv";
 // ---- Brew Stage & Stage Params ----
 int activeBrewStage = -1;
 uint32_t stageStartMillis = 0;
-float stageTargetTemp[3] = {60.0f, 38.0f, 60.0f};
-float preheatCoolTarget = 30.0f;
+float stageTargetTemp[3] = {63.0f, 38.0f, 60.0f};
+float preheatCoolTarget = 33.0f;
 float fermTargetPH = 3.5f;
 float fermTargetGravity = 1.010f;
 float    yeastPitchGrams = 5.0f;
@@ -438,7 +438,7 @@ Preferences brewPrefs;
 
 void saveSettingsToNVS() {
   brewPrefs.begin("wb_config", false);
-  brewPrefs.putInt("cfgVer", 2);
+  brewPrefs.putInt("cfgVer", 3);
   brewPrefs.putFloat("minVol", minVolumeReq);
   brewPrefs.putFloat("phTgt", stageTargetTemp[0]);
   brewPrefs.putFloat("phCoolTgt", preheatCoolTarget);
@@ -465,21 +465,21 @@ void loadSettingsFromNVS() {
   int cfgVer = brewPrefs.getInt("cfgVer", 0);
   brewPrefs.end();
 
-  if (cfgVer < 2) {
-    // Migration: Update stored NVS keys to latest recipe standards
+  if (cfgVer < 3) {
+    // Migration: Update stored NVS keys to latest recipe standards (63C preheat, 33C cool)
     brewPrefs.begin("wb_config", false);
-    brewPrefs.putFloat("phTgt", 60.0f);
-    brewPrefs.putFloat("phCoolTgt", 30.0f);
+    brewPrefs.putFloat("phTgt", 63.0f);
+    brewPrefs.putFloat("phCoolTgt", 33.0f);
     brewPrefs.putFloat("pastTgt", 60.0f);
     brewPrefs.putFloat("fermPH", 3.5f);
-    brewPrefs.putInt("cfgVer", 2);
+    brewPrefs.putInt("cfgVer", 3);
     brewPrefs.end();
   }
 
   brewPrefs.begin("wb_config", true);
   minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
-  stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 60.0f);
-  preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 30.0f);
+  stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 63.0f);
+  preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 33.0f);
   stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
   stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 60.0f);
   pidFanPercent = brewPrefs.getInt("fanBase", 20);
@@ -555,8 +555,8 @@ void loadBrewStateFromNVS() {
     transferStartWeight = brewPrefs.getFloat("startWt", 10.0f);
     transferTargetVolume = brewPrefs.getFloat("targetVol", 10.0f);
     minVolumeReq = brewPrefs.getFloat("minVol", 10.0f);
-    stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 60.0f);
-    preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 30.0f);
+    stageTargetTemp[0] = brewPrefs.getFloat("phTgt", 63.0f);
+    preheatCoolTarget = brewPrefs.getFloat("phCoolTgt", 33.0f);
     stageTargetTemp[1] = brewPrefs.getFloat("fermTgt", 30.0f);
     stageTargetTemp[2] = brewPrefs.getFloat("pastTgt", 60.0f);
     yeastPitchRate = brewPrefs.getFloat("yeastRate", 0.50f);
@@ -769,7 +769,10 @@ void completeLiquidTransfer(float finalVol) {
       yeastDispenseStartMs = millis();
       yeastDispenseDurationMs = (uint32_t)(yeastPitchGrams * msPerGramYeast);
       actualYeastDispensedGrams = 0.0f;
-      pitchMixTotalDurationMs = (uint32_t)(yeastPitchGrams * 10.0f * 1000.0f);
+      uint32_t mixMs = (uint32_t)(yeastPitchGrams * 10.0f * 1000.0f);
+      if (mixMs < MIXER_MIN_MS) mixMs = MIXER_MIN_MS; // 30s min
+      if (mixMs > MIXER_ON_MS) mixMs = MIXER_ON_MS;   // 1 min (60s) max
+      pitchMixTotalDurationMs = mixMs;
       mixerActiveDurationMs = pitchMixTotalDurationMs;
       isInitialPitchMixing = true;
     } else {
@@ -777,7 +780,7 @@ void completeLiquidTransfer(float finalVol) {
       actualYeastDispensedGrams = 0.0f;
       isInitialPitchMixing = false;
       pitchMixTotalDurationMs = 0;
-      mixerActiveDurationMs = MIXER_ON_MS;
+      mixerActiveDurationMs = MIXER_MIN_MS;
     }
     currentMixerMode = MIXER_AUTO;
     mixerRunning = true;
@@ -3143,7 +3146,7 @@ void loop() {
         mixerCycleTimer = now;
         mixerSpeedPercent = 0;
         setMixerSpeed(0);
-        mixerActiveDurationMs = MIXER_ON_MS; // reset to 5-min cycle for subsequent periodic mixing
+        mixerActiveDurationMs = MIXER_ON_MS; // reset to 1-min max cycle for subsequent periodic mixing
       }
     } else {
       isInitialPitchMixing = false;
