@@ -139,7 +139,7 @@ To satisfy thesis Objective 4 and provide empirical data for the Independent Sam
   * Inoculation via DRV8871 dispenser pitching pure Saccharomyces cerevisiae (Lalvin EC-1118) wine yeast with 30s to 60s dynamic initial vortex mixing and 1 min ON every 6 hours periodic agitation (interlocked to 0% during transfers).
   * Closed-loop PID temperature regulation at 25 °C to 30 °C.
   * Automated thermal arrest in Chamber 3 at 60.0 °C (10 to 15 minute hold) upon reaching 60-second rolling average pH <= 3.50.
-  * Operational Status (Oct 21, 2026): Active fermentation running in Chamber 1. 6.86 L conditioned and cooled to 33.0 °C, transferred 100%, inoculated with 3.43 g yeast, vortex mixed (32s), with continuous 24/7 telemetry logging 1.0738 OG (RAPT Pill BLE) and pH 4.62 (ADS1115 dual-slope). Solid aluminum 6x8mm rust-proof rigid coupler sourced to replace oxidized carbon steel sleeve.
+  * Operational Status (Oct 22, 2026): Active fermentation running in Chamber 1. 6.86 L conditioned and cooled to 33.0 °C, transferred 100%, inoculated with 3.43 g yeast, vortex mixed (32s), with continuous 24/7 telemetry logging 1.0738 OG (RAPT Pill BLE) and pH 4.62 (ADS1115 dual-slope). Solid aluminum 6x8mm rust-proof rigid coupler sourced. Prototype machine successfully retrieved from CvSU DCEEE lab on Oct 22 campus run; CEIT-SC PSP scholarship filed; Table 8 winemaker surveys prepared.
 * **Acidity Threshold Clarification**
   * Kaong Wine Target: pH 3.40 to 3.90 (optimal cutoff at pH 3.50).
   * Kaong Vinegar Boundary: pH 2.00 to 3.00 (sukang kaong). If unpasteurized past pH 3.20, acetobacter rapidly oxidizes ethanol into acetic acid.
