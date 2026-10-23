@@ -369,6 +369,10 @@ bool transferErrorActive = false;
 bool preHeatCompleted = false;
 bool fermCompleted = false;
 uint32_t transferLastPulseMs = 0;
+bool manualPump2Override = false;
+uint32_t drainWindowStartMs = 0;
+float drainWindowStartVol = 0.0f;
+int lastTransferTarget = -1;
 
 bool skipPreheatHeater = false;
 float minVolumeReq = 10.0f;
@@ -690,6 +694,13 @@ void startLiquidTransfer(int targetStage) {
       transferStartWeight = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
     }
     transferTargetVolume = (transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq;
+
+    // Explicitly initialize transfer timers, pump relay, and tracking windows
+    drainWindowStartMs = millis();
+    drainWindowStartVol = 0.0f;
+    lastTransferTarget = 1;
+    setPump1(true);
+    pumpPreHeatFermOn = true;
   } else if (targetStage == 2) {
     fermCompleted = true;
     currentHeatingPercent = 0;
@@ -705,6 +716,13 @@ void startLiquidTransfer(int targetStage) {
     float fermVol = (chamberVolume[1] > 0.5f) ? chamberVolume[1] : ((transfer1Volume > 0.5f) ? transfer1Volume : transferStartWeight);
     if (transferStartWeight > 0.5f && fermVol > transferStartWeight) fermVol = transferStartWeight;
     transferTargetVolume = (fermVol > 0.5f) ? fermVol : ((transferStartWeight > 0.5f) ? transferStartWeight : minVolumeReq);
+
+    // Explicitly initialize transfer timers, pump relay, and tracking windows
+    drainWindowStartMs = millis();
+    drainWindowStartVol = 0.0f;
+    lastTransferTarget = 2;
+    setPump2(true);
+    pumpFermPastOn = true;
   }
 
   mcp.digitalWrite(LIGHT_R, RELAY_OFF);
@@ -886,6 +904,78 @@ bool manualAdvanceStage() {
   if (currentAppState == DASHBOARD_ACTIVE)
     drawDashboardLayout();
   return true;
+}
+
+void resetToFermentation() {
+  stageTransferring = false;
+  stageTransferTarget = -1;
+  transferDryRunAlarm = false;
+  transferErrorActive = false;
+  manualPump2Override = false;
+  setPump1(false);
+  setPump2(false);
+  pumpPreHeatFermOn = false;
+  pumpFermPastOn = false;
+
+  activeBrewStage = 1;
+  dashSelection = 1;
+  chamberVolume[1] = (transferStartWeight > 0.5f) ? transferStartWeight : 6.86f;
+  chamberVolume[2] = 0.0f;
+  transfer2Volume = 0.0f;
+  fermCompleted = false;
+
+  mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+  mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+
+  currentHeatingPercent = 0;
+  digitalWrite(SSR_PREHEAT, LOW);
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+
+  currentAppState = DASHBOARD_ACTIVE;
+  dashNeedsFullRedraw = true;
+  saveBrewStateToNVS();
+  drawDashboardLayout();
+}
+
+void setManualPump2(bool state) {
+  manualPump2Override = state;
+  setPump2(state);
+  pumpFermPastOn = state;
+}
+
+void startPasteurization() {
+  manualPump2Override = false;
+  stageTransferring = false;
+  stageTransferTarget = -1;
+  transferDryRunAlarm = false;
+  transferErrorActive = false;
+  setPump1(false);
+  setPump2(false);
+  pumpPreHeatFermOn = false;
+  pumpFermPastOn = false;
+
+  activeBrewStage = 2;
+  dashSelection = 2;
+  stageStartMillis = millis();
+  fermCompleted = true;
+  pastSterilized = false;
+
+  float vol = (chamberVolume[1] > 0.5f) ? chamberVolume[1] : ((transferStartWeight > 0.5f) ? transferStartWeight : 6.86f);
+  chamberVolume[1] = 0.0f;
+  chamberVolume[2] = vol;
+  transfer2Volume = vol;
+
+  mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_G, RELAY_ON);
+
+  pastPid.reset();
+  currentAppState = DASHBOARD_ACTIVE;
+  dashNeedsFullRedraw = true;
+  saveBrewStateToNVS();
+  drawDashboardLayout();
 }
 
 
@@ -1092,6 +1182,9 @@ void setup() {
   server.on("/test/status", HTTP_GET, handleTestStatus);
   server.on("/stage/advance", HTTP_ANY, handleStageAdvance);
   server.on("/api/stage/advance", HTTP_ANY, handleStageAdvance);
+  server.on("/api/reset_to_ferm", HTTP_ANY, handleResetToFerm);
+  server.on("/api/pump2", HTTP_ANY, handlePump2);
+  server.on("/api/start_past", HTTP_ANY, handleStartPast);
   server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -3468,10 +3561,6 @@ void loop() {
         transfer2Volume = transferVolumeTransferred;
       }
 
-      static int lastTransferTarget = -1;
-      static uint32_t drainWindowStartMs = 0;
-      static float drainWindowStartVol = 0.0f;
-
       uint32_t nowMs = millis();
       uint32_t runMs = nowMs - transferStartMs;
 
@@ -4080,8 +4169,8 @@ void loop() {
         pumpFermPastOn = true;
       }
     } else {
-      // Turn off pumps if not in manual transfer test menu, relay test menu, or
-      // calibration wizard
+      // Turn off pumps if not in manual transfer test menu, relay test menu,
+      // calibration wizard, or manual pump override
       if (currentAppState == PH_TRANSFER_TEST_MENU) {
         setPump1(false);
         setPump2(phTransTestTransferActive);
@@ -4091,9 +4180,14 @@ void loop() {
                  currentAppState != RELAY_TEST_MENU &&
                  currentAppState != CALIB_WIZARD) {
         setPump1(false);
-        setPump2(false);
+        if (manualPump2Override) {
+          setPump2(true);
+          pumpFermPastOn = true;
+        } else {
+          setPump2(false);
+          pumpFermPastOn = false;
+        }
         pumpPreHeatFermOn = false;
-        pumpFermPastOn = false;
       }
     }
 

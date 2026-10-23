@@ -27,6 +27,14 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
 .badge-blue{background:#0369a1;color:#bae6fd}
 .badge-amber{background:#78350f;color:#fde68a}
 .badge-green{background:#064e3b;color:#a7f3d0}
+.btn-red{background:#dc2626}
+.btn-red:hover{background:#b91c1c}
+.btn-green{background:#16a34a}
+.btn-green:hover{background:#15803d}
+.btn-blue{background:#0284c7}
+.btn-blue:hover{background:#0369a1}
+.btn-slate{background:#475569}
+.btn-slate:hover{background:#334155}
 </style>
 </head>
 <body>
@@ -40,6 +48,13 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
   <div id="stageTarget" style="font-size:.8rem;color:#94a3b8;margin-top:.25rem">--</div>
   <div style="margin-top:1rem">
     <button type="button" class="btn btn-amber" id="advBtn" onclick="confirmAdvanceStage()">Advance to Next Stage</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem">
+    <button type="button" class="btn btn-slate" id="resetFermBtn" onclick="doResetFerm()">Reset to Ferm</button>
+    <button type="button" class="btn btn-blue" id="pump2Btn" onclick="togglePump2()">Pump 2: OFF</button>
+  </div>
+  <div style="margin-top:.5rem">
+    <button type="button" class="btn btn-green" id="startPastBtn" onclick="doStartPast()">Start Pasteurization (PID)</button>
   </div>
 </div>
 <div class="card" id="pastCard" style="display:none;background:#1e1b4b;border-color:#6366f1;text-align:center">
@@ -136,6 +151,37 @@ async function confirmAdvanceStage(){
   }
 }
 
+async function doResetFerm(){
+  if(!confirm('Reset system state back to Chamber 2 (Fermentation)?\n\nThis will restore Chamber 2 volume to 6.86L and clear completion/alarm states.')) return;
+  try{
+    const r = await fetch('/api/reset_to_ferm', { method: 'POST' });
+    const d = await r.json();
+    alert(d.message || 'State restored to Fermentation.');
+  }catch(e){
+    alert('Reset request sent.');
+  }
+}
+
+async function togglePump2(){
+  try{
+    const r = await fetch('/api/pump2', { method: 'POST' });
+    const d = await r.json();
+  }catch(e){
+    alert('Pump 2 toggle command sent.');
+  }
+}
+
+async function doStartPast(){
+  if(!confirm('Start Pasteurization now?\n\nMake sure the liquid has been pumped into Chamber 3. This will set Chamber 3 volume to 6.86L, turn on the Green LED, and initiate 60°C temperature regulation.')) return;
+  try{
+    const r = await fetch('/api/start_past', { method: 'POST' });
+    const d = await r.json();
+    alert(d.message || 'Pasteurization started.');
+  }catch(e){
+    alert('Start pasteurization command sent.');
+  }
+}
+
 async function update(){
   try{
     const r=await fetch('/data');
@@ -159,6 +205,16 @@ async function update(){
     document.getElementById('abv').innerText=d.abv.toFixed(2);
     document.getElementById('bat').innerText=d.bat+'%';
     document.getElementById('rssi').innerText=(d.rssi ? ' ('+d.rssi+' dBm)' : '');
+    const p2Btn = document.getElementById('pump2Btn');
+    if(p2Btn){
+      if(d.p2){
+        p2Btn.innerText = 'Pump 2: ON (RUNNING)';
+        p2Btn.className = 'btn btn-red';
+      } else {
+        p2Btn.innerText = 'Pump 2: OFF';
+        p2Btn.className = 'btn btn-blue';
+      }
+    }
   }catch(e){}
 }
 setInterval(update,1000);
@@ -309,6 +365,27 @@ void handleStageAdvance() {
   } else {
     server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to advance stage\"}");
   }
+}
+
+void handleResetToFerm() {
+  resetToFermentation();
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Restored to Fermentation (Chamber 2: 6.86L)\",\"stage\":1}");
+}
+
+void handlePump2() {
+  if (server.hasArg("state")) {
+    bool turnOn = (server.arg("state") == "1" || server.arg("state") == "true");
+    setManualPump2(turnOn);
+  } else {
+    setManualPump2(!manualPump2Override);
+  }
+  String json = "{\"status\":\"ok\",\"p2\":" + String(manualPump2Override ? 1 : 0) + "}";
+  server.send(200, "application/json", json);
+}
+
+void handleStartPast() {
+  startPasteurization();
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Started Pasteurization (Chamber 3: 6.86L, 60.0C PID)\",\"stage\":2}");
 }
 
 

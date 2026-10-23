@@ -408,7 +408,14 @@ extern bool  simDynamic[3];
 extern bool  simManual[3];
 extern bool advanceConfirmActive;
 extern uint32_t advanceConfirmTimer;
+extern bool manualPump2Override;
+extern uint32_t drainWindowStartMs;
+extern float drainWindowStartVol;
+extern int lastTransferTarget;
 bool manualAdvanceStage();
+void resetToFermentation();
+void setManualPump2(bool state);
+void startPasteurization();
 
 extern bool     heaterTestNeedsFullRedraw;
 extern int      heaterTestStage;
@@ -477,9 +484,9 @@ extern bool     transferDryRunAlarm;
 extern bool     transferErrorActive;
 extern bool     preHeatCompleted;
 extern bool     fermCompleted;
-const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 15000;  // 15s initial grace period for pump to prime before dry-run checks
-const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 15000;  // 15s of sub-threshold flow (< 0.05L delta) confirms chamber is completely drained during bulk transfer
-const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 15000;  // 15s of sub-threshold flow confirms chamber drained once bulk target volume reached
+const uint32_t  TRANSFER_PRIMING_GRACE_MS  = 45000;  // 45s initial grace period for pump to prime before dry-run checks
+const uint32_t  TRANSFER_DRAIN_TIMEOUT_MS  = 30000;  // 30s of sub-threshold flow confirms chamber is completely drained
+const uint32_t  TRANSFER_DRAIN_SETTLE_MS   = 20000;  // 20s of sub-threshold flow confirms chamber drained once bulk target volume reached
 const float     TRANSFER_DRAIN_MAX_DELTA_L = 0.05f;  // 50mL threshold ensures any active liquid transfer (>0.12 L/min) prevents premature cutoff
 const uint32_t  TRANSFER_DRYRUN_TIMEOUT_MS = 15000;  // Backward compatibility alias
 const uint32_t  TRANSFER_MAX_SAFETY_MS     = 900000; // 15 minutes absolute maximum pump runtime for full batch transfers
