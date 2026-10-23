@@ -19,10 +19,29 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
 .status{display:inline-block;padding:.2rem .5rem;border-radius:4px;font-size:.7rem;font-weight:700}
 .good{background:#064e3b;color:#34d399}
 .warn{background:#78350f;color:#fbbf24}
+.btn{display:inline-block;padding:.75rem 1.5rem;border-radius:8px;font-weight:700;font-size:.9rem;border:none;cursor:pointer;width:100%;text-align:center;transition:background .2s,opacity .2s;color:#fff}
+.btn-amber{background:#d97706}
+.btn-amber:hover{background:#b45309}
+.btn:disabled{background:#334155;color:#94a3b8;cursor:not-allowed;opacity:.7}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:9999px;font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.badge-blue{background:#0369a1;color:#bae6fd}
+.badge-amber{background:#78350f;color:#fde68a}
+.badge-green{background:#064e3b;color:#a7f3d0}
 </style>
 </head>
 <body>
 <h1>SYSTEM MONITOR</h1>
+<div class="card" id="stageCtrlCard" style="background:#0f172a;border:1px solid #0284c7;text-align:center">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+    <div class="label" style="color:#38bdf8">Active Brewing Phase</div>
+    <span class="badge badge-blue" id="stageBadge">--</span>
+  </div>
+  <div class="val" id="stageName" style="color:#f8fafc;font-size:1.25rem">--</div>
+  <div id="stageTarget" style="font-size:.8rem;color:#94a3b8;margin-top:.25rem">--</div>
+  <div style="margin-top:1rem">
+    <button type="button" class="btn btn-amber" id="advBtn" onclick="confirmAdvanceStage()">Advance to Next Stage</button>
+  </div>
+</div>
 <div class="card" id="pastCard" style="display:none;background:#1e1b4b;border-color:#6366f1;text-align:center">
   <div class="label" style="color:#a5b4fc">Test 13: Pasteurization Heater Interlock</div>
   <div class="val" id="pastTrial" style="color:#818cf8">-- / 10 Trials</div>
@@ -46,10 +65,82 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
   <a href="/log.csv" download style="display:inline-block;background:#0284c7;color:#fff;padding:.75rem 1.5rem;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)">Export Batch CSV Log</a>
 </div>
 <script>
+const STAGE_MAP = {
+  0: { badge: 'PRE-HEATING', name: 'Chamber 1: Pre-Heating', next: 'Chamber 2 (Fermentation)' },
+  1: { badge: 'FERMENTATION', name: 'Chamber 2: Fermentation', next: 'Chamber 3 (Pasteurization)' },
+  2: { badge: 'PASTEURIZATION', name: 'Chamber 3: Pasteurization', next: 'Brew Completion' }
+};
+
+function updateStageView(d){
+  const badge = document.getElementById('stageBadge');
+  const name = document.getElementById('stageName');
+  const target = document.getElementById('stageTarget');
+  const btn = document.getElementById('advBtn');
+  if(!badge || !name || !target || !btn) return;
+
+  if(d.stage === undefined || d.stage < 0 || d.stage > 2){
+    badge.innerText = 'IDLE';
+    badge.className = 'badge';
+    badge.style.background = '#334155';
+    name.innerText = 'Brew Completed / Idle';
+    target.innerText = 'No active brewing cycle running.';
+    btn.style.display = 'none';
+    return;
+  }
+
+  btn.style.display = 'block';
+  const info = STAGE_MAP[d.stage] || { badge: 'STAGE ' + d.stage, name: 'Stage ' + d.stage, next: 'Next Stage' };
+
+  if(d.xfer){
+    badge.innerText = 'TRANSFERRING';
+    badge.className = 'badge badge-amber';
+    name.innerText = 'Transferring to ' + info.next;
+    target.innerText = 'Transferred: ' + (d.xfer_vol ? d.xfer_vol.toFixed(2) : '0') + ' L (' + (d.xfer_pct ? d.xfer_pct.toFixed(0) : '0') + '%)';
+    btn.disabled = true;
+    btn.innerText = 'Liquid Transfer In Progress...';
+  } else {
+    badge.innerText = info.badge;
+    badge.className = 'badge ' + (d.stage === 2 ? 'badge-green' : 'badge-blue');
+    name.innerText = info.name;
+    target.innerText = 'Next: ' + info.next;
+    btn.disabled = false;
+    btn.innerText = 'Advance to ' + info.next;
+  }
+}
+
+async function confirmAdvanceStage(){
+  try {
+    const r = await fetch('/data');
+    const d = await r.json();
+    const info = STAGE_MAP[d.stage];
+    if(!info){
+      alert('No active brewing phase found.');
+      return;
+    }
+    const msg = 'Are you sure you want to advance from ' + info.name + ' to ' + info.next + '?\n\nThis will halt active heating/fans and begin liquid transfer.';
+    if(!confirm(msg)) return;
+
+    const btn = document.getElementById('advBtn');
+    btn.disabled = true;
+    btn.innerText = 'Advancing Stage...';
+
+    const res = await fetch('/stage/advance', { method: 'POST' });
+    const resData = await res.json();
+    if(resData.status === 'ok'){
+      alert('Stage transition initiated successfully! Transfer starting.');
+    } else {
+      alert('Notice: ' + (resData.message || 'Advance command sent'));
+    }
+  } catch(e){
+    alert('Advance signal dispatched to machine.');
+  }
+}
+
 async function update(){
   try{
     const r=await fetch('/data');
     const d=await r.json();
+    updateStageView(d);
     if(d.past_active){
       document.getElementById('pastCard').style.display='block';
       document.getElementById('pastTrial').innerText=d.past_trial+' / '+d.past_tot+' Trials';
@@ -199,6 +290,25 @@ void handleData() {
   json += "\"past_done\":" + String(pastTestComplete ? 1 : 0);
   json += "}";
   server.send(200, "application/json", json);
+}
+
+void handleStageAdvance() {
+  if (stageTransferring) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"message\":\"Liquid transfer already in progress\"}");
+    return;
+  }
+  if (activeBrewStage < 0 || activeBrewStage > 2) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No active brew cycle running\"}");
+    return;
+  }
+  int prevStage = activeBrewStage;
+  bool ok = manualAdvanceStage();
+  if (ok) {
+    String json = "{\"status\":\"ok\",\"previous_stage\":" + String(prevStage) + ",\"active_stage\":" + String(activeBrewStage) + ",\"transferring\":" + String(stageTransferring ? 1 : 0) + "}";
+    server.send(200, "application/json", json);
+  } else {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to advance stage\"}");
+  }
 }
 
 

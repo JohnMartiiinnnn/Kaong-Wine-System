@@ -406,6 +406,10 @@ extern bool phAlertActive;
 extern float simTempOverride[3];
 extern bool  simDynamic[3];
 extern bool  simManual[3];
+extern bool advanceConfirmActive;
+extern uint32_t advanceConfirmTimer;
+bool manualAdvanceStage();
+
 extern bool     heaterTestNeedsFullRedraw;
 extern int      heaterTestStage;
 extern int      heaterTestPercent;

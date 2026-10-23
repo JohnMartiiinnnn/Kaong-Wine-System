@@ -304,6 +304,8 @@ float simTempOverride[3] = {0.0f, 0.0f, 0.0f};
 bool simDynamic[3] = {false, false, false};
 bool simManual[3] = {false, false, false};
 uint32_t stageElapsedMs[3] = {0, 0, 0};
+bool advanceConfirmActive = false;
+uint32_t advanceConfirmTimer = 0;
 bool heaterTestNeedsFullRedraw = true;
 int heaterTestStage = 0;
 int heaterTestPercent = 0;
@@ -537,6 +539,9 @@ void saveBrewStateToNVS() {
   brewPrefs.putFloat("dispYeastG", actualYeastDispensedGrams);
   brewPrefs.putUInt("mixTotSec", mixerTotalRunSec);
   brewPrefs.putString("logFile", currentLogFile);
+  brewPrefs.putUInt("elap0", stageElapsedMs[0]);
+  brewPrefs.putUInt("elap1", stageElapsedMs[1]);
+  brewPrefs.putUInt("elap2", stageElapsedMs[2]);
   brewPrefs.end();
 }
 
@@ -575,6 +580,16 @@ void loadBrewStateFromNVS() {
     preHeatCompleted = brewPrefs.getBool("phDone", false);
     fermCompleted = brewPrefs.getBool("fermDone", false);
     pastSterilized = brewPrefs.getBool("pastSter", false);
+    stageElapsedMs[0] = brewPrefs.getUInt("elap0", 0);
+    stageElapsedMs[1] = brewPrefs.getUInt("elap1", 0);
+    stageElapsedMs[2] = brewPrefs.getUInt("elap2", 0);
+    if (activeBrewStage == 1 && stageElapsedMs[1] == 0 && rtcStatus) {
+      DateTime now = rtc.now();
+      DateTime fermStart(2026, 10, 21, 22, 1, 0);
+      if (now.unixtime() > fermStart.unixtime()) {
+        stageElapsedMs[1] = (uint32_t)((now.unixtime() - fermStart.unixtime()) * 1000UL);
+      }
+    }
     stageStartMillis = millis();
     if (stageTransferring) {
       transferStartMs = millis();
@@ -810,6 +825,69 @@ void acknowledgeAndAdvanceTransfer() {
   completeLiquidTransfer(finalVol);
 }
 
+bool manualAdvanceStage() {
+  if (activeBrewStage < 0 || activeBrewStage > 2) return false;
+  if (stageTransferring) return false;
+
+  // 1. Tear down active stage actuators safely
+  currentHeatingPercent = 0;
+  digitalWrite(SSR_PREHEAT, LOW);
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+  isFanOn = false;
+  mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+  setFanSpeed(0);
+  isFermFanOn = false;
+  mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+  setMixerSpeed(0);
+  mixerRunning = false;
+  isInitialPitchMixing = false;
+
+  // 2. Accumulate stage elapsed time
+  stageElapsedMs[activeBrewStage] += (millis() - stageStartMillis);
+
+  // 3. Advance to next stage or complete
+  if (activeBrewStage < 2) {
+    startLiquidTransfer(activeBrewStage + 1);
+  } else {
+    // Pasteurization complete -> finalize brew
+    stageElapsedMs[2] = millis() - stageStartMillis;
+    if (incomingData.bleStatus && incomingData.pillGravity > 0.0f && incomingData.pillGravity < 10.0f) {
+      finalGravity = incomingData.pillGravity;
+    }
+    if (incomingData.adsStatus && incomingData.phValue > 0.0f) {
+      finalPH = incomingData.phValue;
+    }
+    if (originalGravity > 0.0f && finalGravity > 0.0f) {
+      finalABV = max(0.0f, (originalGravity - finalGravity) * 131.25f);
+    }
+    if (rtcStatus) {
+      DateTime now = rtc.now();
+      int h12 = now.hour() % 12;
+      if (h12 == 0) h12 = 12;
+      const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+      sprintf(brewEndTime, "%02d/%02d %d:%02d%s", now.day(), now.month(), h12, now.minute(), ampm);
+    } else {
+      strcpy(brewEndTime, "COMPLETED");
+    }
+    saveBrewSummaryToNVS();
+    clearBrewStateInNVS();
+    activeBrewStage = -1;
+    simRunActive = false;
+    mcp.digitalWrite(LIGHT_R, RELAY_ON);
+    mcp.digitalWrite(LIGHT_Y, RELAY_ON);
+    mcp.digitalWrite(LIGHT_G, RELAY_ON);
+    currentAppState = BREW_SUMMARY_MENU;
+  }
+
+  saveBrewStateToNVS();
+  dashNeedsFullRedraw = true;
+  if (currentAppState == DASHBOARD_ACTIVE)
+    drawDashboardLayout();
+  return true;
+}
+
 
 // ---- Mixer Speed Helper ----
 void setMixerSpeed(int percent) {
@@ -1012,6 +1090,8 @@ void setup() {
   server.on("/test/pasteurization", HTTP_GET, handleTestPasteurization);
   server.on("/test/table20", HTTP_GET, handleTestPasteurization);
   server.on("/test/status", HTTP_GET, handleTestStatus);
+  server.on("/stage/advance", HTTP_ANY, handleStageAdvance);
+  server.on("/api/stage/advance", HTTP_ANY, handleStageAdvance);
   server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -1220,6 +1300,21 @@ void loop() {
   bool cUp = latchedUp;
   bool cDown = latchedDown;
   bool cSelect = latchedSelect;
+
+  // Advance confirm timeout & cancel check
+  if (currentAppState == DASHBOARD_ACTIVE && advanceConfirmActive) {
+    if (millis() - advanceConfirmTimer > 6000UL) {
+      advanceConfirmActive = false;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+    } else if (cLeft && !ljLeft) {
+      advanceConfirmActive = false;
+      dashNeedsFullRedraw = true;
+      drawDashboardLayout();
+      ljLeft = cLeft;
+      return;
+    }
+  }
 
   // Return confirm state
   if (returnConfirmState == 1) {
@@ -1745,6 +1840,14 @@ void loop() {
         graphPickNeedsFullRedraw = true;
         graphPickSelection = dashGraphPlotType;
         drawGraphPickMenu();
+      } else if (advanceConfirmActive) {
+        advanceConfirmActive = false;
+        manualAdvanceStage();
+      } else if (activeBrewStage >= 0 && activeBrewStage <= 2 && !stageTransferring) {
+        advanceConfirmActive = true;
+        advanceConfirmTimer = millis();
+        dashNeedsFullRedraw = true;
+        drawDashboardLayout();
       }
     } else if (currentAppState == GRAPH_PICK_MENU) {
       dashGraphPlotType = graphPickSelection;
