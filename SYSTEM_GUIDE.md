@@ -209,6 +209,15 @@ The top bar always shows:
 - SD card status (READY or ERROR)
 - Last log write time
 
+### Stage Advancement & Reversion Controls
+
+From the Dashboard, you have complete control over stage progression:
+- **Advance Stage:** Press `SELECT` to bring up the advance confirmation banner. Press `SELECT` again to confirm advancing to the next stage.
+- **Revert to Previous Stage:** While the advance confirmation banner is displayed, press `DOWN`. The system will safely shut off active heaters/fans, step back one chamber (e.g. Pasteurization back to Fermentation), and restore previous chamber volumes.
+- **Cancel Advance:** Press `LEFT` while the confirmation banner is active to cancel and remain on the current stage.
+- **Recovering from Transfer Alarms:** If a fluid transfer stalls due to low flow or an air bubble (`XFER ALARM`), pressing `LEFT` immediately aborts the transfer, clears all alarms, and returns the machine safely to Fermentation.
+- **Web Interface:** The web dashboard (`http://192.168.1.137` / `http://winebrew.local`) features matching `Advance Stage` and `Revert Stage` buttons.
+
 ---
 
 ## 7. Brewing Stages
@@ -246,7 +255,9 @@ Open Stage Parameters (RIGHT in module view) and SELECT "ADVANCE TO FERMENTATION
 - The mixer runs automatically in AUTO mode: 5 minutes on, then 355 minutes off, repeating.
 
 **To advance to Pasteurization:**
-Open Stage Parameters and SELECT "ADVANCE TO PASTEURIZATION." The system energizes Pump 2, integrating pulses from Flow Sensor 2 (GPIO 34). It runs until the fermentation vat drains empty (15-second sub-threshold flow dry detection, or 15-minute safety cutoff), locks the transferred volume into the pasteurizer, and switches to Stage 2.
+- **Automated Cutoff (3-Tier Safeguards):** The system automatically advances to Pasteurization upon terminal biological acidity, guarded by three anti-noise rules: (1) fermentation must have run for at least 18 hours, (2) the rolling average pH must remain continuously below 3.50 for 15 solid minutes without transient spikes, and (3) if the RAPT Pill is active, specific gravity must verify sugar attenuation (`SG <= 1.030`).
+- **Manual Advance:** You can manually advance anytime by pressing `SELECT` on the Dashboard or clicking `Advance Stage` on the web interface.
+- **Fluid Transfer:** When advancing, Pump 2 energizes and transfers wine to Chamber 3. If a flow stall or line blockage occurs, the dry-run interlock shuts down the pump and locks out the pasteurization heater to protect against dry heating. Pressing `LEFT` recovers safely back to Fermentation.
 
 **Status light:** YELLOW on during this stage.
 

@@ -116,10 +116,15 @@ The system supports automated batch brewing with NVS memory persistence:
   * Thermal Control: Quartz radiant heater PID regulates chamber temperature to maintain target (25 °C to 30 °C, nominal 28.0 °C).
   * Agitation: Mixing impeller executes scheduled cycles (1 minute ON, 359 minutes OFF for an exact 6-hour cycle) with impeller strictly locked to 0% (OFF) during all liquid transfers (`stageTransferring == true`) to protect against dry-spinning, fluid splashing, and pump cavitation.
   * Completion: Monitors specific gravity progression, continuous pH kinetics, and true biological attenuation without arbitrary placeholder timers.
-  * Auto-Transfer: Triggered upon terminal acidity cutoff requiring the 60-second rolling circular buffer average (`ph1MinAvg`) to remain strictly `<= 3.50 pH` with at least 60 valid samples (`ph60sCount >= 60`). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 60 seconds (1 minute), the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
+  * Auto-Transfer: Triggered upon terminal acidity cutoff protected by a 3-tier anti-noise safeguard (18-hr minimum runtime gate, 15-minute continuous sustained window <= 3.50 pH, and RAPT Pill attenuation verification <= 1.030 SG). Pump 2 transfers fermented wine to the pasteurization tank governed strictly by Flow Sensor 2 pulses. Once liquid runs out and pulses cease for 30 seconds after bulk transfer, the fermentation chamber is confirmed completely evacuated and the system initializes Pasteurization.
 * **Stage 2: Pasteurization**
   * Target: Liquid heated to 60.0 °C via 1.5 kW immersion heater and held for thermal stabilization (conforming to Table 20 interlock specifications).
   * Cooling: Natural or assisted cooling back to ambient before bottling.
+* **Stage Reversion & Batch Recovery (Phase 6 Architecture)**
+  * **On-Device Keypad Revert**: During advance confirmation (`SELECT`), pressing `DOWN` triggers `manualRevertStage()` to safely step back one chamber (Stage 2 -> Stage 1, or Stage 1 -> Stage 0), shutting off active actuators and restoring previous chamber volumes.
+  * **Transfer Alarm Abort to Fermentation**: If a transfer stalls and trips `transferDryRunAlarm` or `transferErrorActive`, pressing `LEFT` immediately executes `resetToFermentation()`, clearing alarms and restoring Stage 1 without forcing an advance.
+  * **Web Monitor Reversion**: REST endpoints `/stage/revert` and `/api/stage/revert` coupled with a dedicated `Revert Stage` UI button allow remote stage reversal.
+  * **Boot Auto-Recovery**: On power-up, `loadBrewStateFromNVS()` checks if an interrupted batch was saved in Stage 2 with `< 0.5 L` transferred fluid. It automatically restores the machine into Stage 1 (Fermentation) with 30.0 °C setpoint and Yellow LED to eliminate stalled startup locks.
 * **Dual-Transfer Test Mode (`TRANSFER TEST`)**
   * Enabled in New Brew Wizard.
   * Executes back-to-back fluid transfer tests (Chamber 1 -> Chamber 2 -> Chamber 3) with zero heating, zero fans, and zero yeast dispensing to safely validate pump flow and plumbing.
@@ -159,11 +164,13 @@ To satisfy thesis Objective 4 and provide empirical data for the Independent Sam
 
 ## 5. Hardware Safety Interlocks & Thermal Protection
 
-* **Dual-Layer pH Filtering & 60-Second Rolling Average Cutoff**
-  * Protects against premature fermentation cutoff and false pump transfers triggered by transient noise spikes, electrode agitation, or EMI.
+* **Hardened 3-Tier Anti-Noise Fermentation Terminal Cutoff**
+  * Protects against premature fermentation cutoff and false pump transfers triggered by transient probe noise, electrical ground loops, electrode agitation, or BTS7960 mixer EMI.
   * **Layer 1 (Secondary Transmitter Node)**: Samples ADS1115 channel 0 with a 10-sample ADC burst at 5ms intervals. Applies a trimmed mean by sorting the burst, discarding the 2 highest and 2 lowest outlier samples, and averaging the central 6. The output is smoothed using Exponential Moving Average (EMA: alpha = 0.30 raw, 0.70 previous).
   * **Layer 2 (Primary Main Controller)**: Feeds incoming telemetry into an 11-sample rolling circular window median filter (`getFilteredPH()`) to reject transient spikes and assigns the smoothed output directly to `incomingData.phValue`.
-  * **60-Second Rolling Average Cutoff**: Acidity evaluation is buffered into a second-by-second 60-sample ring buffer (`ph1MinAvg`). Stage advancement strictly requires `ph60sCount >= 60 && ph1MinAvg <= 3.50`, eliminating fixed placeholder timers and ensuring transfer to pasteurization occurs only upon true biological acidification.
+  * **Tier 1 (15-Minute Continuous Sustained Acidity Window)**: Instead of a fragile 60-second trigger, acidity evaluation requires `ph1MinAvg <= 3.50` and instantaneous `currentPH <= 3.65` continuously for 15 solid minutes (`PH_SUSTAINED_WINDOW_MS = 15UL * 60 * 1000`). If pH spikes or bounces back above 3.65 for even a single second, the timer resets immediately to zero.
+  * **Tier 2 (18-Hour Minimum Fermentation Runtime Gate)**: Biological fermentation takes 36 to 48 hours. The automated cutoff logic is strictly locked out during early fermentation (`stageElapsedMs[1] >= 18UL * 3600 * 1000`), preventing early dips from triggering transfers.
+  * **Tier 3 (Hydrometer Dual-Signal Attenuation Gate)**: If the RAPT Pill is active, the automated cutoff requires physical attenuation verification (`incomingData.pillGravity <= 1.030f`). If sugar concentration remains high, the controller refuses to transfer regardless of sensor noise.
 * **Pasteurization Subsystem Trigger Interlock (Test 13 / Table 20 Validation)**
   * Dedicated interlock routine verifying automated heater cutoff at exactly 60.0 C.
   * Enforces low-level SSR lock, verifies Chamber 3 heater probe telemetry, and samples rate-of-rise to guarantee heater coil immersion before energizing.
