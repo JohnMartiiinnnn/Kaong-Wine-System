@@ -413,6 +413,7 @@ extern uint32_t drainWindowStartMs;
 extern float drainWindowStartVol;
 extern int lastTransferTarget;
 bool manualAdvanceStage();
+bool manualRevertStage();
 void resetToFermentation();
 void setManualPump2(bool state);
 void startPasteurization();

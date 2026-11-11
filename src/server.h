@@ -5,6 +5,7 @@ void handleRoot();
 void handleData();
 void handleDownloadLog();
 void handleStageAdvance();
+void handleStageRevert();
 void handleResetToFerm();
 void handlePump2();
 void handleStartPast();

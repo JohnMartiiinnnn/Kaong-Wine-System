@@ -640,11 +640,11 @@ void drawDashboardLayout() {
     if (advanceConfirmActive) {
       tft.fillRect(0, 444, 320, 36, TFT_RED);
       tft.setTextColor(TFT_WHITE, TFT_RED);
-      tft.drawCentreString("ADVANCE? [SEL: YES | LEFT: NO]", CENTER_X, 458, 2);
+      tft.drawCentreString("ADVANCE? [SEL: NEXT | DOWN: REVERT | LEFT: NO]", CENTER_X, 458, 1);
     } else if (currentAppState == PAST_HEATER_TEST_ACTIVE) {
       tft.drawCentreString("ENTER / RETURN: EXIT TEST (HEATER OFF)", CENTER_X, 458, 1);
     } else if (transferDryRunAlarm || transferErrorActive) {
-      tft.drawCentreString("XFER ALARM   ENTER: ADVANCE   UP: RETRY", CENTER_X, 458, 1);
+      tft.drawCentreString("XFER ALARM   ENTER: ADVANCE   LEFT: RETURN FERM", CENTER_X, 458, 1);
     } else if (stageTransferring) {
       tft.drawCentreString("XFER ACTIVE   ENTER: FORCE ADVANCE", CENTER_X, 458, 1);
     } else {

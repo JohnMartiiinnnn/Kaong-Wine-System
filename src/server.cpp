@@ -46,8 +46,9 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
   </div>
   <div class="val" id="stageName" style="color:#f8fafc;font-size:1.25rem">--</div>
   <div id="stageTarget" style="font-size:.8rem;color:#94a3b8;margin-top:.25rem">--</div>
-  <div style="margin-top:1rem">
-    <button type="button" class="btn btn-amber" id="advBtn" onclick="confirmAdvanceStage()">Advance to Next Stage</button>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:1rem">
+    <button type="button" class="btn btn-amber" id="advBtn" onclick="confirmAdvanceStage()">Advance Stage</button>
+    <button type="button" class="btn btn-slate" id="revertBtn" onclick="confirmRevertStage()">Revert Stage</button>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem">
     <button type="button" class="btn btn-slate" id="resetFermBtn" onclick="doResetFerm()">Reset to Ferm</button>
@@ -148,6 +149,27 @@ async function confirmAdvanceStage(){
     }
   } catch(e){
     alert('Advance signal dispatched to machine.');
+  }
+}
+
+async function confirmRevertStage(){
+  if(!confirm('Revert to previous brewing stage?\n\nThis will safely reset heaters/fans and return to the previous chamber.')) return;
+  const btn = document.getElementById('revertBtn');
+  btn.disabled = true;
+  btn.innerText = 'Reverting...';
+  try{
+    const res = await fetch('/stage/revert', { method: 'POST' });
+    const d = await res.json();
+    if(res.ok && d.status === 'ok'){
+      alert('Stage reverted successfully! Now active at Stage ' + d.active_stage);
+    } else {
+      alert('Notice: ' + (d.message || 'Cannot revert stage'));
+    }
+  } catch(e){
+    alert('Revert signal dispatched to machine.');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Revert Stage';
   }
 }
 
@@ -364,6 +386,25 @@ void handleStageAdvance() {
     server.send(200, "application/json", json);
   } else {
     server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to advance stage\"}");
+  }
+}
+
+void handleStageRevert() {
+  if (stageTransferring) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"message\":\"Liquid transfer already in progress\"}");
+    return;
+  }
+  if (activeBrewStage <= 0 || activeBrewStage > 2) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Cannot revert: already at initial stage or inactive\"}");
+    return;
+  }
+  int prevStage = activeBrewStage;
+  bool ok = manualRevertStage();
+  if (ok) {
+    String json = "{\"status\":\"ok\",\"previous_stage\":" + String(prevStage) + ",\"active_stage\":" + String(activeBrewStage) + "}";
+    server.send(200, "application/json", json);
+  } else {
+    server.send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to revert stage\"}");
   }
 }
 

@@ -599,6 +599,19 @@ void loadBrewStateFromNVS() {
       transferStartMs = millis();
       transferLastPulseMs = millis();
     }
+    // Phase 6 Auto-Recovery: Stalled / interrupted pasteurization transfer (<0.5L moved) auto-reverts to Fermentation on boot
+    if (activeBrewStage == 2 && !pastSterilized && transfer2Volume < 0.5f) {
+      Serial.println("[BOOT] Detected stalled pasteurization transfer (<0.5L moved). Auto-reverting to Fermentation.");
+      activeBrewStage = 1;
+      dashSelection = 1;
+      chamberVolume[1] = (transferStartWeight > 0.5f) ? transferStartWeight : 4.25f;
+      chamberVolume[2] = 0.0f;
+      transfer2Volume = 0.0f;
+      fermCompleted = false;
+      stageTransferring = false;
+      transferDryRunAlarm = false;
+      transferErrorActive = false;
+    }
   }
   brewPrefs.end();
 }
@@ -906,6 +919,47 @@ bool manualAdvanceStage() {
   return true;
 }
 
+bool manualRevertStage() {
+  if (activeBrewStage <= 0 || activeBrewStage > 2) return false;
+  if (stageTransferring) return false;
+
+  // 1. Safely shut off all actuators
+  currentHeatingPercent = 0;
+  digitalWrite(SSR_PREHEAT, LOW);
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+  isFanOn = false;
+  mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+  setFanSpeed(0);
+  isFermFanOn = false;
+  mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+  setMixerSpeed(0);
+  mixerRunning = false;
+  isInitialPitchMixing = false;
+
+  if (activeBrewStage == 2) {
+    resetToFermentation();
+  } else if (activeBrewStage == 1) {
+    activeBrewStage = 0;
+    dashSelection = 0;
+    preHeatCompleted = false;
+    preHeatSterilized = false;
+    preHeatCooled = false;
+    chamberVolume[0] = (transferStartWeight > 0.5f) ? transferStartWeight : 6.86f;
+    chamberVolume[1] = 0.0f;
+    transfer1Volume = 0.0f;
+    mcp.digitalWrite(LIGHT_R, RELAY_ON);
+    mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+    mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+    saveBrewStateToNVS();
+    dashNeedsFullRedraw = true;
+    if (currentAppState == DASHBOARD_ACTIVE)
+      drawDashboardLayout();
+  }
+  return true;
+}
+
 void resetToFermentation() {
   stageTransferring = false;
   stageTransferTarget = -1;
@@ -1182,6 +1236,8 @@ void setup() {
   server.on("/test/status", HTTP_GET, handleTestStatus);
   server.on("/stage/advance", HTTP_ANY, handleStageAdvance);
   server.on("/api/stage/advance", HTTP_ANY, handleStageAdvance);
+  server.on("/stage/revert", HTTP_ANY, handleStageRevert);
+  server.on("/api/stage/revert", HTTP_ANY, handleStageRevert);
   server.on("/api/reset_to_ferm", HTTP_ANY, handleResetToFerm);
   server.on("/api/pump2", HTTP_ANY, handlePump2);
   server.on("/api/start_past", HTTP_ANY, handleStartPast);
@@ -1400,10 +1456,24 @@ void loop() {
       advanceConfirmActive = false;
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
+    } else if (cDown && !ljDown) {
+      advanceConfirmActive = false;
+      manualRevertStage();
+      ljDown = cDown;
+      return;
     } else if (cLeft && !ljLeft) {
       advanceConfirmActive = false;
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
+      ljLeft = cLeft;
+      return;
+    }
+  }
+
+  // Transfer dry-run or error recovery via LEFT button: safely reverts to Fermentation
+  if (currentAppState == DASHBOARD_ACTIVE && (transferDryRunAlarm || transferErrorActive)) {
+    if (cLeft && !ljLeft) {
+      resetToFermentation();
       ljLeft = cLeft;
       return;
     }
