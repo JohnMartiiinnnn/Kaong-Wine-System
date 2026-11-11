@@ -389,6 +389,9 @@ extern float stageTargetTemp[3];
 extern float preheatCoolTarget;
 extern float fermTargetPH;
 extern float fermTargetGravity;
+const uint32_t FERM_MIN_RUNTIME_MS    = 18UL * 3600 * 1000; // 18 hours minimum fermentation runtime before auto-cutoff
+const uint32_t PH_SUSTAINED_WINDOW_MS = 15UL * 60 * 1000;   // 15 minutes of continuous acidity required to confirm terminal cutoff
+const float    FERM_MAX_TERMINAL_SG   = 1.030f;              // Specific Gravity attenuation threshold (<= 1.030 SG)
 extern float ph1MinAvg;
 extern int ph60sCount;
 extern int stageParamSelection;

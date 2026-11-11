@@ -222,12 +222,14 @@ int ph60sCount = 0;
 static int ph60sHead = 0;
 static uint32_t lastPhSampleMs = 0;
 float ph1MinAvg = 7.0f;
+uint32_t phSustainedLowStartMs = 0;
 
 void resetPhRollingAvg() {
   ph60sCount = 0;
   ph60sHead = 0;
   lastPhSampleMs = 0;
   ph1MinAvg = 7.0f;
+  phSustainedLowStartMs = 0;
   for (int i = 0; i < PH_ROLLING_AVG_WINDOW; i++) {
     ph60sBuffer[i] = 7.0f;
   }
@@ -977,6 +979,9 @@ void resetToFermentation() {
   chamberVolume[2] = 0.0f;
   transfer2Volume = 0.0f;
   fermCompleted = false;
+  phAlertActive = false;
+  phSustainedLowStartMs = 0;
+  resetPhRollingAvg();
 
   mcp.digitalWrite(LIGHT_R, RELAY_OFF);
   mcp.digitalWrite(LIGHT_Y, RELAY_ON);
@@ -3880,16 +3885,40 @@ void loop() {
         }
 
         // Fermentation completion: Terminal acidity cutoff (pH <= fermTargetPH)
-        // Evaluates a 60-second rolling average to reject probe fluctuation noise
+        // Hardened multi-layer anti-noise safeguards:
+        // 1. 15-Minute Continuous Sustained Window: pH must stay <= fermTargetPH for 15 solid minutes
+        // 2. Minimum Fermentation Runtime Gate: >= 18 hours elapsed before auto-advance can trip
+        // 3. Hydrometer Dual-Signal Gate: If RAPT Pill connected, SG must indicate attenuation (<= 1.030)
         float currentPH = (incomingData.adsStatus == 1 && incomingData.phValue > 0.0f) ? getFilteredPH() : 7.0f;
         if (millis() - lastPhSampleMs >= 1000UL) {
           lastPhSampleMs = millis();
           updatePhRollingAvg(currentPH);
         }
 
-        // Terminal cutoff requires full 1-minute (60 samples) of continuous rolling telemetry AND 1m average <= fermTargetPH (3.50)
-        // Minute duration placeholder is removed so Chamber 2 strictly waits for target acidity
-        bool phCutoffTriggered = (ph60sCount >= 60 && ph1MinAvg <= fermTargetPH && ph1MinAvg > 0.5f);
+        // 1. Sustained Low Acidity Tracking:
+        // Must stay consistently <= fermTargetPH without bouncing back up
+        if (ph60sCount >= 60 && ph1MinAvg <= fermTargetPH && ph1MinAvg > 0.5f && currentPH <= (fermTargetPH + 0.15f)) {
+          if (phSustainedLowStartMs == 0) {
+            phSustainedLowStartMs = millis();
+          }
+        } else {
+          phSustainedLowStartMs = 0; // Reset timer immediately if pH bounces back up!
+        }
+
+        bool aciditySustained = (phSustainedLowStartMs > 0 && (millis() - phSustainedLowStartMs >= PH_SUSTAINED_WINDOW_MS));
+
+        // 2. Minimum Runtime Gate (18 hours):
+        uint32_t totalFermElapsedMs = stageElapsedMs[1] + (millis() - stageStartMillis);
+        bool minRuntimeMet = (totalFermElapsedMs >= FERM_MIN_RUNTIME_MS || simRunActive);
+
+        // 3. Hydrometer Dual-Signal Gate:
+        // If RAPT Pill is reporting live valid gravity, ensure wine has actually attenuated (SG <= 1.030)
+        bool sgTerminalMet = true;
+        if (incomingData.bleStatus == 1 && incomingData.pillGravity > 1.0f && incomingData.pillGravity < 1.15f) {
+          sgTerminalMet = (incomingData.pillGravity <= FERM_MAX_TERMINAL_SG);
+        }
+
+        bool phCutoffTriggered = aciditySustained && minRuntimeMet && sgTerminalMet;
 
         if (phCutoffTriggered && !phAlertActive) {
           phAlertActive = true;
