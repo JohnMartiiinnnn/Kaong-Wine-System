@@ -1588,15 +1588,15 @@ void drawMixerMenu() {
   tft.setTextColor(TFT_WHITE);
   tft.drawString("MIXER CONTROL", 10, 15, 4);
 
-  const char *modeTxt[] = {"OFF", "MANUAL", "AUTO"};
-  uint16_t modeColors[] = {TFT_RED, 0x0400, 0x001F};
+  const char *modeTxt = (currentMixerMode == MIXER_MANUAL) ? "MANUAL" : "AUTO";
+  uint16_t modeColor = (currentMixerMode == MIXER_MANUAL) ? 0x0400 : 0x001F;
 
-  tft.fillRect(20, 80, 280, 120, modeColors[currentMixerMode]);
+  tft.fillRect(20, 80, 280, 120, modeColor);
   tft.drawRect(20, 80, 280, 120, TFT_DARKGREY);
-  tft.setTextColor(TFT_WHITE, modeColors[currentMixerMode]);
+  tft.setTextColor(TFT_WHITE, modeColor);
   tft.drawCentreString("MIXER MODE", CENTER_X, 100, 2);
-  tft.drawCentreString(modeTxt[currentMixerMode], CENTER_X, 127, 4);
-  tft.drawCentreString("(SELECT TO CYCLE)", CENTER_X, 178, 2);
+  tft.drawCentreString(modeTxt, CENTER_X, 127, 4);
+  tft.drawCentreString("(SELECT TO TOGGLE)", CENTER_X, 178, 2);
 
   tft.fillRect(20, 220, 280, 120, 0xD6BA);
   tft.drawRect(20, 220, 280, 120, TFT_DARKGREY);
@@ -1609,9 +1609,9 @@ void drawMixerMenu() {
   if (currentMixerMode == MIXER_MANUAL)
     tft.drawCentreString("(UP/DOWN TO ADJ)", CENTER_X, 305, 1);
   else
-    tft.drawCentreString("AUTO CONTROLLED", CENTER_X, 305, 1);
+    tft.drawCentreString("AUTO PERIODIC (1m / 6h)", CENTER_X, 305, 1);
 
-  if (currentMixerMode == MIXER_AUTO) {
+  if (currentMixerMode != MIXER_MANUAL) {
     uint16_t statusColor = mixerRunning ? 0x0400 : 0x3566;
     tft.fillRect(20, 360, 280, 50, statusColor);
     tft.drawRect(20, 360, 280, 50, TFT_DARKGREY);
@@ -1627,13 +1627,18 @@ void drawMixerMenu() {
       }
       tft.drawCentreString(mixBuf, CENTER_X, 377, 2);
     } else {
-      tft.drawCentreString("STANDBY", CENTER_X, 377, 2);
+      uint32_t elapsedSinceLast = millis() - mixerCycleTimer;
+      uint32_t remOffMs = (elapsedSinceLast < MIXER_OFF_MS) ? (MIXER_OFF_MS - elapsedSinceLast) : 0;
+      uint32_t remMin = (remOffMs + 59999UL) / 60000UL;
+      char nextBuf[48];
+      sprintf(nextBuf, "NEXT AUTO MIX: %lum", remMin);
+      tft.drawCentreString(nextBuf, CENTER_X, 377, 2);
     }
   }
 
   tft.fillRect(0, 434, 320, 46, TFT_WHITE);
   tft.setTextColor(TFT_DARKGREY, TFT_WHITE);
-  tft.drawCentreString("SELECT: CYCLE MODE   UP/DOWN: SPEED   RETURN: BACK", CENTER_X, 458, 1);
+  tft.drawCentreString("SELECT: TOGGLE MANUAL   UP/DOWN: SPEED   RETURN: BACK", CENTER_X, 458, 1);
 }
 
 void drawInitTile(int x, int y, const char *label, int status) {

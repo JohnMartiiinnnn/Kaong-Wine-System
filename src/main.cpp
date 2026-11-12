@@ -91,7 +91,7 @@ FanMode currentFanMode = FAN_OFF;
 int returnConfirmState = 0;
 uint32_t returnConfirmTimer = 0;
 int mixerSpeedPercent = 0;
-MixerMode currentMixerMode = MIXER_OFF;
+MixerMode currentMixerMode = MIXER_AUTO;
 bool mixerRunning = false;
 uint32_t mixerOnTimer = 0;
 uint32_t mixerCycleTimer = 0;
@@ -975,6 +975,10 @@ void resetToFermentation() {
 
   activeBrewStage = 1;
   dashSelection = 1;
+  currentMixerMode = MIXER_AUTO;
+  mixerRunning = false;
+  mixerCycleTimer = millis();
+  mixerSpeedPercent = 0;
   chamberVolume[1] = (transferStartWeight > 0.5f) ? transferStartWeight : 6.86f;
   chamberVolume[2] = 0.0f;
   transfer2Volume = 0.0f;
@@ -2023,19 +2027,12 @@ void loop() {
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
     } else if (currentAppState == MIXER_MENU) {
-      if (currentMixerMode == MIXER_OFF) {
+      if (currentMixerMode == MIXER_AUTO) {
         currentMixerMode = MIXER_MANUAL;
         mixerSpeedPercent = 100;
         setMixerSpeed(100);
-      } else if (currentMixerMode == MIXER_MANUAL) {
-        currentMixerMode = MIXER_AUTO;
-        mixerRunning = true;
-        mixerOnTimer = millis();
-        mixerCycleTimer = 0;
-        mixerSpeedPercent = 100;
-        setMixerSpeed(100);
       } else {
-        currentMixerMode = MIXER_OFF;
+        currentMixerMode = MIXER_AUTO;
         mixerRunning = false;
         mixerSpeedPercent = 0;
         setMixerSpeed(0);
@@ -2888,6 +2885,9 @@ void loop() {
       dashNeedsFullRedraw = true;
       drawDashboardLayout();
     } else if (currentAppState == MIXER_MENU) {
+      currentMixerMode = MIXER_AUTO;
+      mixerSpeedPercent = 0;
+      setMixerSpeed(0);
       currentAppState = DASHBOARD_ACTIVE;
       moduleViewActive = true;
       dashNeedsFullRedraw = true;
@@ -3410,16 +3410,10 @@ void loop() {
     }
   }
 
-  // Auto-mixing scheduler (strictly locked to OFF during transfers and outside Stage 1)
-  if (currentMixerMode == MIXER_AUTO) {
-    if (stageTransferring || activeBrewStage != 1) {
-      if (mixerRunning) {
-        mixerRunning = false;
-        isInitialPitchMixing = false;
-        mixerSpeedPercent = 0;
-        setMixerSpeed(0);
-      }
-    } else {
+  // Auto-mixing scheduler (permanently active during Stage 1 Fermentation; never disabled)
+  if (activeBrewStage == 1 && !stageTransferring) {
+    if (currentMixerMode != MIXER_MANUAL) {
+      currentMixerMode = MIXER_AUTO;
       uint32_t now = millis();
       if (mixerRunning) {
         if (now - mixerOnTimer >= mixerActiveDurationMs) {
@@ -3440,6 +3434,14 @@ void loop() {
           setMixerSpeed(100);
         }
       }
+    }
+  } else {
+    // Outside Stage 1 or during transfers, halt mixer
+    if (mixerRunning && currentMixerMode == MIXER_AUTO) {
+      mixerRunning = false;
+      isInitialPitchMixing = false;
+      mixerSpeedPercent = 0;
+      setMixerSpeed(0);
     }
   }
 
