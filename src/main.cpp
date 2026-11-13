@@ -1250,6 +1250,8 @@ void setup() {
   server.on("/api/reset_to_ferm", HTTP_ANY, handleResetToFerm);
   server.on("/api/pump2", HTTP_ANY, handlePump2);
   server.on("/api/start_past", HTTP_ANY, handleStartPast);
+  server.on("/api/mixer", HTTP_ANY, handleMixer);
+  server.on("/api/mix", HTTP_ANY, handleMixer);
   server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -3437,11 +3439,20 @@ void loop() {
     }
   } else {
     // Outside Stage 1 or during transfers, halt mixer
-    if (mixerRunning && currentMixerMode == MIXER_AUTO) {
+    if (stageTransferring && mixerRunning) {
       mixerRunning = false;
       isInitialPitchMixing = false;
       mixerSpeedPercent = 0;
       setMixerSpeed(0);
+    } else if (mixerRunning) {
+      uint32_t now = millis();
+      if (now - mixerOnTimer >= mixerActiveDurationMs) {
+        mixerRunning = false;
+        isInitialPitchMixing = false;
+        mixerCycleTimer = now;
+        mixerSpeedPercent = 0;
+        setMixerSpeed(0);
+      }
     }
   }
 

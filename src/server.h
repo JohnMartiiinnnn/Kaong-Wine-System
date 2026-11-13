@@ -9,6 +9,7 @@ void handleStageRevert();
 void handleResetToFerm();
 void handlePump2();
 void handleStartPast();
+void handleMixer();
 void handleTestPhCutoff();
 void handleTestStatus();
 void handleTestPasteurization();

@@ -54,7 +54,8 @@ h1{font-size:1.2rem;margin-bottom:1.5rem;text-align:center;color:#38bdf8}
     <button type="button" class="btn btn-slate" id="resetFermBtn" onclick="doResetFerm()">Reset to Ferm</button>
     <button type="button" class="btn btn-blue" id="pump2Btn" onclick="togglePump2()">Pump 2: OFF</button>
   </div>
-  <div style="margin-top:.5rem">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem">
+    <button type="button" class="btn btn-blue" id="mixerBtn" onclick="toggleMixer()">Pulse Mixer (60s)</button>
     <button type="button" class="btn btn-green" id="startPastBtn" onclick="doStartPast()">Start Pasteurization (PID)</button>
   </div>
 </div>
@@ -193,6 +194,15 @@ async function togglePump2(){
   }
 }
 
+async function toggleMixer(){
+  try{
+    const r = await fetch('/api/mixer', { method: 'POST' });
+    const d = await r.json();
+  }catch(e){
+    alert('Mixer command sent.');
+  }
+}
+
 async function doStartPast(){
   if(!confirm('Start Pasteurization now?\n\nMake sure the liquid has been pumped into Chamber 3. This will set Chamber 3 volume to 6.86L, turn on the Green LED, and initiate 60°C temperature regulation.')) return;
   try{
@@ -235,6 +245,16 @@ async function update(){
       } else {
         p2Btn.innerText = 'Pump 2: OFF';
         p2Btn.className = 'btn btn-blue';
+      }
+    }
+    const mixBtn = document.getElementById('mixerBtn');
+    if(mixBtn){
+      if(d.mix_run){
+        mixBtn.innerText = 'Mixer: ON (' + d.mix_spd + '%)';
+        mixBtn.className = 'btn btn-green';
+      } else {
+        mixBtn.innerText = 'Pulse Mixer (60s)';
+        mixBtn.className = 'btn btn-blue';
       }
     }
   }catch(e){}
@@ -349,6 +369,7 @@ void handleData() {
   json += "\"yd_state\":" + String(yd_state) + ",";
   json += "\"mix_mode\":" + String((int)currentMixerMode) + ",";
   json += "\"mix_spd\":" + String(mixerSpeedPercent) + ",";
+  json += "\"mix_run\":" + String(mixerRunning ? 1 : 0) + ",";
   json += "\"mix_cyc_sec\":" + String(mix_cyc_sec) + ",";
   json += "\"mix_tot_min\":" + String(mix_tot_min, 1) + ",";
   float ch0Vol = (!preHeatCompleted && (activeBrewStage == 0 || activeBrewStage == -1)) ? (hx711Status ? currentWeight : chamberVolume[0]) : chamberVolume[0];
@@ -427,6 +448,55 @@ void handlePump2() {
 void handleStartPast() {
   startPasteurization();
   server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Started Pasteurization (Chamber 3: 6.86L, 60.0C PID)\",\"stage\":2}");
+}
+
+void handleMixer() {
+  int durationSec = 60;
+  int speed = 100;
+  bool turnOff = false;
+
+  if (server.hasArg("duration")) {
+    durationSec = server.arg("duration").toInt();
+    if (durationSec <= 0) durationSec = 60;
+    if (durationSec > 600) durationSec = 600; // max 10 minutes safety clamp
+  }
+  if (server.hasArg("speed")) {
+    speed = server.arg("speed").toInt();
+    if (speed < 0) speed = 0;
+    if (speed > 100) speed = 100;
+  }
+  if (server.hasArg("action") && (server.arg("action") == "stop" || server.arg("action") == "0")) {
+    turnOff = true;
+  }
+
+  if (turnOff || speed == 0) {
+    mixerRunning = false;
+    isInitialPitchMixing = false;
+    mixerSpeedPercent = 0;
+    setMixerSpeed(0);
+    mixerCycleTimer = millis();
+  } else {
+    // If called without specific duration/speed args and already running, toggle off
+    if (!server.hasArg("duration") && !server.hasArg("speed") && mixerRunning) {
+      mixerRunning = false;
+      isInitialPitchMixing = false;
+      mixerSpeedPercent = 0;
+      setMixerSpeed(0);
+      mixerCycleTimer = millis();
+    } else {
+      currentMixerMode = MIXER_AUTO;
+      mixerActiveDurationMs = (uint32_t)durationSec * 1000UL;
+      mixerOnTimer = millis();
+      mixerRunning = true;
+      mixerSpeedPercent = speed;
+      setMixerSpeed(speed);
+    }
+  }
+
+  String json = "{\"status\":\"ok\",\"mixer_running\":" + String(mixerRunning ? "true" : "false") +
+                ",\"speed\":" + String(mixerSpeedPercent) +
+                ",\"duration_sec\":" + String(mixerActiveDurationMs / 1000UL) + "}";
+  server.send(200, "application/json", json);
 }
 
 
