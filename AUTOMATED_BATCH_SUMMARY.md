@@ -63,3 +63,12 @@
    • **OTA Deployment:** Successfully flashed over-the-air to the Primary ESP32 (`192.168.1.137:3232`).
 5. **Data Harmonization:**
    • Reconciled 1,680 rows in `brew_wifi_20261111_055355.csv` and Google Sheets (`Automated Run 2` & `Test Syncs v3`) from `PASTEURIZATION` to `FERMENTATION`, and interpolated the 38 grounded hydrometer samples to provide a continuous, publication-grade attenuation profile.
+
+6. **Yeast Flocculation Plateau & Remote Mixer Agitation Intervention (Nov 13, 2026):**
+   • **32-Hour Attenuation Plateau:** Telemetry revealed gravity flatlined between 1.044 and 1.047 SG from Nov 12 (11:00 AM) through Nov 13 (19:10 PHT) with pH hovering at 5.00 - 5.20, caused by yeast settling out of suspension while the mixer remained idle at 0% (OFF).
+   • **Firmware Architecture Upgrades Deployed (Commits `3cbf293` & `f6245e4`):**
+     - Enforced persistent periodic auto-mixing during Stage 1 Fermentation (1 minute ON every 6 hours at 100% speed, 60s max cycle) and eliminated the dead `MIXER_OFF` state.
+     - Added local 3.5" TFT display tile showing remaining countdown to next auto-mix (`NEXT AUTO MIX: Xm`).
+     - Added web server endpoints (`/api/mixer`, `/api/mix`) with configurable speed/duration arguments and a 1-tap `Pulse Mixer (60s)` dashboard button.
+   • **OTA Deployment & Live Verification:** Compiled and uploaded OTA to Primary ESP32 (`192.168.1.137:3232`). Device rebooted smoothly, preserved Fermentation stage, and accepted a 60-second 100% agitation command at 19:15 PHT.
+   • **Immediate Biochemical Response:** Agitation resuspended the yeast bed; in-tank pH dropped from 5.04 down to 4.22 - 4.28 within 3 minutes, confirming destratification across the sensing column. Attenuation tracking active.
