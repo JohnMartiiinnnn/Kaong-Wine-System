@@ -746,6 +746,16 @@ Both Primary and Secondary microcontrollers operate in dual station / access poi
   * Formats worksheets with soft gray header styling (`#E8EAED`), pure white data cell backgrounds (`#FFFFFF`), centered alignment, 28px divider columns, auto-fitted column widths, and strictly frozen Row 1 headers.
   * Streams new rows in near-real-time every 5 seconds without duplicate entries.
 
+### Web Monitor & REST API Remote Controls
+The Primary ESP32 serves a responsive web dashboard on port 80 and exposes remote management endpoints for benchtop overrides:
+* `GET /data`: Full JSON operational telemetry dump (sensor readings, setpoints, actuator duty cycles, stage states, and mixer timers).
+* `POST /stage/advance` (or `/api/stage/advance`): Advances the active brew cycle to the next phase on demand.
+* `POST /stage/revert`: Safely rolls back to the previous stage and restores stage parameters.
+* `POST /api/reset_to_ferm`: Force-recovers Chamber 2 fermentation state and resets transfer tallies without data loss.
+* `POST /api/pump2`: Toggles Pump 2 (Fermentation to Pasteurization transfer) for manual priming or fluid salvage.
+* `POST /api/mixer` (or `/api/mix`): Triggers immediate impeller agitation. Supports optional query parameters `?duration=<sec>` (default 60s, max 600s) and `?speed=<pct>` (default 100%). Calling without arguments while running toggles the mixer OFF.
+* `POST /api/start_past`: Force-initiates Chamber 3 60.0 °C PID pasteurization hold once fluid transfer is confirmed.
+
 ### Autonomous One-Click OTA Deployment
 Firmware updates can be compiled and flashed directly from the Beelink server over Wi-Fi without needing a USB cable or physical access to the brewing machine:
 * **Tool Location**: `/home/dave/.local/bin/flash-winebrew`
