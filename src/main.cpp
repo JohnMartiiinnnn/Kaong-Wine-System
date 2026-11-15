@@ -114,6 +114,13 @@ bool bypassWeightCheck = false;
 bool transferTestMode = false;
 float chamberVolume[3] = {0.0f, 0.0f, 0.0f};
 bool dryElementAlarm = false;
+uint32_t lastSdLogLatencyMs = 0;
+uint32_t stageTransitionSeq = 0;
+uint32_t lastTransitionLatencyMs = 0;
+bool fullLoadTestActive = false;
+uint32_t fullLoadTestEndMs = 0;
+bool fullLoadAllowHeater = false;
+bool fullLoadAllowPumps = false;
 bool settingsNeedsFullRedraw = true;
 int settingsSelection = 0;
 bool settingsEditing = false;
@@ -748,6 +755,7 @@ void startLiquidTransfer(int targetStage) {
 }
 
 void completeLiquidTransfer(float finalVol) {
+  uint32_t transT0 = micros();
   stageTransferring = false;
   transferDryRunAlarm = false;
   transferErrorActive = false;
@@ -850,6 +858,9 @@ void completeLiquidTransfer(float finalVol) {
   dashNeedsFullRedraw = true;
   if (currentAppState == DASHBOARD_ACTIVE)
     drawDashboardLayout();
+  stageTransitionSeq++;
+  uint32_t transUs = micros() - transT0;
+  lastTransitionLatencyMs = (transUs >= 1000UL) ? (transUs / 1000UL) : 1UL;
 }
 
 void acknowledgeAndAdvanceTransfer() {
@@ -861,6 +872,7 @@ void acknowledgeAndAdvanceTransfer() {
 bool manualAdvanceStage() {
   if (activeBrewStage < 0 || activeBrewStage > 2) return false;
   if (stageTransferring) return false;
+  uint32_t transT0 = micros();
 
   // 1. Tear down active stage actuators safely
   currentHeatingPercent = 0;
@@ -918,6 +930,9 @@ bool manualAdvanceStage() {
   dashNeedsFullRedraw = true;
   if (currentAppState == DASHBOARD_ACTIVE)
     drawDashboardLayout();
+  stageTransitionSeq++;
+  uint32_t transUs = micros() - transT0;
+  lastTransitionLatencyMs = (transUs >= 1000UL) ? (transUs / 1000UL) : 1UL;
   return true;
 }
 
@@ -1039,6 +1054,122 @@ void startPasteurization() {
   dashNeedsFullRedraw = true;
   saveBrewStateToNVS();
   drawDashboardLayout();
+}
+
+void startWaterTestCycle(float preheatTargetC, float coolTargetC, float fermTargetC, float pastTargetC, bool skipPreheat) {
+  stageTransferring = false;
+  stageTransferTarget = -1;
+  transferDryRunAlarm = false;
+  transferErrorActive = false;
+  manualPump2Override = false;
+  fullLoadTestActive = false;
+  setPump1(false);
+  setPump2(false);
+  pumpPreHeatFermOn = false;
+  pumpFermPastOn = false;
+  setMixerSpeed(0);
+  mixerRunning = false;
+  isInitialPitchMixing = false;
+  isFanOn = false;
+  isFermFanOn = false;
+  mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+  setFanSpeed(0);
+
+  stageTargetTemp[0] = constrain(preheatTargetC, 30.0f, 95.0f);
+  preheatCoolTarget  = constrain(coolTargetC, 25.0f, 45.0f);
+  stageTargetTemp[1] = constrain(fermTargetC, 20.0f, 45.0f);
+  stageTargetTemp[2] = constrain(pastTargetC, 50.0f, 85.0f);
+  skipPreheatHeater  = skipPreheat;
+  transferTestMode   = false;
+  dryElementAlarm    = false;
+
+  if (rtcStatus) {
+    DateTime now = rtc.now();
+    int h12 = now.hour() % 12;
+    if (h12 == 0) h12 = 12;
+    const char* ampm = (now.hour() >= 12) ? "PM" : "AM";
+    sprintf(brewStartTime, "%02d/%02d %d:%02d%s", now.day(), now.month(), h12, now.minute(), ampm);
+    char batchName[32];
+    sprintf(batchName, "/water_%04d%02d%02d_%02d%02d.csv", now.year(), now.month(), now.day(), now.hour(), now.minute());
+    currentLogFile = String(batchName);
+  } else {
+    currentLogFile = "/water_test.csv";
+  }
+
+  activeBrewStage = 0;
+  dashSelection = 0;
+  simRunActive = false;
+  stageStartMillis = millis();
+  tempHistoryCount = 0;
+  flowPulse1 = 0;
+  flowPulse2 = 0;
+  float initVol = (hx711Status && currentWeight > 0.0f) ? currentWeight : minVolumeReq;
+  transferStartWeight = initVol;
+  transferTargetVolume = initVol;
+  transferVolumeTransferred = 0.0f;
+  transfer1Volume = 0.0f;
+  transfer2Volume = 0.0f;
+  chamberVolume[0] = (hx711Status && currentWeight > 0.0f) ? currentWeight : 0.0f;
+  chamberVolume[1] = 0.0f;
+  chamberVolume[2] = 0.0f;
+  preHeatSterilized = skipPreheatHeater;
+  preHeatCooled = skipPreheatHeater;
+  preHeatCompleted = false;
+  preHeatHolding = false;
+  fermCompleted = false;
+  pastSterilized = false;
+  pastHolding = false;
+  phAlertActive = false;
+  stageElapsedMs[0] = stageElapsedMs[1] = stageElapsedMs[2] = 0;
+  preheatPid.reset();
+  quartzPid.reset();
+  pastPid.reset();
+
+  mcp.digitalWrite(LIGHT_R, RELAY_ON);
+  mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+  stageTransitionSeq++;
+  saveBrewStateToNVS();
+  currentAppState = DASHBOARD_ACTIVE;
+  dashNeedsFullRedraw = true;
+  drawDashboardLayout();
+}
+
+void stopWaterTestCycle() {
+  activeBrewStage = -1;
+  stageTransferring = false;
+  stageTransferTarget = -1;
+  transferDryRunAlarm = false;
+  transferErrorActive = false;
+  manualPump2Override = false;
+  fullLoadTestActive = false;
+  currentHeatingPercent = 0;
+  digitalWrite(SSR_PREHEAT, LOW);
+  digitalWrite(SSR_FERM, LOW);
+  digitalWrite(SSR_PAST, LOW);
+  isFanOn = false;
+  isFermFanOn = false;
+  mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+  mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+  setFanSpeed(0);
+  setPump1(false);
+  setPump2(false);
+  pumpPreHeatFermOn = false;
+  pumpFermPastOn = false;
+  setMixerSpeed(0);
+  mixerRunning = false;
+  isInitialPitchMixing = false;
+  mcp.digitalWrite(LIGHT_R, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_Y, RELAY_OFF);
+  mcp.digitalWrite(LIGHT_G, RELAY_OFF);
+  clearBrewStateInNVS();
+  stageTransitionSeq++;
+  currentAppState = START_MENU;
+  menuNeedsFullRedraw = true;
+  drawStartMenu();
 }
 
 
@@ -1252,6 +1383,10 @@ void setup() {
   server.on("/api/start_past", HTTP_ANY, handleStartPast);
   server.on("/api/mixer", HTTP_ANY, handleMixer);
   server.on("/api/mix", HTTP_ANY, handleMixer);
+  server.on("/api/test/dry_fire", HTTP_ANY, handleTestDryFire);
+  server.on("/api/test/yeast", HTTP_ANY, handleTestYeast);
+  server.on("/api/test/full_load", HTTP_ANY, handleTestFullLoad);
+  server.on("/api/brew/start_water", HTTP_ANY, handleStartWaterBrew);
   server.begin();
   ArduinoOTA.setHostname("winebrew-main");
   ArduinoOTA.begin();
@@ -4123,7 +4258,45 @@ void loop() {
     }
 
     int activeHeaterPin = -1;
-    if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
+    if (fullLoadTestActive) {
+      if (millis() >= fullLoadTestEndMs) {
+        fullLoadTestActive = false;
+        fullLoadAllowHeater = false;
+        fullLoadAllowPumps = false;
+        currentHeatingPercent = 0;
+        isFanOn = false;
+        isFermFanOn = false;
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+        setFanSpeed(0);
+        setPump1(false);
+        setPump2(false);
+        setMixerSpeed(0);
+        mixerRunning = false;
+      } else {
+        isFanOn = true;
+        isFermFanOn = true;
+        mcp.digitalWrite(FAN_RELAY_PIN, RELAY_ON);
+        mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_ON);
+        mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_ON);
+        setFanSpeed(100);
+        if (!mixerRunning || mixerSpeedPercent != 100) {
+          mixerRunning = true;
+          mixerSpeedPercent = 100;
+          mixerOnTimer = millis();
+          mixerActiveDurationMs = 120000UL;
+          setMixerSpeed(100);
+        }
+        float curVol = hx711Status ? currentWeight : chamberVolume[0];
+        if (fullLoadAllowHeater && curVol >= MIN_HEATER_SAFE_VOLUME && !dryElementAlarm) {
+          currentHeatingPercent = 100;
+          activeHeaterPin = SSR_PREHEAT;
+        } else {
+          currentHeatingPercent = 0;
+        }
+      }
+    } else if (currentAppState == PID_TRACKING_MENU && pidTrackRunning) {
       if (pidTestChoice == 0)
         activeHeaterPin = SSR_PREHEAT;
       else if (pidTestChoice == 1)
@@ -4272,7 +4445,12 @@ void loop() {
     digitalWrite(SSR_PAST, pastState);
 
     // ---- Stage Transition Pump Control ----
-    if (stageTransferring && !simRunActive) {
+    if (fullLoadTestActive) {
+      setPump1(fullLoadAllowPumps);
+      setPump2(fullLoadAllowPumps);
+      pumpPreHeatFermOn = fullLoadAllowPumps;
+      pumpFermPastOn = fullLoadAllowPumps;
+    } else if (stageTransferring && !simRunActive) {
       if (stageTransferTarget == 1) {
         setPump1(true);
         pumpPreHeatFermOn = true;

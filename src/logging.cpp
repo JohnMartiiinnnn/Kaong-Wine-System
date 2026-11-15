@@ -11,6 +11,7 @@ uint8_t calculateChecksum(const struct_message &msg) {
 void logDataToSD() {
   if (!sdStatus || !rtcStatus)
     return;
+  uint32_t logT0 = micros();
   DateTime now = rtc.now();
 
   // If currentLogFile is default and a batch is active, set a batch-specific log filename
@@ -83,4 +84,6 @@ void logDataToSD() {
 
   dataFile.println(lineBuf);
   dataFile.close();
+  uint32_t elapsedUs = micros() - logT0;
+  lastSdLogLatencyMs = (elapsedUs >= 1000UL) ? (elapsedUs / 1000UL) : 1UL;
 }

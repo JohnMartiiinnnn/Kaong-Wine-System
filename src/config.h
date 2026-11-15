@@ -548,5 +548,16 @@ void saveBrewStateToNVS();
 void loadBrewStateFromNVS();
 void clearBrewStateInNVS();
 
+// ---- Bench Telemetry & Safety-Interlocked Test Harness ----
+extern uint32_t lastSdLogLatencyMs;
+extern uint32_t stageTransitionSeq;
+extern uint32_t lastTransitionLatencyMs;
+extern bool     fullLoadTestActive;
+extern uint32_t fullLoadTestEndMs;
+extern bool     fullLoadAllowHeater;
+extern bool     fullLoadAllowPumps;
+void startWaterTestCycle(float preheatTargetC, float coolTargetC, float fermTargetC, float pastTargetC, bool skipPreheat);
+void stopWaterTestCycle();
+
 
 

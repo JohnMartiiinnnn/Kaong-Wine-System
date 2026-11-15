@@ -386,7 +386,21 @@ void handleData() {
   json += "\"past_tot\":" + String(pastTestTotalTrials) + ",";
   json += "\"past_heat\":" + String(pastTestHeating ? 1 : 0) + ",";
   json += "\"past_ferm\":" + String(pastTestFermDone ? 1 : 0) + ",";
-  json += "\"past_done\":" + String(pastTestComplete ? 1 : 0);
+  json += "\"past_done\":" + String(pastTestComplete ? 1 : 0) + ",";
+  json += "\"dry_alarm\":" + String(dryElementAlarm ? 1 : 0) + ",";
+  json += "\"ssr_pre\":" + String(digitalRead(SSR_PREHEAT) == HIGH ? 1 : 0) + ",";
+  json += "\"ssr_ferm\":" + String(digitalRead(SSR_FERM) == HIGH ? 1 : 0) + ",";
+  json += "\"ssr_past\":" + String(digitalRead(SSR_PAST) == HIGH ? 1 : 0) + ",";
+  json += "\"flow_p1\":" + String((uint32_t)flowPulse1) + ",";
+  json += "\"flow_p2\":" + String((uint32_t)flowPulse2) + ",";
+  json += "\"sd_ms\":" + String(lastSdLogLatencyMs) + ",";
+  json += "\"stage_seq\":" + String(stageTransitionSeq) + ",";
+  json += "\"trans_ms\":" + String(lastTransitionLatencyMs) + ",";
+  json += "\"esp_ms\":" + String(millis()) + ",";
+  json += "\"pre_sterilized\":" + String(preHeatSterilized ? 1 : 0) + ",";
+  json += "\"pre_cooled\":" + String(preHeatCooled ? 1 : 0) + ",";
+  json += "\"past_sterilized\":" + String(pastSterilized ? 1 : 0) + ",";
+  json += "\"full_load\":" + String(fullLoadTestActive ? 1 : 0);
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -672,6 +686,167 @@ void handleTestPasteurization() {
     json += "}";
   }
   json += "]}";
+  server.send(200, "application/json", json);
+}
+
+// ==========================================
+// BENCH TEST ENDPOINTS (TABLES 16, 19/22, 21/24/28, 30)
+// ==========================================
+
+void handleTestDryFire() {
+  uint32_t t0 = micros();
+  float vol = hx711Status ? currentWeight : chamberVolume[0];
+  bool belowMin = (vol < MIN_HEATER_SAFE_VOLUME);
+  if (belowMin) {
+    dryElementAlarm = true;
+    currentHeatingPercent = 0;
+    digitalWrite(SSR_PREHEAT, LOW);
+    digitalWrite(SSR_FERM, LOW);
+    digitalWrite(SSR_PAST, LOW);
+  }
+  uint32_t elapsedUs = micros() - t0;
+  uint32_t latencyMs = (elapsedUs >= 1000UL) ? (elapsedUs / 1000UL) : 1UL;
+  bool ssrLockedOut = (digitalRead(SSR_PREHEAT) == LOW && digitalRead(SSR_FERM) == LOW && digitalRead(SSR_PAST) == LOW);
+  bool pass = belowMin && dryElementAlarm && ssrLockedOut && (currentHeatingPercent == 0);
+
+  String json = "{";
+  json += "\"status\":\"ok\",\"table\":16,";
+  json += "\"vol_l\":" + String(vol, 2) + ",";
+  json += "\"min_safe_l\":" + String(MIN_HEATER_SAFE_VOLUME, 1) + ",";
+  json += "\"hx711_ok\":" + String(hx711Status ? "true" : "false") + ",";
+  json += "\"below_min\":" + String(belowMin ? "true" : "false") + ",";
+  json += "\"dry_alarm\":" + String(dryElementAlarm ? "true" : "false") + ",";
+  json += "\"ssr_preheat\":" + String(digitalRead(SSR_PREHEAT) == HIGH ? 1 : 0) + ",";
+  json += "\"heater_pct\":" + String(currentHeatingPercent) + ",";
+  json += "\"lcd_warning\":\"" + String(belowMin ? "ERROR: MIN 5L REQUIRED" : "SAFE_LEVEL") + "\",";
+  json += "\"latency_ms\":" + String(latencyMs) + ",";
+  json += "\"pass\":" + String(pass ? "true" : "false");
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleTestYeast() {
+  float grams = server.hasArg("grams") ? server.arg("grams").toFloat() : 3.5f;
+  if (grams < 0.1f) grams = 0.1f;
+  if (grams > 20.0f) grams = 20.0f;
+
+  uint32_t customMs = server.hasArg("ms") ? (uint32_t)server.arg("ms").toInt() : 0;
+  int mixSec = server.hasArg("mix_sec") ? server.arg("mix_sec").toInt() : 30;
+  if (mixSec < 0) mixSec = 0;
+  if (mixSec > 180) mixSec = 180;
+  int mixSpd = server.hasArg("mix_spd") ? server.arg("mix_spd").toInt() : 100;
+  if (mixSpd < 0) mixSpd = 0;
+  if (mixSpd > 100) mixSpd = 100;
+
+  uint32_t t0 = micros();
+  yeastPitchGrams = grams;
+  actualYeastDispensedGrams = 0.0f;
+  isYeastDispensingActive = true;
+  yeastDispenseStartMs = millis();
+
+  if (customMs > 0) {
+    yeastDispenseDurationMs = customMs;
+    sendMotorCommand((mixSec > 0 ? mixSpd : 0), true, 1, customMs);
+  } else {
+    yeastDispenseDurationMs = (uint32_t)(grams * msPerGramYeast);
+    sendMotorCommand((mixSec > 0 ? mixSpd : 0), true, 2, (uint32_t)(grams * 1000.0f));
+  }
+
+  if (mixSec > 0 && mixSpd > 0) {
+    currentMixerMode = MIXER_AUTO;
+    mixerActiveDurationMs = (uint32_t)mixSec * 1000UL;
+    mixerOnTimer = millis();
+    mixerRunning = true;
+    mixerSpeedPercent = mixSpd;
+    isInitialPitchMixing = false;
+  } else {
+    mixerRunning = false;
+    mixerSpeedPercent = 0;
+  }
+  uint32_t elapsedUs = micros() - t0;
+  uint32_t dispatchMs = (elapsedUs >= 1000UL) ? (elapsedUs / 1000UL) : 1UL;
+
+  String json = "{";
+  json += "\"status\":\"ok\",\"table\":\"19/22\",";
+  json += "\"target_g\":" + String(grams, 2) + ",";
+  json += "\"est_duration_ms\":" + String(yeastDispenseDurationMs) + ",";
+  json += "\"mix_sec\":" + String(mixSec) + ",";
+  json += "\"mix_spd\":" + String(mixSpd) + ",";
+  json += "\"motor_sense_v\":" + String(incomingData.motorSenseVolts, 3) + ",";
+  json += "\"dispatch_ms\":" + String(dispatchMs);
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleTestFullLoad() {
+  String action = server.hasArg("action") ? server.arg("action") : "start";
+  if (action == "stop" || action == "0") {
+    fullLoadTestActive = false;
+    fullLoadAllowHeater = false;
+    fullLoadAllowPumps = false;
+    currentHeatingPercent = 0;
+    digitalWrite(SSR_PREHEAT, LOW);
+    digitalWrite(SSR_FERM, LOW);
+    digitalWrite(SSR_PAST, LOW);
+    isFanOn = false;
+    isFermFanOn = false;
+    mcp.digitalWrite(FAN_RELAY_PIN, RELAY_OFF);
+    mcp.digitalWrite(FERM_FAN_RELAY_PIN, RELAY_OFF);
+    mcp.digitalWrite(FERM_FAN2_RELAY_PIN, RELAY_OFF);
+    setPump1(false);
+    setPump2(false);
+    setMixerSpeed(0);
+    mixerRunning = false;
+    server.send(200, "application/json", "{\"status\":\"ok\",\"full_load\":0,\"message\":\"Full load bench test stopped\"}");
+    return;
+  }
+
+  int durSec = server.hasArg("sec") ? server.arg("sec").toInt() : 60;
+  if (durSec < 5) durSec = 5;
+  if (durSec > 120) durSec = 120;
+  bool wantHeaters = (server.hasArg("heaters") && server.arg("heaters") == "1");
+  bool wantPumps = (server.hasArg("pumps") && server.arg("pumps") == "1");
+
+  // Safety gate: never energize immersion SSRs unless Preheat volume >= 5.0 L
+  float vol = hx711Status ? currentWeight : chamberVolume[0];
+  bool heaterSafe = wantHeaters && (vol >= MIN_HEATER_SAFE_VOLUME) && !dryElementAlarm;
+
+  fullLoadAllowHeater = heaterSafe;
+  fullLoadAllowPumps = wantPumps;
+  fullLoadTestActive = true;
+  fullLoadTestEndMs = millis() + (uint32_t)durSec * 1000UL;
+
+  String json = "{";
+  json += "\"status\":\"ok\",\"table\":30,\"full_load\":1,";
+  json += "\"duration_sec\":" + String(durSec) + ",";
+  json += "\"heaters_enabled\":" + String(heaterSafe ? "true" : "false") + ",";
+  json += "\"pumps_enabled\":" + String(wantPumps ? "true" : "false") + ",";
+  json += "\"vol_l\":" + String(vol, 2);
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void handleStartWaterBrew() {
+  if (server.hasArg("stop") && (server.arg("stop") == "1" || server.arg("stop") == "true")) {
+    stopWaterTestCycle();
+    server.send(200, "application/json", "{\"status\":\"ok\",\"active_stage\":-1,\"message\":\"Water commissioning cycle stopped\"}");
+    return;
+  }
+  float preC  = server.hasArg("pre_c")  ? server.arg("pre_c").toFloat()  : stageTargetTemp[0];
+  float coolC = server.hasArg("cool_c") ? server.arg("cool_c").toFloat() : preheatCoolTarget;
+  float fermC = server.hasArg("ferm_c") ? server.arg("ferm_c").toFloat() : stageTargetTemp[1];
+  float pastC = server.hasArg("past_c") ? server.arg("past_c").toFloat() : stageTargetTemp[2];
+  bool skipH  = (server.hasArg("skip_heat") && server.arg("skip_heat") == "1");
+
+  startWaterTestCycle(preC, coolC, fermC, pastC, skipH);
+  String json = "{";
+  json += "\"status\":\"ok\",\"active_stage\":0,";
+  json += "\"pre_c\":" + String(stageTargetTemp[0], 1) + ",";
+  json += "\"cool_c\":" + String(preheatCoolTarget, 1) + ",";
+  json += "\"ferm_c\":" + String(stageTargetTemp[1], 1) + ",";
+  json += "\"past_c\":" + String(stageTargetTemp[2], 1) + ",";
+  json += "\"vol_l\":" + String(hx711Status ? currentWeight : chamberVolume[0], 2);
+  json += "}";
   server.send(200, "application/json", json);
 }
 

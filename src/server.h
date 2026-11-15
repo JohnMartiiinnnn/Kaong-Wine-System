@@ -13,3 +13,7 @@ void handleMixer();
 void handleTestPhCutoff();
 void handleTestStatus();
 void handleTestPasteurization();
+void handleTestDryFire();
+void handleTestYeast();
+void handleTestFullLoad();
+void handleStartWaterBrew();
