@@ -48,6 +48,12 @@ curl -s http://192.168.1.137/data
 curl -s http://winebrew-main.local/data
 ```
 
+### Automated Bench Test Suite (Chapter 4 CSV Generation)
+```bash
+# Run automated Chapter 4 bench tests over HTTP (dry-fire, yeast dispensing, full load, data logging)
+python3 scripts/bench_test_suite.py --esp32-ip 192.168.1.137
+```
+
 ---
 
 ## System Architecture
